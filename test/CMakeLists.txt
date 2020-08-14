@@ -19,10 +19,11 @@ target_link_libraries(SFrameTests doctest::doctest SFrame OpenSSL::Crypto)
 set_target_properties(SFrameTests PROPERTIES CXX_STANDARD 17)
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-  target_compile_options(SFrame PUBLIC -Wall -pedantic -Wextra -Werror)
+  target_compile_options(SFrameTests PUBLIC -Wall -pedantic -Wextra -Werror)
 elseif(MSVC)
-  target_compile_options(SFrame PUBLIC /W4 /WX)
+  target_compile_options(SFrameTests PUBLIC /W4 /WX)
 endif()
 
-# TODO Enable CTest
-# doctest_discover_tests(SFrameTests)
+# Enable CTest
+include(doctest)
+doctest_discover_tests(SFrameTests)
