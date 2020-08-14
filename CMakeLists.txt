@@ -5,11 +5,13 @@ project(SFrame
   LANGUAGES CXX
 )
 
+# Dependencies 
 find_package(OpenSSL 1.1 REQUIRED)
 
-FILE(GLOB_RECURSE headers CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h")
-FILE(GLOB_RECURSE sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp") 
+# Library 
 
+file(GLOB_RECURSE headers CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h")
+file(GLOB_RECURSE sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp") 
 
 add_library(SFrame ${headers} ${sources})
 
@@ -22,3 +24,7 @@ target_include_directories(SFrame
   PRIVATE
     ${OPENSSL_INCLUDE_DIR}
 )
+
+# Test
+
+add_subdirectory(test)

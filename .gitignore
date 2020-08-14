@@ -1,6 +1,12 @@
 # Prerequisites
 *.d
 
+# CMake buid directory
+build
+
+# Vim swap files
+.*.swp
+
 # Compiled Object files
 *.slo
 *.lo
