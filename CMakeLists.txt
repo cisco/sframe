@@ -15,8 +15,6 @@ add_library(SFrame ${headers} ${sources})
 
 set_target_properties(SFrame PROPERTIES CXX_STANDARD 17)
 
-target_link_libraries(SFrame PRIVATE OpenSSL::Crypto)
-
 target_include_directories(SFrame
   PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
