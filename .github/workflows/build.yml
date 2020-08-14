@@ -1,0 +1,41 @@
+name: Build and Test
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+env:
+  CTEST_OUTPUT_ON_FAILURE: 1
+  PKG_CONFIG_PATH: /usr/local/opt/openssl/lib/pkgconfig
+
+jobs:
+  build:
+
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    
+    steps:
+    - uses: actions/checkout@v1
+    
+    - name: dependencies
+      run: |
+        brew install pkgconfig
+        brew reinstall openssl
+
+    - name: configure
+      run: cmake -H. -Bbuild
+
+    - name: build
+      run: cmake --build build --config Debug -j4
+
+    - name: test
+      run: |
+        cd build
+        ctest --build-config Debug
+
