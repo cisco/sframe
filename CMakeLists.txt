@@ -1,5 +1,4 @@
-
-cmake_minimum_required(VERSION 3.1 )
+cmake_minimum_required(VERSION 3.12)
 
 project(SFrame 
   VERSION 0.1
@@ -7,8 +6,6 @@ project(SFrame
 )
 
 find_package(OpenSSL 1.1 REQUIRED)
-
-
 
 FILE(GLOB_RECURSE headers CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h")
 FILE(GLOB_RECURSE sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp") 
@@ -27,10 +24,3 @@ target_include_directories(SFrame
   PRIVATE
     ${OPENSSL_INCLUDE_DIR}
 )
-
-
-#add_executable ( sframe test/sframe.cpp )
-# enable_testing()
-#add_test( NAME sframe COMMAND sframe )
-
-
