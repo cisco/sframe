@@ -14,7 +14,6 @@ env:
 
 jobs:
   build:
-
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -37,7 +36,7 @@ jobs:
         vcpkg install doctest
 
     - name: configure
-      run: cmake -Bbuild .
+      run: cmake -Bbuild -DBUILD_TESTS=ON -DCLANG_TIDY=ON .
 
     - name: build
       run: cmake --build build --target SFrame
