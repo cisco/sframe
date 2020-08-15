@@ -15,7 +15,7 @@ test: all
 	cd ${BUILD_DIR} && ctest
 
 ${BUILD_DIR}: CMakeLists.txt
-	cmake -H. ${GENERATOR} -B${BUILD_DIR}
+	cmake ${GENERATOR} -B${BUILD_DIR} .
 
 clean:
 	cd ${BUILD_DIR} && ninja clean

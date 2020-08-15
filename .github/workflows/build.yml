@@ -37,7 +37,7 @@ jobs:
         vcpkg install doctest
 
     - name: configure
-      run: cmake -H. -Bbuild
+      run: cmake -Bbuild .
 
     - name: build
       run: cmake --build build --target SFrame
