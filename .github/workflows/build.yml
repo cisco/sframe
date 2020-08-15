@@ -32,7 +32,9 @@ jobs:
     
     - name: dependencies (windows)
       if: ${{ matrix.os == 'windows-latest' }}
-      run: choco install openssl doctest
+      run: |
+        choco install openssl
+        vcpkg install doctest
 
     - name: configure
       run: cmake -H. -Bbuild
