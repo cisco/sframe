@@ -1,0 +1,24 @@
+name: Build and Test
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+env:
+  CTEST_OUTPUT_ON_FAILURE: 1
+  PKG_CONFIG_PATH: /usr/local/opt/openssl/lib/pkgconfig
+
+jobs:
+  build:
+
+    runs-on: macos-latest
+    
+    steps:
+    - uses: actions/checkout@v1
+    
+    - name: check clang-format
+      uses: jidicula/clang-format-action@master
