@@ -4,12 +4,12 @@ project(SFrameTests
   LANGUAGES CXX
 )
 
-# Dependencies
+#Dependencies
 
 find_package(doctest REQUIRED)
 find_package(OpenSSL 1.1 REQUIRED)
 
-# Test Binary
+#Test Binary
 
 file(GLOB sources CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
 
