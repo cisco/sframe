@@ -4,6 +4,7 @@
 # choose: Ninja, Unix Makefiles, Xcode, or leave blank for default
 GENERATOR=-G Ninja
 BUILD_DIR=build
+CLANG_FORMAT=clang-format
 
 .PHONY: all test clean cclean format
 
@@ -22,3 +23,8 @@ clean:
 
 cclean:
 	rm -rf ${BUILD_DIR}
+
+format:
+	${CLANG_FORMAT} -i src/*
+	${CLANG_FORMAT} -i include/sframe/*
+	${CLANG_FORMAT} -i test/*
