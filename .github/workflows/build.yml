@@ -38,10 +38,11 @@ jobs:
       run: cmake -H. -Bbuild
 
     - name: build
-      run: cmake --build build --config Debug -j4
+      run: cmake --build build --target SFrame
 
     - name: test
       run: |
+        cmake --build build --target SFrameTests
         cd build
-        ctest --build-config Debug
+        ctest
 

@@ -25,6 +25,6 @@ target_include_directories(SFrame
     ${OPENSSL_INCLUDE_DIR}
 )
 
-# Test
-
+# Testing
+enable_testing()
 add_subdirectory(test)

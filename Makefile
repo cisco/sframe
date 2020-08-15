@@ -2,15 +2,16 @@
 # all the CMake commands and their arguments.
 
 # choose: Ninja, Unix Makefiles, Xcode, or leave blank for default
-GENERATOR=
+GENERATOR=-G Ninja
 BUILD_DIR=build
 
-.PHONY: all lint test gen gen_debug example clean cclean format
+.PHONY: all test clean cclean format
 
 all: ${BUILD_DIR}
-	cmake --build ${BUILD_DIR} --config Debug
+	cmake --build ${BUILD_DIR} --target SFrame
 
 test: all
+	cmake --build ${BUILD_DIR} --target SFrameTests
 	cd ${BUILD_DIR} && ctest
 
 ${BUILD_DIR}: CMakeLists.txt
