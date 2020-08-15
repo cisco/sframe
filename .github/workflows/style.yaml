@@ -10,10 +10,8 @@ on:
 
 jobs:
   build:
-    runs-on: macos-latest
-    
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1
-    
     - name: check clang-format
       uses: jidicula/clang-format-action@master
