@@ -19,10 +19,12 @@ implementaiton evolve together.
 
 ## Building and Running Tests
 
+A convenience Makefile is included to avoid the need to remember a bunch of
+CMake parameters.
+
 ```
-mkdir build
-( cd build ; cmake .. )
-( cd build ; make )
+> make        # Configures all targets and builds the library
+> make test   # Builds and runs tests
 ```
 
 ## Prerequisites

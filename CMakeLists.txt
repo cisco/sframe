@@ -1,24 +1,21 @@
-
-cmake_minimum_required(VERSION 3.1 )
+cmake_minimum_required(VERSION 3.12)
 
 project(SFrame 
   VERSION 0.1
   LANGUAGES CXX
 )
 
+# Dependencies 
 find_package(OpenSSL 1.1 REQUIRED)
 
+# Library 
 
-
-FILE(GLOB_RECURSE headers CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h")
-FILE(GLOB_RECURSE sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp") 
-
+file(GLOB_RECURSE headers CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h")
+file(GLOB_RECURSE sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp") 
 
 add_library(SFrame ${headers} ${sources})
 
 set_target_properties(SFrame PROPERTIES CXX_STANDARD 17)
-
-target_link_libraries(SFrame PRIVATE OpenSSL::Crypto)
 
 target_include_directories(SFrame
   PUBLIC
@@ -28,9 +25,6 @@ target_include_directories(SFrame
     ${OPENSSL_INCLUDE_DIR}
 )
 
-
-#add_executable ( sframe test/sframe.cpp )
-# enable_testing()
-#add_test( NAME sframe COMMAND sframe )
-
-
+# Testing
+enable_testing()
+add_subdirectory(test)
