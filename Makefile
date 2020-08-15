@@ -25,6 +25,6 @@ cclean:
 	rm -rf ${BUILD_DIR}
 
 format:
-	${CLANG_FORMAT} -i src/*
-	${CLANG_FORMAT} -i include/sframe/*
-	${CLANG_FORMAT} -i test/*
+	${CLANG_FORMAT} -i src/*.cpp
+	${CLANG_FORMAT} -i include/sframe/*.h
+	${CLANG_FORMAT} -i test/*.cpp

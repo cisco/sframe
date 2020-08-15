@@ -5,8 +5,20 @@ project(SFrame
   LANGUAGES CXX
 )
 
+option(CLANG_TIDY "Perform linting with clang-tidy" OFF)
+
 # Dependencies 
 find_package(OpenSSL 1.1 REQUIRED)
+
+# Linting
+if(CLANG_TIDY)
+  find_program(CLANG_TIDY_EXE NAMES "clang-tidy")
+  if(CLANG_TIDY_EXE)
+    set(CMAKE_CXX_CLANG_TIDY 
+      "${CLANG_TIDY_EXE}"
+    )
+  endif()
+endif()
 
 # Library 
 
