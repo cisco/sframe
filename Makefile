@@ -8,7 +8,7 @@ CLANG_FORMAT=clang-format
 
 .PHONY: all test clean cclean format
 
-all: ${BUILD_DIR}
+all: ${BUILD_DIR} format
 	cmake --build ${BUILD_DIR} --target SFrame
 
 test: all
