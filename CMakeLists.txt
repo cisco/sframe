@@ -6,6 +6,7 @@ project(SFrame
 )
 
 option(CLANG_TIDY "Perform linting with clang-tidy" OFF)
+option(BUILD_TESTS "Build tests as well as the library" OFF)
 
 # Dependencies 
 find_package(OpenSSL 1.1 REQUIRED)
@@ -17,6 +18,8 @@ if(CLANG_TIDY)
     set(CMAKE_CXX_CLANG_TIDY 
       "${CLANG_TIDY_EXE}"
     )
+  else()
+    message(WARNING "clang-tidy requested, but not found")
   endif()
 endif()
 
@@ -38,5 +41,7 @@ target_include_directories(SFrame
 )
 
 # Testing
-enable_testing()
-add_subdirectory(test)
+if(BUILD_TESTS)
+  enable_testing()
+  add_subdirectory(test)
+endif()
