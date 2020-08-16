@@ -26,7 +26,7 @@ jobs:
     - name: dependencies (ubuntu and macos)
       if: ${{ matrix.os == 'macos-latest' || matrix.os == 'ubuntu-latest' }}
       run: |
-        brew install pkgconfig doctest
+        brew install pkgconfig doctest clang-format
         brew reinstall openssl
     
     - name: dependencies (windows)
