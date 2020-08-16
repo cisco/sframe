@@ -23,14 +23,11 @@ A convenience Makefile is included to avoid the need to remember a bunch of
 CMake parameters.
 
 ```
-> make        # Configures all targets and builds the library
+> make        # Builds the library
 > make test   # Builds and runs tests
+> make format # Runs clang-format over the source
 ```
 
 ## Prerequisites
 
 You need openssl 1.1 or greater installed, C++ compiler, make, and cmake
-
-
-
-

@@ -39,9 +39,3 @@ target_include_directories(SFrame
   PRIVATE
     ${OPENSSL_INCLUDE_DIR}
 )
-
-# Testing
-if(BUILD_TESTS)
-  enable_testing()
-  add_subdirectory(test)
-endif()
