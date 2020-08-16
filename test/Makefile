@@ -2,7 +2,6 @@
 # all the CMake commands and their arguments.
 
 # choose: Ninja, Unix Makefiles, Xcode, or leave blank for default
-GENERATOR=-G Ninja
 LIB_DIR=../build
 BUILD_DIR=build
 CLANG_FORMAT=clang-format
@@ -16,10 +15,10 @@ test: all
 	cd ${BUILD_DIR} && ctest
 
 tidy:
-	cmake ${GENERATOR} -B${BUILD_DIR} ${CMAKE_FLAGS} -DCLANG_TIDY=ON .
+	cmake -B${BUILD_DIR} -DCLANG_TIDY=ON .
 
 ${BUILD_DIR}: CMakeLists.txt
-	cmake ${GENERATOR} -B${BUILD_DIR} ${CMAKE_FLAGS} .
+	cmake -B${BUILD_DIR} .
 
 clean:
 	cmake --build build --target clean
