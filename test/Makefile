@@ -22,7 +22,7 @@ ${BUILD_DIR}: CMakeLists.txt
 	cmake ${GENERATOR} -B${BUILD_DIR} ${CMAKE_FLAGS} .
 
 clean:
-	cd ${BUILD_DIR} && ninja clean
+	cmake --build build --target clean
 
 cclean:
 	rm -rf ${BUILD_DIR}

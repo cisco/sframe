@@ -1,8 +1,6 @@
 # This is just a convenience Makefile to avoid having to remember
 # all the CMake commands and their arguments.
 
-# choose: Ninja, Unix Makefiles, Xcode, or leave blank for default
-GENERATOR=-G Ninja
 BUILD_DIR=build
 CLANG_FORMAT=clang-format
 
@@ -21,7 +19,7 @@ ${BUILD_DIR}: CMakeLists.txt
 	cmake ${GENERATOR} -B${BUILD_DIR} .
 
 clean:
-	cd ${BUILD_DIR} && ninja clean
+	cmake --build build --target clean
 
 cclean:
 	rm -rf ${BUILD_DIR}
