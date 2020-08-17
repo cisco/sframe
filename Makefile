@@ -6,7 +6,7 @@ CLANG_FORMAT=clang-format
 
 .PHONY: all tidy test clean cclean format
 
-all: ${BUILD_DIR} format
+all: ${BUILD_DIR}
 	cmake --build ${BUILD_DIR}
 
 test: all
