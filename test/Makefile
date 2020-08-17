@@ -4,7 +4,6 @@
 # choose: Ninja, Unix Makefiles, Xcode, or leave blank for default
 LIB_DIR=../build
 BUILD_DIR=build
-CLANG_FORMAT=clang-format
 
 .PHONY: all tidy test clean cclean
 
@@ -13,9 +12,6 @@ all: ${BUILD_DIR} ${LIB_DIR}
 
 test: all
 	cd ${BUILD_DIR} && ctest
-
-tidy:
-	cmake -B${BUILD_DIR} -DCLANG_TIDY=ON .
 
 ${BUILD_DIR}: CMakeLists.txt
 	cmake -B${BUILD_DIR} .
