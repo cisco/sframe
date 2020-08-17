@@ -20,9 +20,11 @@ ${BUILD_DIR}: CMakeLists.txt
 
 clean:
 	cmake --build build --target clean
+	make -C test clean
 
 cclean:
 	rm -rf ${BUILD_DIR}
+	make -C test cclean
 
 format:
 	${CLANG_FORMAT} -i src/*.cpp

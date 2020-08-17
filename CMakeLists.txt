@@ -24,7 +24,6 @@ if(CLANG_TIDY)
 endif()
 
 # Library 
-
 file(GLOB_RECURSE headers CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h")
 file(GLOB_RECURSE sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp") 
 
@@ -39,3 +38,8 @@ target_include_directories(SFrame
   PRIVATE
     ${OPENSSL_INCLUDE_DIR}
 )
+
+# Export package for local development access
+set(CMAKE_EXPORT_PACKAGE_REGISTRY ON)
+export(TARGETS SFrame FILE SFrameConfig.cmake NAMESPACE SFrame::)
+export(PACKAGE SFrame)

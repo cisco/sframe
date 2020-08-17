@@ -5,21 +5,18 @@ project(SFrameTests
 )
 
 # Dependencies
+set(CMAKE_EXPORT_PACKAGE_REGISTRY ON)
+find_package(SFrame REQUIRED)
 find_package(doctest REQUIRED)
 find_package(OpenSSL 1.1 REQUIRED)
 
-# SFrame
-set(SFRAME_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/../include)
-set(SFRAME_BINARY_DIR ${PROJECT_SOURCE_DIR}/../build)
-
 # Test Binary
-
 file(GLOB sources CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
 
 add_executable(SFrameTests ${sources})
 target_include_directories(SFrameTests PRIVATE ${SFRAME_INCLUDE_DIR})
 target_link_directories(SFrameTests PRIVATE ${SFRAME_BINARY_DIR})
-target_link_libraries(SFrameTests doctest::doctest SFrame OpenSSL::Crypto)
+target_link_libraries(SFrameTests doctest::doctest SFrame::SFrame OpenSSL::Crypto)
 
 set_target_properties(SFrameTests PROPERTIES CXX_STANDARD 17)
 
