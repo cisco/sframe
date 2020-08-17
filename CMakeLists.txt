@@ -24,13 +24,12 @@ if(CLANG_TIDY)
 endif()
 
 # Library 
-
 file(GLOB_RECURSE headers CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h")
 file(GLOB_RECURSE sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp") 
 
 add_library(SFrame ${headers} ${sources})
-
-set_target_properties(SFrame PROPERTIES CXX_STANDARD 17)
+set_property(TARGET SFrame PROPERTY CXX_STANDARD 17)
+set_property(TARGET SFrame PROPERTY CXX_STANDARD_REQUIRED ON)
 
 target_include_directories(SFrame
   PUBLIC
@@ -40,8 +39,7 @@ target_include_directories(SFrame
     ${OPENSSL_INCLUDE_DIR}
 )
 
-# Testing
-if(BUILD_TESTS)
-  enable_testing()
-  add_subdirectory(test)
-endif()
+# Export package for local development access
+set(CMAKE_EXPORT_PACKAGE_REGISTRY ON)
+export(TARGETS SFrame FILE SFrameConfig.cmake NAMESPACE SFrame::)
+export(PACKAGE SFrame)

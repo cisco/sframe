@@ -1,32 +1,30 @@
 # This is just a convenience Makefile to avoid having to remember
 # all the CMake commands and their arguments.
 
-# choose: Ninja, Unix Makefiles, Xcode, or leave blank for default
-GENERATOR=-G Ninja
 BUILD_DIR=build
 CLANG_FORMAT=clang-format
-CMAKE_FLAGS=-DBUILD_TESTS=ON
 
 .PHONY: all tidy test clean cclean format
 
-all: ${BUILD_DIR} format
-	cmake --build ${BUILD_DIR} --target SFrame
+all: ${BUILD_DIR}
+	cmake --build ${BUILD_DIR}
 
 test: all
-	cmake --build ${BUILD_DIR} --target SFrameTests
-	cd ${BUILD_DIR} && ctest
+	make -C test test
 
 tidy:
-	cmake ${GENERATOR} -B${BUILD_DIR} ${CMAKE_FLAGS} -DCLANG_TIDY=ON .
+	cmake -B${BUILD_DIR} -DCLANG_TIDY=ON .
 
 ${BUILD_DIR}: CMakeLists.txt
-	cmake ${GENERATOR} -B${BUILD_DIR} ${CMAKE_FLAGS} .
+	cmake -B${BUILD_DIR} .
 
 clean:
-	cd ${BUILD_DIR} && ninja clean
+	cmake --build build --target clean
+	make -C test clean
 
 cclean:
 	rm -rf ${BUILD_DIR}
+	make -C test cclean
 
 format:
 	${CLANG_FORMAT} -i src/*.cpp

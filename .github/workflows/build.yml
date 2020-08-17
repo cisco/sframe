@@ -35,15 +35,9 @@ jobs:
         choco install openssl
         vcpkg install doctest
 
-    - name: configure
-      run: cmake -Bbuild -DBUILD_TESTS=ON -DCLANG_TIDY=ON .
+    - name: build the library
+      run: make
 
-    - name: build
-      run: cmake --build build --target SFrame
-
-    - name: test
-      run: |
-        cmake --build build --target SFrameTests
-        cd build
-        ctest
+    - name: build and run tests
+      run: make test
 

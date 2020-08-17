@@ -1,0 +1,23 @@
+# This is just a convenience Makefile to avoid having to remember
+# all the CMake commands and their arguments.
+
+# choose: Ninja, Unix Makefiles, Xcode, or leave blank for default
+LIB_DIR=../build
+BUILD_DIR=build
+
+.PHONY: all tidy test clean cclean
+
+all: ${BUILD_DIR} ${LIB_DIR}
+	cmake --build ${BUILD_DIR}
+
+test: all
+	cd ${BUILD_DIR} && ctest
+
+${BUILD_DIR}: CMakeLists.txt
+	cmake -B${BUILD_DIR} .
+
+clean:
+	cmake --build build --target clean
+
+cclean:
+	rm -rf ${BUILD_DIR}
