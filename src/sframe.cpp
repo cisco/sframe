@@ -1,19 +1,11 @@
-#include <openssl/err.h>      // for ERR_error_string, ERR_get_error
-#include <openssl/evp.h>      // for EVP_CIPHER_CTX_ctrl, EVP_CIPHER_CTX_new
-#include <openssl/ossl_typ.h> // for EVP_CIPHER_CTX, EVP_CIPHER
+#include <openssl/err.h>
+#include <openssl/evp.h>
 #include <sframe/sframe.h>
-#include <stddef.h> // for size_t
-#include <stdint.h> // for uint8_t, uint64_t
 
-#include <iomanip>     // for operator<<, setfill, setw
-#include <iostream>    // for ostream, basic_ostream, ios
-#include <map>         // for __map_iterator, operator==, map
-#include <memory>      // for unique_ptr
-#include <stdexcept>   // for runtime_error
-#include <tuple>       // for make_tuple, tuple
-#include <type_traits> // for move
-#include <utility>     // for pair
-#include <vector>      // for vector
+#include <iomanip>
+#include <iostream>
+#include <stdexcept>
+#include <tuple>
 
 namespace sframe {
 
@@ -233,7 +225,7 @@ decode_uint(const uint8_t* data, size_t size)
 {
   uint64_t val = 0;
   for (size_t i = 0; i < size; i++) {
-    val = (val << 8) + data[size - i - 1];
+    val = (val << 8) + static_cast<uint64_t>(data[i]);
   }
   return val;
 }
