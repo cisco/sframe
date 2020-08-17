@@ -36,15 +36,8 @@ jobs:
         vcpkg install doctest
 
     - name: build the library
-      run: |
-        cmake -B build .
-        cmake --build build
+      run: make
 
     - name: build and run tests
-      run: |
-        cd test
-        cmake -B build .
-        cmake --build build
-        cd build
-        ctest
+      run: make test
 
