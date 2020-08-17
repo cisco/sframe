@@ -1,11 +1,8 @@
 #pragma once
 
-#include <stddef.h> // for size_t
-#include <stdint.h> // for uint64_t, uint8_t, uint16_t
-
-#include <iosfwd> // for ostream
-#include <map>    // for map
-#include <vector> // for vector
+#include <iosfwd>
+#include <map>
+#include <vector>
 
 namespace sframe {
 

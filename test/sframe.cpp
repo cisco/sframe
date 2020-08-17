@@ -1,15 +1,10 @@
 #include <doctest/doctest.h>
 #include <sframe/sframe.h>
-#include <stdint.h> // for uint8_t
-#include <stdlib.h> // for strtol
 
 #include <iostream>    // for string, operator<<
 #include <map>         // for map
 #include <stdexcept>   // for invalid_argument
 #include <string>      // for basic_string, operator==
-#include <string_view> // for operator==, string_view
-#include <utility>     // for pair
-#include <vector>      // for vector, operator==
 
 using namespace sframe;
 
