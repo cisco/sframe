@@ -14,11 +14,10 @@ find_package(OpenSSL 1.1 REQUIRED)
 file(GLOB sources CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
 
 add_executable(SFrameTests ${sources})
-target_include_directories(SFrameTests PRIVATE ${SFRAME_INCLUDE_DIR})
-target_link_directories(SFrameTests PRIVATE ${SFRAME_BINARY_DIR})
 target_link_libraries(SFrameTests doctest::doctest SFrame::SFrame OpenSSL::Crypto)
 
-set_target_properties(SFrameTests PROPERTIES CXX_STANDARD 17)
+set_property(TARGET SFrameTests PROPERTY CXX_STANDARD 17)
+set_property(TARGET SFrameTests PROPERTY CXX_STANDARD_REQUIRED ON)
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
   target_compile_options(SFrameTests PUBLIC -Wall -pedantic -Wextra -Werror)
