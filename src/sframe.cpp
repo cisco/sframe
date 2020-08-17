@@ -225,7 +225,7 @@ decode_uint(const uint8_t* data, size_t size)
 {
   uint64_t val = 0;
   for (size_t i = 0; i < size; i++) {
-    val = (val << 8) + data[size - i - 1];
+    val = (val << 8) + static_cast<uint64_t>(data[i]);
   }
   return val;
 }

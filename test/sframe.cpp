@@ -1,10 +1,10 @@
 #include <doctest/doctest.h>
 #include <sframe/sframe.h>
 
-#include <iostream>    // for string, operator<<
-#include <map>         // for map
-#include <stdexcept>   // for invalid_argument
-#include <string>      // for basic_string, operator==
+#include <iostream>  // for string, operator<<
+#include <map>       // for map
+#include <stdexcept> // for invalid_argument
+#include <string>    // for basic_string, operator==
 
 using namespace sframe;
 
@@ -112,5 +112,35 @@ TEST_CASE("SFrame Known-Answer")
     CHECK(plaintext == ctx.unprotect(ct0));
     CHECK(plaintext == ctx.unprotect(ct1));
     CHECK(plaintext == ctx.unprotect(ct2));
+  }
+}
+
+TEST_CASE("SFrame Round-Trip")
+{
+  const auto rounds = 1 << 9;
+  const auto kid = KeyID(0x42);
+  const auto plaintext = from_hex("00010203");
+  const std::map<CipherSuite, bytes> keys{
+    { CipherSuite::AES_GCM_128, from_hex("101112131415161718191a1b1c1d1e1f") },
+    { CipherSuite::AES_GCM_256,
+      from_hex("202122232425262728292a2b2c2d2e2f"
+               "303132333435363738393a3b3c3d3e3f") },
+  };
+
+  for (auto& pair : keys) {
+    auto& suite = pair.first;
+    auto& key = pair.second;
+
+    auto send = Context(suite);
+    send.add_key(kid, key);
+
+    auto recv = Context(suite);
+    recv.add_key(kid, key);
+
+    for (int i = 0; i < rounds; i++) {
+      auto encrypted = send.protect(kid, plaintext);
+      auto decrypted = recv.unprotect(encrypted);
+      CHECK(decrypted == plaintext);
+    }
   }
 }
