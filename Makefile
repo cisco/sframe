@@ -13,10 +13,10 @@ test: all
 	make -C test test
 
 tidy:
-	cmake ${GENERATOR} -B${BUILD_DIR} -DCLANG_TIDY=ON .
+	cmake -B${BUILD_DIR} -DCLANG_TIDY=ON .
 
 ${BUILD_DIR}: CMakeLists.txt
-	cmake ${GENERATOR} -B${BUILD_DIR} .
+	cmake -B${BUILD_DIR} .
 
 clean:
 	cmake --build build --target clean
