@@ -86,11 +86,7 @@ func (ctr AESCTRHMAC) crypt(nonce, pt []byte) []byte {
 }
 
 func (ctr AESCTRHMAC) tag(aad, ct []byte) []byte {
-	aadSize := make([]byte, 8)
-	binary.BigEndian.PutUint64(aadSize, uint64(len(aad)))
-
 	h := hmac.New(ctr.Hash.New, ctr.AuthKey)
-	h.Write(aadSize)
 	h.Write(aad)
 	h.Write(ct)
 	return h.Sum(nil)[:ctr.TagSize]
