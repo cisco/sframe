@@ -26,7 +26,7 @@ class Context
 public:
   Context(CipherSuite suite);
 
-  void add_key(KeyID kid, bytes key);
+  void add_key(KeyID kid, const bytes& key);
 
   bytes protect(KeyID key_id, const bytes& plaintext);
   bytes unprotect(const bytes& ciphertext);
@@ -35,6 +35,7 @@ private:
   struct KeyState
   {
     bytes key;
+    bytes salt;
     Counter counter;
   };
 

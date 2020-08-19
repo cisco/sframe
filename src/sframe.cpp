@@ -51,6 +51,21 @@ openssl_cipher(CipherSuite suite)
 }
 
 static int
+openssl_key_size(CipherSuite suite)
+{
+  switch (suite) {
+    case CipherSuite::AES_GCM_128_SHA256:
+      return 16;
+
+    case CipherSuite::AES_GCM_256_SHA512:
+      return 32;
+
+    default:
+      throw std::runtime_error("Unsupported ciphersuite");
+  }
+}
+
+static int
 openssl_tag_size(CipherSuite suite)
 {
   switch (suite) {
@@ -270,10 +285,23 @@ Context::Context(CipherSuite suite_in)
   : suite(suite_in)
 {}
 
+static const bytes sframe_label{
+  0x53, 0x46, 0x72, 0x61, 0x6d, 0x65, 0x31, 0x30
+};                                                               // "SFrame10"
+static const bytes sframe_key_label{0x6b, 0x65, 0x79 };        // "key"
+static const bytes sframe_salt_label{0x73, 0x61, 0x6c, 0x74 }; // "salt"
+
 void
-Context::add_key(KeyID key_id, bytes key)
+Context::add_key(KeyID key_id, const bytes& base_key)
 {
-  state.insert_or_assign(key_id, KeyState{ std::move(key), 0 });
+  auto key_size = openssl_key_size(suite);
+  auto nonce_size = openssl_nonce_size(suite);
+
+  auto secret = hkdf_extract(suite, sframe_label, base_key);
+  auto key = hkdf_expand(suite, secret, sframe_key_label, key_size);
+  auto salt = hkdf_expand(suite, secret, sframe_salt_label, nonce_size);
+
+  state.insert_or_assign(key_id, KeyState{ std::move(key), std::move(salt), 0 });
 }
 
 static size_t
@@ -302,13 +330,18 @@ decode_uint(const uint8_t* data, size_t size)
 }
 
 static bytes
-form_nonce(CipherSuite suite, Counter ctr)
+form_nonce(CipherSuite suite, Counter ctr, const bytes& salt)
 {
   auto nonce_size = openssl_nonce_size(suite);
   auto nonce = bytes(nonce_size);
   for (size_t i = 0; i < sizeof(ctr); i++) {
     nonce[nonce_size - i - 1] = uint8_t(ctr >> (8 * i));
   }
+
+  for (size_t i = 0; i < nonce.size(); i++) {
+    nonce[i] ^= salt[i];
+  }
+
   return nonce;
 }
 
@@ -377,18 +410,18 @@ Context::protect(KeyID kid, const bytes& plaintext)
     throw std::runtime_error("Unknown key");
   }
 
-  const auto& key = it->second.key;
-  const auto ctr = it->second.counter;
-  it->second.counter += 1;
+  auto& st = it->second;
+  const auto ctr = st.counter;
+  st.counter += 1;
 
   auto ct = bytes(max_header_size);
   auto hdr_size = encode_header(kid, ctr, ct.data());
   auto tag_size = openssl_tag_size(suite);
   ct.resize(hdr_size + plaintext.size() + tag_size);
 
-  const auto nonce = form_nonce(suite, ctr);
+  const auto nonce = form_nonce(suite, ctr, st.salt);
   seal(suite,
-       key,
+       st.key,
        nonce,
        hdr_size,
        ct.data(),
@@ -413,11 +446,11 @@ Context::unprotect(const bytes& ciphertext)
     throw std::runtime_error("Unknown key");
   }
 
-  const auto& key = it->second.key;
-  const auto nonce = form_nonce(suite, ctr);
+  const auto& st = it->second;
+  const auto nonce = form_nonce(suite, ctr, st.salt);
   auto pt = bytes(ciphertext.size() - hdr_size - tag_size);
   open(suite,
-       key,
+       st.key,
        nonce,
        hdr_size,
        pt.data(),
