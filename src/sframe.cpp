@@ -161,18 +161,32 @@ hkdf_expand(CipherSuite suite,
 }
 
 static size_t
-seal(CipherSuite suite,
-     const bytes& key,
-     const bytes& nonce,
-     size_t aad_size,
-     uint8_t* ct,
-     size_t ct_size,
-     const uint8_t* pt,
-     size_t pt_size)
+seal_ctr(CipherSuite suite,
+         const bytes& key,
+         const bytes& nonce,
+         size_t aad_size,
+         uint8_t* ct,
+         size_t ct_size,
+         const uint8_t* pt,
+         size_t pt_size)
+{
+  // TODO: Implement CTR+HMAC
+  return 0;
+}
+
+static size_t
+seal_aead(CipherSuite suite,
+          const bytes& key,
+          const bytes& nonce,
+          size_t aad_size,
+          uint8_t* ct,
+          size_t ct_size,
+          const uint8_t* pt,
+          size_t pt_size)
 {
   auto tag_size = openssl_tag_size(suite);
   if (ct_size < aad_size + pt_size + tag_size) {
-    throw std::runtime_error("Ciphertext buffer too small ");
+    throw std::runtime_error("Ciphertext buffer too small");
   }
 
   auto ctx = scoped_evp_ctx(EVP_CIPHER_CTX_new(), evp_cipher_ctx_free);
@@ -218,14 +232,48 @@ seal(CipherSuite suite,
 }
 
 static size_t
-open(CipherSuite suite,
+seal(CipherSuite suite,
      const bytes& key,
      const bytes& nonce,
      size_t aad_size,
-     uint8_t* pt,
-     size_t pt_size,
-     const uint8_t* ct,
-     size_t ct_size)
+     uint8_t* ct,
+     size_t ct_size,
+     const uint8_t* pt,
+     size_t pt_size)
+{
+  switch (suite) {
+    case CipherSuite::AES_CM_128_HMAC_SHA256_4:
+    case CipherSuite::AES_CM_128_HMAC_SHA256_8:
+      return seal_ctr(suite, key, nonce, aad_size, ct, ct_size, pt, pt_size);
+    case CipherSuite::AES_GCM_128_SHA256:
+    case CipherSuite::AES_GCM_256_SHA512:
+      return seal_aead(suite, key, nonce, aad_size, ct, ct_size, pt, pt_size);
+  }
+}
+
+static size_t
+open_ctr(CipherSuite suite,
+         const bytes& key,
+         const bytes& nonce,
+         size_t aad_size,
+         uint8_t* pt,
+         size_t pt_size,
+         const uint8_t* ct,
+         size_t ct_size)
+{
+  // TODO Implement CTR+HMAC
+  return 0;
+}
+
+static size_t
+open_aead(CipherSuite suite,
+          const bytes& key,
+          const bytes& nonce,
+          size_t aad_size,
+          uint8_t* pt,
+          size_t pt_size,
+          const uint8_t* ct,
+          size_t ct_size)
 {
   auto tag_size = openssl_tag_size(suite);
   if (ct_size < aad_size + tag_size) {
@@ -279,6 +327,26 @@ open(CipherSuite suite,
   }
 
   return inner_ct_size;
+}
+
+static size_t
+open(CipherSuite suite,
+     const bytes& key,
+     const bytes& nonce,
+     size_t aad_size,
+     uint8_t* pt,
+     size_t pt_size,
+     const uint8_t* ct,
+     size_t ct_size)
+{
+  switch (suite) {
+    case CipherSuite::AES_CM_128_HMAC_SHA256_4:
+    case CipherSuite::AES_CM_128_HMAC_SHA256_8:
+      return open_ctr(suite, key, nonce, aad_size, pt, pt_size, ct, ct_size);
+    case CipherSuite::AES_GCM_128_SHA256:
+    case CipherSuite::AES_GCM_256_SHA512:
+      return open_aead(suite, key, nonce, aad_size, pt, pt_size, ct, ct_size);
+  }
 }
 
 Context::Context(CipherSuite suite_in)
