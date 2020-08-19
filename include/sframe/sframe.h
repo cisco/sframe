@@ -8,8 +8,8 @@ namespace sframe {
 
 enum class CipherSuite : uint16_t
 {
-  AES_GCM_128_SHA256 = 0,
-  AES_GCM_256_SHA512 = 1,
+  AES_GCM_128_SHA256 = 3,
+  AES_GCM_256_SHA512 = 4,
 };
 
 const size_t max_overhead = 12 + 16;

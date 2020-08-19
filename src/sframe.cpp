@@ -287,9 +287,9 @@ Context::Context(CipherSuite suite_in)
 
 static const bytes sframe_label{
   0x53, 0x46, 0x72, 0x61, 0x6d, 0x65, 0x31, 0x30
-};                                                               // "SFrame10"
-static const bytes sframe_key_label{0x6b, 0x65, 0x79 };        // "key"
-static const bytes sframe_salt_label{0x73, 0x61, 0x6c, 0x74 }; // "salt"
+};                                                              // "SFrame10"
+static const bytes sframe_key_label{ 0x6b, 0x65, 0x79 };        // "key"
+static const bytes sframe_salt_label{ 0x73, 0x61, 0x6c, 0x74 }; // "salt"
 
 void
 Context::add_key(KeyID key_id, const bytes& base_key)
@@ -301,7 +301,8 @@ Context::add_key(KeyID key_id, const bytes& base_key)
   auto key = hkdf_expand(suite, secret, sframe_key_label, key_size);
   auto salt = hkdf_expand(suite, secret, sframe_salt_label, nonce_size);
 
-  state.insert_or_assign(key_id, KeyState{ std::move(key), std::move(salt), 0 });
+  state.insert_or_assign(key_id,
+                         KeyState{ std::move(key), std::move(salt), 0 });
 }
 
 static size_t
@@ -420,6 +421,7 @@ Context::protect(KeyID kid, const bytes& plaintext)
   ct.resize(hdr_size + plaintext.size() + tag_size);
 
   const auto nonce = form_nonce(suite, ctr, st.salt);
+
   seal(suite,
        st.key,
        nonce,
@@ -428,6 +430,7 @@ Context::protect(KeyID kid, const bytes& plaintext)
        ct.size(),
        plaintext.data(),
        plaintext.size());
+
   return ct;
 }
 
