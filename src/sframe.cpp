@@ -1,6 +1,8 @@
+#include <sframe/sframe.h>
+
 #include <openssl/err.h>
 #include <openssl/evp.h>
-#include <sframe/sframe.h>
+#include <openssl/hmac.h>
 
 #include <iomanip>
 #include <iostream>
@@ -37,10 +39,10 @@ static const EVP_CIPHER*
 openssl_cipher(CipherSuite suite)
 {
   switch (suite) {
-    case CipherSuite::AES_GCM_128:
+    case CipherSuite::AES_GCM_128_SHA256:
       return EVP_aes_128_gcm();
 
-    case CipherSuite::AES_GCM_256:
+    case CipherSuite::AES_GCM_256_SHA512:
       return EVP_aes_256_gcm();
 
     default:
@@ -52,8 +54,8 @@ static int
 openssl_tag_size(CipherSuite suite)
 {
   switch (suite) {
-    case CipherSuite::AES_GCM_128:
-    case CipherSuite::AES_GCM_256:
+    case CipherSuite::AES_GCM_128_SHA256:
+    case CipherSuite::AES_GCM_256_SHA512:
       return 16;
 
     default:
@@ -65,13 +67,82 @@ static size_t
 openssl_nonce_size(CipherSuite suite)
 {
   switch (suite) {
-    case CipherSuite::AES_GCM_128:
-    case CipherSuite::AES_GCM_256:
+    case CipherSuite::AES_GCM_128_SHA256:
+    case CipherSuite::AES_GCM_256_SHA512:
       return 12;
 
     default:
       throw std::runtime_error("Unsupported ciphersuite");
   }
+}
+
+static const EVP_MD*
+openssl_digest_type(CipherSuite suite)
+{
+  switch (suite) {
+    case CipherSuite::AES_GCM_128_SHA256:
+      return EVP_sha256();
+
+    case CipherSuite::AES_GCM_256_SHA512:
+      return EVP_sha512();
+
+    default:
+      throw std::runtime_error("Unsupported ciphersuite");
+  }
+}
+
+static size_t
+openssl_digest_size(CipherSuite suite)
+{
+  return EVP_MD_size(openssl_digest_type(suite));
+}
+
+static bytes
+hmac(CipherSuite suite, const bytes& key, const bytes& data)
+{
+  unsigned int size = 0;
+  auto type = openssl_digest_type(suite);
+  bytes md(EVP_MAX_MD_SIZE);
+  if (nullptr == HMAC(type,
+                      key.data(),
+                      key.size(),
+                      data.data(),
+                      data.size(),
+                      md.data(),
+                      &size)) {
+    throw std::runtime_error("HMAC failure");
+  }
+
+  md.resize(size);
+  return md;
+}
+
+static bytes
+hkdf_extract(CipherSuite suite, const bytes& salt, const bytes& ikm)
+{
+  return hmac(suite, salt, ikm);
+}
+
+// For simplicity, we enforce that size <= Hash.length, so that
+// HKDF-Expand(Secret, Label) reduces to:
+//
+//   HMAC(Secret, Label || 0x01)
+static bytes
+hkdf_expand(CipherSuite suite,
+            const bytes& secret,
+            const bytes& info,
+            size_t size)
+{
+  // Ensure that we need only one hash invocation
+  if (size > openssl_digest_size(suite)) {
+    throw std::runtime_error("Size too big for hkdf_expand");
+  }
+
+  auto label = info;
+  label.push_back(0x01);
+  auto mac = hmac(suite, secret, label);
+  mac.resize(size);
+  return mac;
 }
 
 static size_t

@@ -29,10 +29,10 @@ std::string
 ciphersuite_name(CipherSuite suite)
 {
   switch (suite) {
-    case CipherSuite::AES_GCM_128:
+    case CipherSuite::AES_GCM_128_SHA256:
       return "AES_GCM_128";
 
-    case CipherSuite::AES_GCM_256:
+    case CipherSuite::AES_GCM_256_SHA512:
       return "AES_GCM_256";
 
     default:
@@ -57,7 +57,7 @@ TEST_CASE("SFrame Known-Answer")
   const auto long_ctr = KeyID(0x0100);
   const auto plaintext = from_hex("00010203");
   const std::map<CipherSuite, KnownAnswerTest> cases{
-    { CipherSuite::AES_GCM_128,
+    { CipherSuite::AES_GCM_128_SHA256,
       {
         from_hex("101112131415161718191a1b1c1d1e1f"),
         from_hex("1700111266b003b9cd7225d9d4cb6e5c8143bb80bf98"),
@@ -66,7 +66,7 @@ TEST_CASE("SFrame Known-Answer")
         from_hex("1affff00111266b0a5fc4fc173aafd0c5c56956dc6bc87c7"),
         from_hex("2affff0100f15d230ba637848d89c9910dde14f9f23372e610"),
       } },
-    { CipherSuite::AES_GCM_256,
+    { CipherSuite::AES_GCM_256_SHA512,
       {
         from_hex("202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c"
                  "3d3e3f"),
@@ -121,8 +121,8 @@ TEST_CASE("SFrame Round-Trip")
   const auto kid = KeyID(0x42);
   const auto plaintext = from_hex("00010203");
   const std::map<CipherSuite, bytes> keys{
-    { CipherSuite::AES_GCM_128, from_hex("101112131415161718191a1b1c1d1e1f") },
-    { CipherSuite::AES_GCM_256,
+    { CipherSuite::AES_GCM_128_SHA256, from_hex("101112131415161718191a1b1c1d1e1f") },
+    { CipherSuite::AES_GCM_256_SHA512,
       from_hex("202122232425262728292a2b2c2d2e2f"
                "303132333435363738393a3b3c3d3e3f") },
   };
