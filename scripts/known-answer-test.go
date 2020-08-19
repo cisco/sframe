@@ -4,6 +4,7 @@ import (
 	"crypto"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/hmac"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -45,7 +46,98 @@ func newGCM(key []byte) cipher.AEAD {
 	return gcm
 }
 
+type AESCTRHMAC struct {
+	Block   cipher.Block
+	AuthKey []byte
+	Hash    crypto.Hash
+	TagSize int
+}
+
+func newAESCTRHMAC(key []byte, hash crypto.Hash, encSize, tagSize int) AESCTRHMAC {
+	secret := hkdf.Extract(hash.New, key, []byte("SFrame10 AES CM AEAD"))
+
+	encKey := make([]byte, encSize)
+	hkdf.Expand(hash.New, secret, []byte("enc")).Read(encKey)
+
+	authKey := make([]byte, hash.Size())
+	hkdf.Expand(hash.New, secret, []byte("auth")).Read(authKey)
+
+	block, err := aes.NewCipher(encKey)
+	chk(err)
+
+	return AESCTRHMAC{block, authKey, hash, tagSize}
+}
+
+func (ctr AESCTRHMAC) NonceSize() int {
+	return 12
+}
+
+func (ctr AESCTRHMAC) Overhead() int {
+	return ctr.TagSize
+}
+
+func (ctr AESCTRHMAC) crypt(nonce, pt []byte) []byte {
+	iv := append(nonce, []byte{0, 0, 0, 0}...)
+	stream := cipher.NewCTR(ctr.Block, iv)
+
+	ct := make([]byte, len(pt))
+	stream.XORKeyStream(ct, pt)
+	return ct
+}
+
+func (ctr AESCTRHMAC) tag(aad, ct []byte) []byte {
+	aadSize := make([]byte, 8)
+	binary.BigEndian.PutUint64(aadSize, uint64(len(aad)))
+
+	h := hmac.New(ctr.Hash.New, ctr.AuthKey)
+	h.Write(aadSize)
+	h.Write(aad)
+	h.Write(ct)
+	return h.Sum(nil)[:ctr.TagSize]
+}
+
+func (ctr AESCTRHMAC) Seal(dst, nonce, plaintext, additionalData []byte) []byte {
+	ciphertext := ctr.crypt(nonce, plaintext)
+	tag := ctr.tag(additionalData, ciphertext)
+	return append(ciphertext, tag...)
+}
+
+func (ctr AESCTRHMAC) Open(dst, nonce, ciphertext, additionalData []byte) ([]byte, error) {
+	cut := len(ciphertext) - ctr.TagSize
+	innerCiphertext, tag := ciphertext[:cut], ciphertext[cut:]
+
+	computedTag := ctr.tag(additionalData, innerCiphertext)
+	if !hmac.Equal(computedTag, tag) {
+		return nil, fmt.Errorf("Authentication failure")
+	}
+
+	plaintext := ctr.crypt(nonce, innerCiphertext)
+	return plaintext, nil
+}
+
+func makeAESCTRHMAC(hash crypto.Hash, encSize, tagSize int) func(key []byte) cipher.AEAD {
+	return func(key []byte) cipher.AEAD {
+		return newAESCTRHMAC(key, hash, encSize, tagSize)
+	}
+}
+
 var (
+	AES_CM_128_HMAC_SHA256_4 = CipherSuite{
+		ID:      0x0001,
+		Name:    "AES_CM_128_HMAC_SHA256_4",
+		Nk:      16,
+		Nn:      12,
+		Hash:    crypto.SHA256,
+		NewAEAD: makeAESCTRHMAC(crypto.SHA256, 16, 4),
+	}
+	AES_CM_128_HMAC_SHA256_8 = CipherSuite{
+		ID:      0x0002,
+		Name:    "AES_CM_128_HMAC_SHA256_8",
+		Nk:      16,
+		Nn:      12,
+		Hash:    crypto.SHA256,
+		NewAEAD: makeAESCTRHMAC(crypto.SHA256, 16, 8),
+	}
 	AES_GCM_128_SHA256 = CipherSuite{
 		ID:      0x0003,
 		Name:    "AES_GCM_128_SHA256",
@@ -81,7 +173,9 @@ func (suite CipherSuite) Expand(prk, info []byte, size int) []byte {
 // * KID=0xffff, CTR=0x0100
 var (
 	baseKeys = map[uint16][]byte{
-		AES_GCM_128_SHA256.ID: from_hex("101112131415161718191a1b1c1d1e1f"),
+		AES_CM_128_HMAC_SHA256_4.ID: from_hex("101112131415161718191a1b1c1d1e1f"),
+		AES_CM_128_HMAC_SHA256_8.ID: from_hex("101112131415161718191a1b1c1d1e1f"),
+		AES_GCM_128_SHA256.ID:       from_hex("101112131415161718191a1b1c1d1e1f"),
 		AES_GCM_256_SHA512.ID: from_hex("202122232425262728292a2b2c2d2e2f" +
 			"303132333435363738393a3b3c3d3e3f"),
 	}
@@ -112,7 +206,13 @@ func protect(suite CipherSuite, ctr uint64, header []byte) []byte {
 }
 
 func main() {
-	suites := []CipherSuite{AES_GCM_128_SHA256, AES_GCM_256_SHA512}
+	suites := []CipherSuite{
+		AES_CM_128_HMAC_SHA256_4,
+		AES_CM_128_HMAC_SHA256_8,
+		AES_GCM_128_SHA256,
+		AES_GCM_256_SHA512,
+	}
+
 	for _, suite := range suites {
 		ct_7_0 := protect(suite, 0, header_7_0)
 		ct_7_1 := protect(suite, 1, header_7_1)
