@@ -8,8 +8,8 @@ namespace sframe {
 
 enum class CipherSuite : uint16_t
 {
-  AES_GCM_128 = 0,
-  AES_GCM_256 = 1,
+  AES_GCM_128_SHA256 = 3,
+  AES_GCM_256_SHA512 = 4,
 };
 
 const size_t max_overhead = 12 + 16;
@@ -26,7 +26,7 @@ class Context
 public:
   Context(CipherSuite suite);
 
-  void add_key(KeyID kid, bytes key);
+  void add_key(KeyID kid, const bytes& key);
 
   bytes protect(KeyID key_id, const bytes& plaintext);
   bytes unprotect(const bytes& ciphertext);
@@ -35,6 +35,7 @@ private:
   struct KeyState
   {
     bytes key;
+    bytes salt;
     Counter counter;
   };
 
