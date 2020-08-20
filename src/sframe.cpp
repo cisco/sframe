@@ -8,6 +8,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <tuple>
+#include <array>
 
 namespace sframe {
 
@@ -189,9 +190,8 @@ ctr_crypt(CipherSuite suite,
     throw openssl_error();
   }
 
-  auto pad = bytes{ 0, 0, 0, 0 };
-  auto padded_nonce = nonce;
-  padded_nonce.insert(padded_nonce.end(), pad.begin(), pad.end());
+  static auto padded_nonce = std::array<uint8_t, 16>{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+  std::copy(nonce.begin(), nonce.end(), padded_nonce.begin());
 
   auto cipher = openssl_cipher(suite);
   if (1 !=
@@ -210,8 +210,6 @@ ctr_crypt(CipherSuite suite,
   }
 }
 
-// XXX(RLB): There's a lot of allocations / copies in here that shouldn't be
-// needed, but were convenient.
 static size_t
 seal_ctr(CipherSuite suite,
          const bytes& key,
