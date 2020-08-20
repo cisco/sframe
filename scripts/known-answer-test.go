@@ -170,10 +170,10 @@ func (suite CipherSuite) Expand(prk, info []byte, size int) []byte {
 var (
 	baseKeys = map[uint16][]byte{
 		AES_CM_128_HMAC_SHA256_4.ID: from_hex("101112131415161718191a1b1c1d1e1f"),
-		AES_CM_128_HMAC_SHA256_8.ID: from_hex("101112131415161718191a1b1c1d1e1f"),
-		AES_GCM_128_SHA256.ID:       from_hex("101112131415161718191a1b1c1d1e1f"),
-		AES_GCM_256_SHA512.ID: from_hex("202122232425262728292a2b2c2d2e2f" +
-			"303132333435363738393a3b3c3d3e3f"),
+		AES_CM_128_HMAC_SHA256_8.ID: from_hex("202122232425262728292a2b2c2d2e2f"),
+		AES_GCM_128_SHA256.ID:       from_hex("303132333435363738393a3b3c3d3e3f"),
+		AES_GCM_256_SHA512.ID: from_hex("404142434445464748494a4b4c4d4e4f" +
+			"505152535455565758595a5b5c5d5e5f"),
 	}
 
 	plaintext         = from_hex("00010203")

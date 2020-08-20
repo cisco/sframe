@@ -1,3 +1,4 @@
+
 #include <doctest/doctest.h>
 #include <sframe/sframe.h>
 
@@ -57,24 +58,42 @@ TEST_CASE("SFrame Known-Answer")
   const auto long_ctr = KeyID(0x0100);
   const auto plaintext = from_hex("00010203");
   const std::map<CipherSuite, KnownAnswerTest> cases{
-    { CipherSuite::AES_GCM_128_SHA256,
+    { CipherSuite::AES_CM_128_HMAC_SHA256_4,
       {
         from_hex("101112131415161718191a1b1c1d1e1f"),
-        from_hex("170003fcfa7edc96c2588a057f97da438fd964805f2e"),
-        from_hex("17014999d3b99fc9f0aaf67bdaafbe2e063f62670e83"),
-        from_hex("1702ba35e14d380bb8783ac7ce0df0956b87e59ccfa5"),
-        from_hex("1affff0003fcfa7e05ae25c2e08687b08e6aa1b9e62eaf7e"),
-        from_hex("2affff0100ab7fed4b60f2a2bce541613a50fafc5adb518287"),
+        from_hex("170023b51101e8cf3180"),
+        from_hex("1701aa0743f6fed8c056"),
+        from_hex("1702eae8243335f26dc9"),
+        from_hex("1affff0023b51101b0927605"),
+        from_hex("2affff01001981bb4f5d35ad0c"),
+      } },
+    { CipherSuite::AES_CM_128_HMAC_SHA256_8,
+      {
+        from_hex("202122232425262728292a2b2c2d2e2f"),
+        from_hex("170022067e9270080090597dfadc"),
+        from_hex("1701d868b21f5e80434093d12eef"),
+        from_hex("170266de5b9332a80dea44a6407c"),
+        from_hex("1affff0022067e92500ce44901a10eef"),
+        from_hex("2affff01005ba58d1302a41630f1214e17"),
+      } },
+    { CipherSuite::AES_GCM_128_SHA256,
+      {
+        from_hex("303132333435363738393a3b3c3d3e3f"),
+        from_hex("170048310f3b8c8a7297a92b3ed392938f9d0d087118"),
+        from_hex("170145c8c2cd5ef5773e38f23ee6236a623f8351cfce"),
+        from_hex("17021ea6e7b05246606050b44fe105f419dea85b4b7a"),
+        from_hex("1affff0048310f3b542c2bc859816a10ee5f83f4f840f6e5"),
+        from_hex("2affff0100f1f838df14b1e675fb0b0618291838e628fea346"),
       } },
     { CipherSuite::AES_GCM_256_SHA512,
       {
         from_hex(
-          "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f"),
-        from_hex("1700eb166e453dac4de40e2bc7a2f07aaea11bbbb36c"),
-        from_hex("1701a817dcfd4e8aa98981459086566f3cd30701af9c"),
-        from_hex("1702294c87f5af03eb0602aed3a4beb2104ecc11653e"),
-        from_hex("1affff00eb166e45641c5c46e602d8f429d2a0de241d007a"),
-        from_hex("2affff010069f14831479e0ebe67276c36006aa5d1c584f817"),
+          "404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f"),
+        from_hex("1700b591faafe60c9c3a7d8dd1c18f91a72c510c8e63"),
+        from_hex("1701d555e665358a2486d99ac7272bedd503f53ec9d7"),
+        from_hex("170222e5fcd4709da8cc4d4a4e6e38a0b16afd0063fc"),
+        from_hex("1affff00b591faafc843b5831c7fc08b477d926f8c4c8f9b"),
+        from_hex("2affff01007b0e9ee905ab26c73927d7ece036a08c618610e4"),
       } },
   };
 
@@ -121,11 +140,15 @@ TEST_CASE("SFrame Round-Trip")
   const auto kid = KeyID(0x42);
   const auto plaintext = from_hex("00010203");
   const std::map<CipherSuite, bytes> keys{
-    { CipherSuite::AES_GCM_128_SHA256,
+    { CipherSuite::AES_CM_128_HMAC_SHA256_4,
       from_hex("101112131415161718191a1b1c1d1e1f") },
+    { CipherSuite::AES_CM_128_HMAC_SHA256_8,
+      from_hex("202122232425262728292a2b2c2d2e2f") },
+    { CipherSuite::AES_GCM_128_SHA256,
+      from_hex("303132333435363738393a3b3c3d3e3f") },
     { CipherSuite::AES_GCM_256_SHA512,
-      from_hex("202122232425262728292a2b2c2d2e2f"
-               "303132333435363738393a3b3c3d3e3f") },
+      from_hex("404142434445464748494a4b4c4d4e4f"
+               "505152535455565758595a5b5c5d5e5f") },
   };
 
   for (auto& pair : keys) {

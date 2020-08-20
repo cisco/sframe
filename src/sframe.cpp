@@ -201,8 +201,7 @@ ctr_crypt(CipherSuite suite,
 
   int outlen = 0;
   auto pt_size_int = static_cast<int>(pt_size);
-  if (1 !=
-      EVP_EncryptUpdate(ctx.get(), ct, &outlen, pt, pt_size_int)) {
+  if (1 != EVP_EncryptUpdate(ctx.get(), ct, &outlen, pt, pt_size_int)) {
     throw openssl_error();
   }
 
@@ -213,9 +212,6 @@ ctr_crypt(CipherSuite suite,
 
 // XXX(RLB): There's a lot of allocations / copies in here that shouldn't be
 // needed, but were convenient.
-//
-// XXX(RLB): There's a lot of duplicated code between this and open_ctr that can
-// probably be factored out.
 static size_t
 seal_ctr(CipherSuite suite,
          const bytes& key,
@@ -243,8 +239,7 @@ seal_ctr(CipherSuite suite,
   auto tag_start = ct + aad_size + pt_size;
   auto mac_input = bytes(ct, tag_start);
   auto mac = hmac(suite, auth_key, mac_input);
-
-  std::copy(tag_start, tag_start + tag_size, mac.data());
+  std::copy(mac.begin(), mac.begin() + tag_size, tag_start);
 
   return aad_size + pt_size + tag_size;
 }
@@ -352,7 +347,6 @@ open_ctr(CipherSuite suite,
   auto tag_start = ct + aad_size + inner_ct_size;
   auto mac_input = bytes(ct, tag_start);
   auto mac = hmac(suite, auth_key, mac_input);
-
   if (CRYPTO_memcmp(mac.data(), tag_start, tag_size) != 0) {
     throw std::runtime_error("AEAD authentication failure");
   }
@@ -452,16 +446,18 @@ Context::Context(CipherSuite suite_in)
 {}
 
 static const bytes sframe_label{
-  0x53, 0x46, 0x72, 0x61, 0x6d, 0x65, 0x31, 0x30
-};                                                              // "SFrame10"
+  0x53, 0x46, 0x72, 0x61, 0x6d, 0x65, 0x31, 0x30 // "SFrame10"
+};
 static const bytes sframe_key_label{ 0x6b, 0x65, 0x79 };        // "key"
 static const bytes sframe_salt_label{ 0x73, 0x61, 0x6c, 0x74 }; // "salt"
 
 static const bytes sframe_ctr_label{
-
+  // "SFrame10 AES CM AEAD"
+  0x53, 0x46, 0x72, 0x61, 0x6d, 0x65, 0x31, 0x30, 0x20, 0x41,
+  0x45, 0x53, 0x20, 0x43, 0x4d, 0x20, 0x41, 0x45, 0x41, 0x44,
 };
-static const bytes sframe_enc_label{ 0x6b, 0x65, 0x79 };        // "enc"
-static const bytes sframe_auth_label{ 0x73, 0x61, 0x6c, 0x74 }; // "auth"
+static const bytes sframe_enc_label{ 0x65, 0x6e, 0x63 };        // "enc"
+static const bytes sframe_auth_label{ 0x61, 0x75, 0x74, 0x68 }; // "auth"
 
 void
 Context::add_key(KeyID key_id, const bytes& base_key)
@@ -478,8 +474,12 @@ Context::add_key(KeyID key_id, const bytes& base_key)
   if (suite == CipherSuite::AES_CM_128_HMAC_SHA256_4 ||
       suite == CipherSuite::AES_CM_128_HMAC_SHA256_8) {
     secret = hkdf_extract(suite, sframe_ctr_label, key);
-    key = hkdf_expand(suite, secret, sframe_enc_label, key_size);
+
+    auto main_key = key;
+    auto enc_key = hkdf_expand(suite, secret, sframe_enc_label, key_size);
     auto auth_key = hkdf_expand(suite, secret, sframe_auth_label, hash_size);
+
+    key = enc_key;
     key.insert(key.end(), auth_key.begin(), auth_key.end());
   }
 
