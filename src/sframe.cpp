@@ -317,6 +317,8 @@ seal(CipherSuite suite,
     case CipherSuite::AES_GCM_256_SHA512:
       return seal_aead(suite, key, nonce, aad_size, ct, ct_size, pt, pt_size);
   }
+
+  throw std::runtime_error("Unknown algorithm");
 }
 
 static size_t
