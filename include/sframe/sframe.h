@@ -35,7 +35,9 @@ public:
 
   void add_key(KeyID kid, const bytes& key);
 
-  output_bytes protect(KeyID key_id, output_bytes ciphertext, input_bytes plaintext);
+  output_bytes protect(KeyID key_id,
+                       output_bytes ciphertext,
+                       input_bytes plaintext);
   output_bytes unprotect(output_bytes plaintext, input_bytes ciphertext);
 
 private:

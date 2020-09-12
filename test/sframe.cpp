@@ -42,7 +42,9 @@ ciphersuite_name(CipherSuite suite)
 }
 
 template<typename T>
-bytes to_bytes(const T& range) {
+bytes
+to_bytes(const T& range)
+{
   return bytes(range.begin(), range.end());
 }
 
