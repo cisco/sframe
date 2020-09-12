@@ -350,7 +350,7 @@ open_ctr(CipherSuite suite,
   }
 
   // Decrypt with AES-CM
-  ctr_crypt(suite, enc_key, nonce, pt, ct + aad_size, inner_ct_size);
+  ctr_crypt(suite, enc_key, nonce, pt, ct + aad_size, pt_size);
 
   return inner_ct_size;
 }
