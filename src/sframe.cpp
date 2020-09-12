@@ -499,7 +499,7 @@ Context::add_key(KeyID key_id, const bytes& base_key)
 }
 
 static size_t
-encode_uint(uint64_t val, uint8_t* start)
+encode_uint(uint64_t val, output_bytes start)
 {
   size_t size = 1;
   while (val >> (8 * size) > 0) {
@@ -514,10 +514,10 @@ encode_uint(uint64_t val, uint8_t* start)
 }
 
 static uint64_t
-decode_uint(const uint8_t* data, size_t size)
+decode_uint(input_bytes data)
 {
   uint64_t val = 0;
-  for (size_t i = 0; i < size; i++) {
+  for (size_t i = 0; i < data.size(); i++) {
     val = (val << 8) + static_cast<uint64_t>(data[i]);
   }
   return val;
@@ -543,14 +543,14 @@ static constexpr size_t min_header_size = 1;
 static constexpr size_t max_header_size = 1 + 8 + 8;
 
 static size_t
-encode_header(KeyID kid, Counter ctr, uint8_t* data)
+encode_header(KeyID kid, Counter ctr, output_bytes data)
 {
   size_t kid_size = 0;
   if (kid > 0x07) {
-    kid_size = encode_uint(kid, data + 1);
+    kid_size = encode_uint(kid, data.subspan(1));
   }
 
-  size_t ctr_size = encode_uint(ctr, data + 1 + kid_size);
+  size_t ctr_size = encode_uint(ctr, data.subspan(1 + kid_size));
   if ((ctr_size > 0x07) || (kid_size > 0x07)) {
     throw std::runtime_error("Header overflow");
   }
@@ -566,9 +566,9 @@ encode_header(KeyID kid, Counter ctr, uint8_t* data)
 }
 
 static std::tuple<KeyID, Counter, size_t>
-decode_header(const uint8_t* data, size_t size)
+decode_header(input_bytes data)
 {
-  if (size < min_header_size) {
+  if (data.size() < min_header_size) {
     throw std::runtime_error("Ciphertext too small to decode header");
   }
 
@@ -579,19 +579,19 @@ decode_header(const uint8_t* data, size_t size)
 
   auto kid = KeyID(kid_size);
   if (kid_long) {
-    if (size < 1 + kid_size) {
+    if (data.size() < 1 + kid_size) {
       throw std::runtime_error("Ciphertext too small to decode KID");
     }
 
-    kid = KeyID(decode_uint(data + 1, kid_size));
+    kid = KeyID(decode_uint(data.subspan(1, kid_size)));
   } else {
     kid_size = 0;
   }
 
-  if (size < 1 + kid_size + ctr_size) {
+  if (data.size() < 1 + kid_size + ctr_size) {
     throw std::runtime_error("Ciphertext too small to decode CTR");
   }
-  auto ctr = Counter(decode_uint(data + 1 + kid_size, ctr_size));
+  auto ctr = Counter(decode_uint(data.subspan(1 + kid_size, ctr_size)));
 
   return std::make_tuple(kid, ctr, 1 + kid_size + ctr_size);
 }
@@ -614,7 +614,7 @@ Context::protect(KeyID key_id, output_bytes ciphertext, input_bytes plaintext)
     throw std::runtime_error("Ciphertext buffer too small");
   }
 
-  auto hdr_size = encode_header(key_id, ctr, ciphertext.data());
+  auto hdr_size = encode_header(key_id, ctr, ciphertext);
 
   const auto nonce = form_nonce(suite, ctr, st.salt);
   return seal(suite, st.key, nonce, hdr_size, ciphertext, plaintext);
@@ -624,7 +624,7 @@ output_bytes
 Context::unprotect(output_bytes plaintext, input_bytes ciphertext)
 {
   auto [kid, ctr, hdr_size] =
-    decode_header(ciphertext.data(), ciphertext.size());
+    decode_header(ciphertext);
   auto tag_size = openssl_tag_size(suite);
   if (ciphertext.size() < hdr_size + tag_size) {
     throw std::runtime_error("Ciphertext too small");
