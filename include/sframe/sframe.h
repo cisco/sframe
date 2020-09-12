@@ -4,6 +4,8 @@
 #include <map>
 #include <vector>
 
+#include <gsl/gsl-lite.hpp>
+
 namespace sframe {
 
 enum class CipherSuite : uint16_t
