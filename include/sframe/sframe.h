@@ -8,6 +8,8 @@ namespace sframe {
 
 enum class CipherSuite : uint16_t
 {
+  AES_CM_128_HMAC_SHA256_4 = 1,
+  AES_CM_128_HMAC_SHA256_8 = 2,
   AES_GCM_128_SHA256 = 3,
   AES_GCM_256_SHA512 = 4,
 };

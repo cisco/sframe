@@ -8,6 +8,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <tuple>
+#include <array>
 
 namespace sframe {
 
@@ -39,6 +40,10 @@ static const EVP_CIPHER*
 openssl_cipher(CipherSuite suite)
 {
   switch (suite) {
+    case CipherSuite::AES_CM_128_HMAC_SHA256_4:
+    case CipherSuite::AES_CM_128_HMAC_SHA256_8:
+      return EVP_aes_128_ctr();
+
     case CipherSuite::AES_GCM_128_SHA256:
       return EVP_aes_128_gcm();
 
@@ -54,6 +59,8 @@ static int
 openssl_key_size(CipherSuite suite)
 {
   switch (suite) {
+    case CipherSuite::AES_CM_128_HMAC_SHA256_4:
+    case CipherSuite::AES_CM_128_HMAC_SHA256_8:
     case CipherSuite::AES_GCM_128_SHA256:
       return 16;
 
@@ -69,6 +76,12 @@ static int
 openssl_tag_size(CipherSuite suite)
 {
   switch (suite) {
+    case CipherSuite::AES_CM_128_HMAC_SHA256_4:
+      return 4;
+
+    case CipherSuite::AES_CM_128_HMAC_SHA256_8:
+      return 8;
+
     case CipherSuite::AES_GCM_128_SHA256:
     case CipherSuite::AES_GCM_256_SHA512:
       return 16;
@@ -82,6 +95,8 @@ static size_t
 openssl_nonce_size(CipherSuite suite)
 {
   switch (suite) {
+    case CipherSuite::AES_CM_128_HMAC_SHA256_4:
+    case CipherSuite::AES_CM_128_HMAC_SHA256_8:
     case CipherSuite::AES_GCM_128_SHA256:
     case CipherSuite::AES_GCM_256_SHA512:
       return 12;
@@ -95,6 +110,8 @@ static const EVP_MD*
 openssl_digest_type(CipherSuite suite)
 {
   switch (suite) {
+    case CipherSuite::AES_CM_128_HMAC_SHA256_4:
+    case CipherSuite::AES_CM_128_HMAC_SHA256_8:
     case CipherSuite::AES_GCM_128_SHA256:
       return EVP_sha256();
 
@@ -160,19 +177,84 @@ hkdf_expand(CipherSuite suite,
   return mac;
 }
 
+void
+ctr_crypt(CipherSuite suite,
+          const bytes& key,
+          const bytes& nonce,
+          uint8_t* ct,
+          const uint8_t* pt,
+          size_t pt_size)
+{
+  auto ctx = scoped_evp_ctx(EVP_CIPHER_CTX_new(), evp_cipher_ctx_free);
+  if (ctx.get() == nullptr) {
+    throw openssl_error();
+  }
+
+  static auto padded_nonce = std::array<uint8_t, 16>{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+  std::copy(nonce.begin(), nonce.end(), padded_nonce.begin());
+
+  auto cipher = openssl_cipher(suite);
+  if (1 !=
+      EVP_EncryptInit(ctx.get(), cipher, key.data(), padded_nonce.data())) {
+    throw openssl_error();
+  }
+
+  int outlen = 0;
+  auto pt_size_int = static_cast<int>(pt_size);
+  if (1 != EVP_EncryptUpdate(ctx.get(), ct, &outlen, pt, pt_size_int)) {
+    throw openssl_error();
+  }
+
+  if (1 != EVP_EncryptFinal(ctx.get(), nullptr, &outlen)) {
+    throw openssl_error();
+  }
+}
+
 static size_t
-seal(CipherSuite suite,
-     const bytes& key,
-     const bytes& nonce,
-     size_t aad_size,
-     uint8_t* ct,
-     size_t ct_size,
-     const uint8_t* pt,
-     size_t pt_size)
+seal_ctr(CipherSuite suite,
+         const bytes& key,
+         const bytes& nonce,
+         size_t aad_size,
+         uint8_t* ct,
+         size_t ct_size,
+         const uint8_t* pt,
+         size_t pt_size)
 {
   auto tag_size = openssl_tag_size(suite);
   if (ct_size < aad_size + pt_size + tag_size) {
-    throw std::runtime_error("Ciphertext buffer too small ");
+    throw std::runtime_error("Ciphertext buffer too small");
+  }
+
+  // Split the key into enc and auth subkeys
+  auto key_size = openssl_key_size(suite);
+  auto enc_key = bytes(key.begin(), key.begin() + key_size);
+  auto auth_key = bytes(key.begin() + key_size, key.end());
+
+  // Encrypt with AES-CM
+  ctr_crypt(suite, key, nonce, ct + aad_size, pt, pt_size);
+
+  // Authenticate with truncated HMAC
+  auto tag_start = ct + aad_size + pt_size;
+  auto mac_input = bytes(ct, tag_start);
+  auto mac = hmac(suite, auth_key, mac_input);
+  std::copy(mac.begin(), mac.begin() + tag_size, tag_start);
+
+  return aad_size + pt_size + tag_size;
+}
+
+static size_t
+seal_aead(CipherSuite suite,
+          const bytes& key,
+          const bytes& nonce,
+          size_t aad_size,
+          uint8_t* ct,
+          size_t ct_size,
+          const uint8_t* pt,
+          size_t pt_size)
+{
+  auto tag_size = openssl_tag_size(suite);
+  if (ct_size < aad_size + pt_size + tag_size) {
+    throw std::runtime_error("Ciphertext buffer too small");
   }
 
   auto ctx = scoped_evp_ctx(EVP_CIPHER_CTX_new(), evp_cipher_ctx_free);
@@ -218,14 +300,70 @@ seal(CipherSuite suite,
 }
 
 static size_t
-open(CipherSuite suite,
+seal(CipherSuite suite,
      const bytes& key,
      const bytes& nonce,
      size_t aad_size,
-     uint8_t* pt,
-     size_t pt_size,
-     const uint8_t* ct,
-     size_t ct_size)
+     uint8_t* ct,
+     size_t ct_size,
+     const uint8_t* pt,
+     size_t pt_size)
+{
+  switch (suite) {
+    case CipherSuite::AES_CM_128_HMAC_SHA256_4:
+    case CipherSuite::AES_CM_128_HMAC_SHA256_8:
+      return seal_ctr(suite, key, nonce, aad_size, ct, ct_size, pt, pt_size);
+    case CipherSuite::AES_GCM_128_SHA256:
+    case CipherSuite::AES_GCM_256_SHA512:
+      return seal_aead(suite, key, nonce, aad_size, ct, ct_size, pt, pt_size);
+  }
+}
+
+static size_t
+open_ctr(CipherSuite suite,
+         const bytes& key,
+         const bytes& nonce,
+         size_t aad_size,
+         uint8_t* pt,
+         size_t pt_size,
+         const uint8_t* ct,
+         size_t ct_size)
+{
+  auto tag_size = openssl_tag_size(suite);
+  if (ct_size < aad_size + tag_size) {
+    throw std::runtime_error("Ciphertext buffer too small");
+  }
+
+  auto inner_ct_size = ct_size - aad_size - tag_size;
+
+  // Split the key into enc and auth subkeys
+  auto key_size = openssl_key_size(suite);
+  auto enc_key = bytes(key.begin(), key.begin() + key_size);
+  auto auth_key = bytes(key.begin() + key_size, key.end());
+
+  // Authenticate with truncated HMAC
+  auto tag_start = ct + aad_size + inner_ct_size;
+  auto mac_input = bytes(ct, tag_start);
+  auto mac = hmac(suite, auth_key, mac_input);
+  if (CRYPTO_memcmp(mac.data(), tag_start, tag_size) != 0) {
+    throw std::runtime_error("AEAD authentication failure");
+  }
+
+  // Decrypt with AES-CM
+  ctr_crypt(suite, enc_key, nonce, pt, ct + aad_size, inner_ct_size);
+
+  return inner_ct_size;
+}
+
+static size_t
+open_aead(CipherSuite suite,
+          const bytes& key,
+          const bytes& nonce,
+          size_t aad_size,
+          uint8_t* pt,
+          size_t pt_size,
+          const uint8_t* ct,
+          size_t ct_size)
 {
   auto tag_size = openssl_tag_size(suite);
   if (ct_size < aad_size + tag_size) {
@@ -281,25 +419,67 @@ open(CipherSuite suite,
   return inner_ct_size;
 }
 
+static size_t
+open(CipherSuite suite,
+     const bytes& key,
+     const bytes& nonce,
+     size_t aad_size,
+     uint8_t* pt,
+     size_t pt_size,
+     const uint8_t* ct,
+     size_t ct_size)
+{
+  switch (suite) {
+    case CipherSuite::AES_CM_128_HMAC_SHA256_4:
+    case CipherSuite::AES_CM_128_HMAC_SHA256_8:
+      return open_ctr(suite, key, nonce, aad_size, pt, pt_size, ct, ct_size);
+    case CipherSuite::AES_GCM_128_SHA256:
+    case CipherSuite::AES_GCM_256_SHA512:
+      return open_aead(suite, key, nonce, aad_size, pt, pt_size, ct, ct_size);
+  }
+}
+
 Context::Context(CipherSuite suite_in)
   : suite(suite_in)
 {}
 
 static const bytes sframe_label{
-  0x53, 0x46, 0x72, 0x61, 0x6d, 0x65, 0x31, 0x30
-};                                                              // "SFrame10"
+  0x53, 0x46, 0x72, 0x61, 0x6d, 0x65, 0x31, 0x30 // "SFrame10"
+};
 static const bytes sframe_key_label{ 0x6b, 0x65, 0x79 };        // "key"
 static const bytes sframe_salt_label{ 0x73, 0x61, 0x6c, 0x74 }; // "salt"
+
+static const bytes sframe_ctr_label{
+  // "SFrame10 AES CM AEAD"
+  0x53, 0x46, 0x72, 0x61, 0x6d, 0x65, 0x31, 0x30, 0x20, 0x41,
+  0x45, 0x53, 0x20, 0x43, 0x4d, 0x20, 0x41, 0x45, 0x41, 0x44,
+};
+static const bytes sframe_enc_label{ 0x65, 0x6e, 0x63 };        // "enc"
+static const bytes sframe_auth_label{ 0x61, 0x75, 0x74, 0x68 }; // "auth"
 
 void
 Context::add_key(KeyID key_id, const bytes& base_key)
 {
   auto key_size = openssl_key_size(suite);
   auto nonce_size = openssl_nonce_size(suite);
+  auto hash_size = openssl_digest_size(suite);
 
   auto secret = hkdf_extract(suite, sframe_label, base_key);
   auto key = hkdf_expand(suite, secret, sframe_key_label, key_size);
   auto salt = hkdf_expand(suite, secret, sframe_salt_label, nonce_size);
+
+  // If using CTR+HMAC, set key = enc_key || auth_key
+  if (suite == CipherSuite::AES_CM_128_HMAC_SHA256_4 ||
+      suite == CipherSuite::AES_CM_128_HMAC_SHA256_8) {
+    secret = hkdf_extract(suite, sframe_ctr_label, key);
+
+    auto main_key = key;
+    auto enc_key = hkdf_expand(suite, secret, sframe_enc_label, key_size);
+    auto auth_key = hkdf_expand(suite, secret, sframe_auth_label, hash_size);
+
+    key = enc_key;
+    key.insert(key.end(), auth_key.begin(), auth_key.end());
+  }
 
   state.insert_or_assign(key_id,
                          KeyState{ std::move(key), std::move(salt), 0 });
