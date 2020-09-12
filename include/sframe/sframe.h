@@ -4,7 +4,7 @@
 #include <map>
 #include <vector>
 
-#include <gsl/gsl-lite.hpp>
+#include <gsl/gsl>
 
 namespace sframe {
 
@@ -16,11 +16,14 @@ enum class CipherSuite : uint16_t
   AES_GCM_256_SHA512 = 4,
 };
 
-const size_t max_overhead = 12 + 16;
+constexpr size_t max_overhead = 17 + 16;
 
 using bytes = std::vector<uint8_t>;
+using input_bytes = gsl::span<const uint8_t>;
+using output_bytes = gsl::span<uint8_t>;
+
 std::ostream&
-operator<<(std::ostream& str, const bytes& data);
+operator<<(std::ostream& str, const input_bytes data);
 
 using KeyID = uint64_t;
 using Counter = uint64_t;
@@ -32,8 +35,8 @@ public:
 
   void add_key(KeyID kid, const bytes& key);
 
-  bytes protect(KeyID key_id, const bytes& plaintext);
-  bytes unprotect(const bytes& ciphertext);
+  output_bytes protect(KeyID key_id, output_bytes ciphertext, input_bytes plaintext);
+  output_bytes unprotect(output_bytes plaintext, input_bytes ciphertext);
 
 private:
   struct KeyState

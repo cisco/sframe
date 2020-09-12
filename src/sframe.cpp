@@ -13,7 +13,7 @@
 namespace sframe {
 
 std::ostream&
-operator<<(std::ostream& str, const bytes& data)
+operator<<(std::ostream& str, const input_bytes data)
 {
   str.flags(std::ios::hex);
   for (const auto& byte : data) {
@@ -587,10 +587,10 @@ decode_header(const uint8_t* data, size_t size)
   return std::make_tuple(kid, ctr, 1 + kid_size + ctr_size);
 }
 
-bytes
-Context::protect(KeyID kid, const bytes& plaintext)
+output_bytes
+Context::protect(KeyID key_id, output_bytes ciphertext, input_bytes plaintext)
 {
-  auto it = state.find(kid);
+  auto it = state.find(key_id);
   if (it == state.end()) {
     throw std::runtime_error("Unknown key");
   }
@@ -599,10 +599,15 @@ Context::protect(KeyID kid, const bytes& plaintext)
   const auto ctr = st.counter;
   st.counter += 1;
 
-  auto ct = bytes(max_header_size);
-  auto hdr_size = encode_header(kid, ctr, ct.data());
+  // TODO(RLB): Create a header_size() method and call it here
   auto tag_size = openssl_tag_size(suite);
-  ct.resize(hdr_size + plaintext.size() + tag_size);
+  if (ciphertext.size() < max_header_size + plaintext.size() + tag_size) {
+    throw std::runtime_error("Ciphertext buffer too small");
+  }
+
+  auto hdr_size = encode_header(key_id, ctr, ciphertext.data());
+  auto ct_size = hdr_size + plaintext.size() + tag_size;
+  auto ct_out = ciphertext.subspan(0, ct_size);
 
   const auto nonce = form_nonce(suite, ctr, st.salt);
 
@@ -610,22 +615,27 @@ Context::protect(KeyID kid, const bytes& plaintext)
        st.key,
        nonce,
        hdr_size,
-       ct.data(),
-       ct.size(),
+       ct_out.data(),
+       ct_out.size(),
        plaintext.data(),
        plaintext.size());
 
-  return ct;
+  return ct_out;
 }
 
-bytes
-Context::unprotect(const bytes& ciphertext)
+output_bytes
+Context::unprotect(output_bytes plaintext, input_bytes ciphertext)
 {
   auto [kid, ctr, hdr_size] =
     decode_header(ciphertext.data(), ciphertext.size());
   auto tag_size = openssl_tag_size(suite);
   if (ciphertext.size() < hdr_size + tag_size) {
     throw std::runtime_error("Ciphertext too small");
+  }
+
+  auto pt_size = ciphertext.size() - hdr_size - tag_size;
+  if (plaintext.size() < pt_size) {
+    throw std::runtime_error("Plaintext too small");
   }
 
   auto it = state.find(kid);
@@ -635,16 +645,16 @@ Context::unprotect(const bytes& ciphertext)
 
   const auto& st = it->second;
   const auto nonce = form_nonce(suite, ctr, st.salt);
-  auto pt = bytes(ciphertext.size() - hdr_size - tag_size);
+  auto pt_out = plaintext.subspan(0, pt_size);
   open(suite,
        st.key,
        nonce,
        hdr_size,
-       pt.data(),
-       pt.size(),
+       pt_out.data(),
+       pt_out.size(),
        ciphertext.data(),
        ciphertext.size());
-  return pt;
+  return pt_out;
 }
 
 } // namespace sframe
