@@ -439,6 +439,8 @@ open(CipherSuite suite,
     case CipherSuite::AES_GCM_256_SHA512:
       return open_aead(suite, key, nonce, aad_size, pt, pt_size, ct, ct_size);
   }
+
+  throw std::runtime_error("Unknown algorithm");
 }
 
 Context::Context(CipherSuite suite_in)
