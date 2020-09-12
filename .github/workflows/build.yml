@@ -35,6 +35,9 @@ jobs:
         choco install openssl
         vcpkg install doctest
 
+    - name: configure with clang-tidy
+      run: make tidy
+
     - name: build the library
       run: make
 

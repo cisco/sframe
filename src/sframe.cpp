@@ -317,6 +317,8 @@ seal(CipherSuite suite,
     case CipherSuite::AES_GCM_256_SHA512:
       return seal_aead(suite, key, nonce, aad_size, ct, ct_size, pt, pt_size);
   }
+
+  throw std::runtime_error("Unknown algorithm");
 }
 
 static size_t
@@ -350,7 +352,7 @@ open_ctr(CipherSuite suite,
   }
 
   // Decrypt with AES-CM
-  ctr_crypt(suite, enc_key, nonce, pt, ct + aad_size, inner_ct_size);
+  ctr_crypt(suite, enc_key, nonce, pt, ct + aad_size, pt_size);
 
   return inner_ct_size;
 }
@@ -437,6 +439,8 @@ open(CipherSuite suite,
     case CipherSuite::AES_GCM_256_SHA512:
       return open_aead(suite, key, nonce, aad_size, pt, pt_size, ct, ct_size);
   }
+
+  throw std::runtime_error("Unknown algorithm");
 }
 
 Context::Context(CipherSuite suite_in)
