@@ -55,7 +55,7 @@ openssl_cipher(CipherSuite suite)
   }
 }
 
-static int
+static size_t
 openssl_key_size(CipherSuite suite)
 {
   switch (suite) {
@@ -72,7 +72,7 @@ openssl_key_size(CipherSuite suite)
   }
 }
 
-static int
+static size_t
 openssl_tag_size(CipherSuite suite)
 {
   switch (suite) {
@@ -129,12 +129,13 @@ openssl_digest_size(CipherSuite suite)
   return EVP_MD_size(openssl_digest_type(suite));
 }
 
-static bytes
-hmac(CipherSuite suite, const bytes& key, input_bytes data)
+static input_bytes
+hmac(CipherSuite suite, input_bytes key, input_bytes data)
 {
+  static auto md = std::array<uint8_t, EVP_MAX_MD_SIZE>();
+
   unsigned int size = 0;
   auto type = openssl_digest_type(suite);
-  bytes md(EVP_MAX_MD_SIZE);
   if (nullptr == HMAC(type,
                       key.data(),
                       key.size(),
@@ -145,14 +146,14 @@ hmac(CipherSuite suite, const bytes& key, input_bytes data)
     throw std::runtime_error("HMAC failure");
   }
 
-  md.resize(size);
-  return md;
+  return input_bytes(md.data(), size);
 }
 
 static bytes
 hkdf_extract(CipherSuite suite, const bytes& salt, const bytes& ikm)
 {
-  return hmac(suite, salt, ikm);
+  auto mac = hmac(suite, salt, ikm);
+  return bytes(mac.begin(), mac.end());
 }
 
 // For simplicity, we enforce that size <= Hash.length, so that
@@ -173,14 +174,13 @@ hkdf_expand(CipherSuite suite,
   auto label = info;
   label.push_back(0x01);
   auto mac = hmac(suite, secret, label);
-  mac.resize(size);
-  return mac;
+  return bytes(mac.begin(), mac.begin() + size);
 }
 
 void
 ctr_crypt(CipherSuite suite,
-          const bytes& key,
-          const bytes& nonce,
+          input_bytes key,
+          input_bytes nonce,
           output_bytes out,
           input_bytes in)
 {
@@ -206,7 +206,8 @@ ctr_crypt(CipherSuite suite,
 
   int outlen = 0;
   auto in_size_int = static_cast<int>(in.size());
-  if (1 != EVP_EncryptUpdate(ctx.get(), out.data(), &outlen, in.data(), in_size_int)) {
+  if (1 != EVP_EncryptUpdate(
+             ctx.get(), out.data(), &outlen, in.data(), in_size_int)) {
     throw openssl_error();
   }
 
@@ -219,47 +220,46 @@ static output_bytes
 seal_ctr(CipherSuite suite,
          const bytes& key,
          const bytes& nonce,
-         size_t aad_size,
          output_bytes ct,
+         input_bytes aad,
          input_bytes pt)
 {
-  auto ct_size = ct.size();
-  auto pt_size = pt.size();
   auto tag_size = openssl_tag_size(suite);
-  if (ct_size < aad_size + pt_size + tag_size) {
+  if (ct.size() < pt.size() + tag_size) {
     throw std::runtime_error("Ciphertext buffer too small");
   }
 
   // Split the key into enc and auth subkeys
-  auto key_size = openssl_key_size(suite);
-  auto enc_key = bytes(key.begin(), key.begin() + key_size);
-  auto auth_key = bytes(key.begin() + key_size, key.end());
+  auto key_span = input_bytes(key);
+  auto enc_key_size = openssl_key_size(suite);
+  auto enc_key = key_span.subspan(0, enc_key_size);
+  auto auth_key = key_span.subspan(enc_key_size);
 
   // Encrypt with AES-CM
-  ctr_crypt(suite, key, nonce, ct.subspan(aad_size, pt_size), pt);
+  auto inner_ct = ct.subspan(0, pt.size());
+  ctr_crypt(suite, enc_key, nonce, inner_ct, pt);
 
   // Authenticate with truncated HMAC
-  auto mac_input = ct.subspan(0, aad_size + pt_size);
+  auto mac_input = bytes(aad.begin(), aad.end());
+  mac_input.insert(mac_input.end(), inner_ct.begin(), inner_ct.end());
   auto mac = hmac(suite, auth_key, mac_input);
 
-  auto tag = ct.subspan(aad_size + pt_size, tag_size);
+  auto tag = ct.subspan(pt.size(), tag_size);
   std::copy(mac.begin(), mac.begin() + tag_size, tag.begin());
 
-  return ct.subspan(0, aad_size + pt_size + tag_size);
+  return ct.subspan(0, pt.size() + tag_size);
 }
 
 static output_bytes
 seal_aead(CipherSuite suite,
           const bytes& key,
           const bytes& nonce,
-          size_t aad_size,
           output_bytes ct,
+          input_bytes aad,
           input_bytes pt)
 {
-  auto ct_size = ct.size();
-  auto pt_size = pt.size();
   auto tag_size = openssl_tag_size(suite);
-  if (ct_size < aad_size + pt_size + tag_size) {
+  if (ct.size() < pt.size() + tag_size) {
     throw std::runtime_error("Ciphertext buffer too small");
   }
 
@@ -274,23 +274,20 @@ seal_aead(CipherSuite suite,
   }
 
   int outlen = 0;
-  auto aad_size_int = static_cast<int>(aad_size);
-  if (aad_size > 0) {
+  auto aad_size_int = static_cast<int>(aad.size());
+  if (aad.size() > 0) {
     if (1 != EVP_EncryptUpdate(
-               ctx.get(), nullptr, &outlen, ct.data(), aad_size_int)) {
+               ctx.get(), nullptr, &outlen, aad.data(), aad_size_int)) {
       throw openssl_error();
     }
   }
 
-  auto pt_size_int = static_cast<int>(pt_size);
+  auto pt_size_int = static_cast<int>(pt.size());
   if (1 !=
       EVP_EncryptUpdate(
-        ctx.get(), ct.data() + aad_size, &outlen, pt.data(), pt_size_int)) {
+        ctx.get(), ct.data(), &outlen, pt.data(), pt_size_int)) {
     throw openssl_error();
   }
-
-  auto inner_ct_size = size_t(outlen);
-  auto tag_start = ct.data() + aad_size + inner_ct_size;
 
   // Providing nullptr as an argument is safe here because this
   // function never writes with GCM; it only computes the tag
@@ -298,32 +295,33 @@ seal_aead(CipherSuite suite,
     throw openssl_error();
   }
 
-  auto tag_ptr = const_cast<void*>(static_cast<const void*>(tag_start));
+  auto tag = ct.subspan(pt.size(), tag_size);
+  auto tag_ptr = const_cast<void*>(static_cast<const void*>(tag.data()));
   if (1 !=
-      EVP_CIPHER_CTX_ctrl(ctx.get(), EVP_CTRL_GCM_GET_TAG, tag_size, tag_ptr)) {
+      EVP_CIPHER_CTX_ctrl(ctx.get(), EVP_CTRL_GCM_GET_TAG, tag.size(), tag_ptr)) {
     throw openssl_error();
   }
 
-  return ct.subspan(0, aad_size + pt_size + tag_size);
+  return ct.subspan(0, pt.size() + tag_size);
 }
 
 static output_bytes
 seal(CipherSuite suite,
      const bytes& key,
      const bytes& nonce,
-     size_t aad_size,
      output_bytes ct,
+     input_bytes aad,
      input_bytes pt)
 {
   switch (suite) {
     case CipherSuite::AES_CM_128_HMAC_SHA256_4:
     case CipherSuite::AES_CM_128_HMAC_SHA256_8: {
-      return seal_ctr(suite, key, nonce, aad_size, ct, pt);
+      return seal_ctr(suite, key, nonce, ct, aad, pt);
     }
 
     case CipherSuite::AES_GCM_128_SHA256:
     case CipherSuite::AES_GCM_256_SHA512: {
-      return seal_aead(suite, key, nonce, aad_size, ct, pt);
+      return seal_aead(suite, key, nonce, ct, aad, pt);
     }
   }
 
@@ -334,33 +332,35 @@ static output_bytes
 open_ctr(CipherSuite suite,
          const bytes& key,
          const bytes& nonce,
-         size_t aad_size,
          output_bytes pt,
+         input_bytes aad,
          input_bytes ct)
 {
-  auto ct_size = ct.size();
   auto tag_size = openssl_tag_size(suite);
-  if (ct_size < aad_size + tag_size) {
+  if (ct.size() < tag_size) {
     throw std::runtime_error("Ciphertext buffer too small");
   }
 
-  auto inner_ct_size = ct_size - aad_size - tag_size;
+  auto inner_ct_size = ct.size() - tag_size;
+  auto inner_ct = ct.subspan(0, inner_ct_size);
+  auto tag = ct.subspan(inner_ct_size, tag_size);
 
   // Split the key into enc and auth subkeys
-  auto key_size = openssl_key_size(suite);
-  auto enc_key = bytes(key.begin(), key.begin() + key_size);
-  auto auth_key = bytes(key.begin() + key_size, key.end());
+  auto key_span = input_bytes(key);
+  auto enc_key_size = openssl_key_size(suite);
+  auto enc_key = key_span.subspan(0, enc_key_size);
+  auto auth_key = key_span.subspan(enc_key_size);
 
   // Authenticate with truncated HMAC
-  auto tag_start = ct.data() + aad_size + inner_ct_size;
-  auto mac_input = bytes(ct.data(), tag_start);
+  auto mac_input = bytes(aad.begin(), aad.end());
+  mac_input.insert(mac_input.end(), inner_ct.begin(), inner_ct.end());
   auto mac = hmac(suite, auth_key, mac_input);
-  if (CRYPTO_memcmp(mac.data(), tag_start, tag_size) != 0) {
+  if (CRYPTO_memcmp(mac.data(), tag.data(), tag.size()) != 0) {
     throw std::runtime_error("AEAD authentication failure");
   }
 
   // Decrypt with AES-CM
-  ctr_crypt(suite, enc_key, nonce, pt, ct.subspan(aad_size, inner_ct_size));
+  ctr_crypt(suite, enc_key, nonce, pt, ct.subspan(0, inner_ct_size));
 
   return pt.subspan(0, inner_ct_size);
 }
@@ -369,25 +369,19 @@ static output_bytes
 open_aead(CipherSuite suite,
           const bytes& key,
           const bytes& nonce,
-          size_t aad_size,
           output_bytes pt,
+          input_bytes aad,
           input_bytes ct)
 {
-  auto pt_size = pt.size();
-  auto ct_size = ct.size();
   auto tag_size = openssl_tag_size(suite);
-  if (ct_size < aad_size + tag_size) {
+  if (ct.size() < tag_size) {
     throw std::runtime_error("Ciphertext buffer too small");
   }
 
-  auto inner_ct_size = ct_size - aad_size - tag_size;
-  if (pt_size < inner_ct_size) {
+  auto inner_ct_size = ct.size() - tag_size;
+  if (pt.size() < inner_ct_size) {
     throw std::runtime_error("Plaintext buffer too small");
   }
-
-  auto aad_start = ct.data();
-  auto ct_start = aad_start + aad_size;
-  auto tag_start = ct_start + inner_ct_size;
 
   auto ctx = scoped_evp_ctx(EVP_CIPHER_CTX_new(), evp_cipher_ctx_free);
   if (ctx.get() == nullptr) {
@@ -399,24 +393,25 @@ open_aead(CipherSuite suite,
     throw openssl_error();
   }
 
-  auto tag = bytes(tag_start, tag_start + tag_size);
+  auto tag = ct.subspan(inner_ct_size, tag_size);
+  auto tag_ptr = const_cast<void*>(static_cast<const void*>(tag.data()));
   if (1 != EVP_CIPHER_CTX_ctrl(
-             ctx.get(), EVP_CTRL_GCM_SET_TAG, tag_size, tag.data())) {
+             ctx.get(), EVP_CTRL_GCM_SET_TAG, tag.size(), tag_ptr)) {
     throw openssl_error();
   }
 
   int out_size;
-  auto aad_size_int = static_cast<int>(aad_size);
-  if (aad_size > 0) {
+  auto aad_size_int = static_cast<int>(aad.size());
+  if (aad.size() > 0) {
     if (1 != EVP_DecryptUpdate(
-               ctx.get(), nullptr, &out_size, aad_start, aad_size_int)) {
+               ctx.get(), nullptr, &out_size, aad.data(), aad_size_int)) {
       throw openssl_error();
     }
   }
 
   auto inner_ct_size_int = static_cast<int>(inner_ct_size);
   if (1 != EVP_DecryptUpdate(
-             ctx.get(), pt.data(), &out_size, ct_start, inner_ct_size_int)) {
+             ctx.get(), pt.data(), &out_size, ct.data(), inner_ct_size_int)) {
     throw openssl_error();
   }
 
@@ -433,19 +428,19 @@ static output_bytes
 open(CipherSuite suite,
      const bytes& key,
      const bytes& nonce,
-     size_t aad_size,
      output_bytes pt,
+     input_bytes aad,
      input_bytes ct)
 {
   switch (suite) {
     case CipherSuite::AES_CM_128_HMAC_SHA256_4:
     case CipherSuite::AES_CM_128_HMAC_SHA256_8: {
-      return open_ctr(suite, key, nonce, aad_size, pt, ct);
+      return open_ctr(suite, key, nonce, pt, aad, ct);
     }
 
     case CipherSuite::AES_GCM_128_SHA256:
     case CipherSuite::AES_GCM_256_SHA512: {
-      return open_aead(suite, key, nonce, aad_size, pt, ct);
+      return open_aead(suite, key, nonce, pt, aad, ct);
     }
   }
 
@@ -565,7 +560,7 @@ encode_header(KeyID kid, Counter ctr, output_bytes data)
   return 1 + kid_size + ctr_size;
 }
 
-static std::tuple<KeyID, Counter, size_t>
+static std::tuple<KeyID, Counter, input_bytes>
 decode_header(input_bytes data)
 {
   if (data.size() < min_header_size) {
@@ -593,7 +588,7 @@ decode_header(input_bytes data)
   }
   auto ctr = Counter(decode_uint(data.subspan(1 + kid_size, ctr_size)));
 
-  return std::make_tuple(kid, ctr, 1 + kid_size + ctr_size);
+  return std::make_tuple(kid, ctr, data.subspan(0, 1 + kid_size + ctr_size));
 }
 
 output_bytes
@@ -608,32 +603,24 @@ Context::protect(KeyID key_id, output_bytes ciphertext, input_bytes plaintext)
   const auto ctr = st.counter;
   st.counter += 1;
 
-  // TODO(RLB): Create a header_size() method and call it here
-  auto tag_size = openssl_tag_size(suite);
-  if (ciphertext.size() < max_header_size + plaintext.size() + tag_size) {
-    throw std::runtime_error("Ciphertext buffer too small");
+  if (ciphertext.size() < max_header_size) {
+    throw std::runtime_error("Ciphertext to small to encod header");
   }
 
   auto hdr_size = encode_header(key_id, ctr, ciphertext);
+  auto header = ciphertext.subspan(0, hdr_size);
+  auto inner_ciphertext = ciphertext.subspan(hdr_size);
 
   const auto nonce = form_nonce(suite, ctr, st.salt);
-  return seal(suite, st.key, nonce, hdr_size, ciphertext, plaintext);
+  auto final_ciphertext = seal(suite, st.key, nonce, inner_ciphertext, header, plaintext);
+  return ciphertext.subspan(0, hdr_size + final_ciphertext.size());
 }
 
 output_bytes
 Context::unprotect(output_bytes plaintext, input_bytes ciphertext)
 {
-  auto [kid, ctr, hdr_size] =
-    decode_header(ciphertext);
-  auto tag_size = openssl_tag_size(suite);
-  if (ciphertext.size() < hdr_size + tag_size) {
-    throw std::runtime_error("Ciphertext too small");
-  }
-
-  auto pt_size = ciphertext.size() - hdr_size - tag_size;
-  if (plaintext.size() < pt_size) {
-    throw std::runtime_error("Plaintext too small");
-  }
+  auto [kid, ctr, header] = decode_header(ciphertext);
+  auto inner_ciphertext = ciphertext.subspan(header.size());
 
   auto it = state.find(kid);
   if (it == state.end()) {
@@ -642,7 +629,7 @@ Context::unprotect(output_bytes plaintext, input_bytes ciphertext)
 
   const auto& st = it->second;
   const auto nonce = form_nonce(suite, ctr, st.salt);
-  return open(suite, st.key, nonce, hdr_size, plaintext, ciphertext);
+  return open(suite, st.key, nonce, plaintext, header, inner_ciphertext);
 }
 
 } // namespace sframe
