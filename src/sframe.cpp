@@ -68,16 +68,11 @@ Context::add_key(KeyID key_id, const bytes& base_key)
 }
 
 static bytes
-form_nonce(CipherSuite suite, Counter ctr, const bytes& salt)
+form_nonce(Counter ctr, const bytes& salt)
 {
-  auto nonce_size = cipher_nonce_size(suite);
-  auto nonce = bytes(nonce_size);
+  auto nonce = salt;
   for (size_t i = 0; i < sizeof(ctr); i++) {
-    nonce[nonce_size - i - 1] = uint8_t(ctr >> (8 * i));
-  }
-
-  for (size_t i = 0; i < nonce.size(); i++) {
-    nonce[i] ^= salt[i];
+    nonce[nonce.size() - i - 1] ^= uint8_t(ctr >> (8 * i));
   }
 
   return nonce;
@@ -99,7 +94,7 @@ Context::protect(KeyID key_id, output_bytes ciphertext, input_bytes plaintext)
   auto header = ciphertext.subspan(0, hdr_size);
   auto inner_ciphertext = ciphertext.subspan(hdr_size);
 
-  const auto nonce = form_nonce(suite, ctr, st.salt);
+  const auto nonce = form_nonce(ctr, st.salt);
   auto final_ciphertext =
     seal(suite, st.key, nonce, inner_ciphertext, header, plaintext);
   return ciphertext.subspan(0, hdr_size + final_ciphertext.size());
@@ -117,7 +112,7 @@ Context::unprotect(output_bytes plaintext, input_bytes ciphertext)
   }
 
   const auto& st = it->second;
-  const auto nonce = form_nonce(suite, header.counter, st.salt);
+  const auto nonce = form_nonce(header.counter, st.salt);
   return open(suite, st.key, nonce, plaintext, aad, inner_ciphertext);
 }
 
