@@ -90,7 +90,7 @@ Context::protect(KeyID key_id, output_bytes ciphertext, input_bytes plaintext)
   const auto ctr = st.counter;
   st.counter += 1;
 
-  auto hdr_size = Header{key_id, ctr}.encode(ciphertext);
+  auto hdr_size = Header{ key_id, ctr }.encode(ciphertext);
   auto header = ciphertext.subspan(0, hdr_size);
   auto inner_ciphertext = ciphertext.subspan(hdr_size);
 

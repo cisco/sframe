@@ -113,7 +113,6 @@ cipher_nonce_size(CipherSuite suite)
   }
 }
 
-
 ///
 /// HMAC and HKDF
 ///

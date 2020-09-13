@@ -25,9 +25,12 @@ using scoped_hmac_ctx = std::unique_ptr<HMAC_CTX, decltype(hmac_ctx_free)>;
 /// Information about algorithms
 ///
 
-size_t cipher_digest_size(CipherSuite suite);
-size_t cipher_key_size(CipherSuite suite);
-size_t cipher_nonce_size(CipherSuite suite);
+size_t
+cipher_digest_size(CipherSuite suite);
+size_t
+cipher_key_size(CipherSuite suite);
+size_t
+cipher_nonce_size(CipherSuite suite);
 
 ///
 /// HMAC and HKDF

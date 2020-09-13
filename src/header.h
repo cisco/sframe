@@ -4,7 +4,8 @@
 
 namespace sframe {
 
-struct Header {
+struct Header
+{
   const KeyID key_id;
   const Counter counter;
 

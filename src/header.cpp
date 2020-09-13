@@ -3,9 +3,10 @@
 namespace sframe {
 
 static size_t
-uint_size(uint64_t val) {
+uint_size(uint64_t val)
+{
   for (unsigned int i = 0; i < 8; i += 1) {
-    if ((val >> (8*i)) == 0) {
+    if ((val >> (8 * i)) == 0) {
       return i;
     }
   }
@@ -38,7 +39,8 @@ decode_uint(input_bytes data)
   return val;
 }
 
-size_t Header::size() const
+size_t
+Header::size() const
 {
   auto kid_size = size_t(0);
   if (key_id > 0x07) {
@@ -81,7 +83,8 @@ Header::decode(input_bytes buffer)
   }
   auto counter = Counter(decode_uint(buffer.subspan(1 + kid_size, ctr_size)));
 
-  return std::make_tuple(Header{key_id, counter}, buffer.subspan(0, 1 + kid_size + ctr_size));
+  return std::make_tuple(Header{ key_id, counter },
+                         buffer.subspan(0, 1 + kid_size + ctr_size));
 }
 
 size_t
