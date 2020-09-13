@@ -11,15 +11,8 @@ namespace sframe {
 /// Scoped pointers for OpenSSL objects
 ///
 
-static auto evp_cipher_ctx_free = [](EVP_CIPHER_CTX* ptr) {
-  EVP_CIPHER_CTX_free(ptr);
-};
-
-static auto hmac_ctx_free = [](HMAC_CTX* ptr) { HMAC_CTX_free(ptr); };
-
-using scoped_evp_ctx =
-  std::unique_ptr<EVP_CIPHER_CTX, decltype(evp_cipher_ctx_free)>;
-using scoped_hmac_ctx = std::unique_ptr<HMAC_CTX, decltype(hmac_ctx_free)>;
+using scoped_evp_ctx = std::unique_ptr<EVP_CIPHER_CTX, decltype(&EVP_CIPHER_CTX_free)>;
+using scoped_hmac_ctx = std::unique_ptr<HMAC_CTX, decltype(&HMAC_CTX_free)>;
 
 ///
 /// Information about algorithms

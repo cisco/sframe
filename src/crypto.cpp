@@ -118,7 +118,7 @@ cipher_nonce_size(CipherSuite suite)
 ///
 
 HMAC::HMAC(CipherSuite suite, input_bytes key)
-  : ctx(HMAC_CTX_new(), hmac_ctx_free)
+  : ctx(HMAC_CTX_new(), HMAC_CTX_free)
 {
   auto type = openssl_digest_type(suite);
   if (1 != HMAC_Init_ex(ctx.get(), key.data(), key.size(), type, nullptr)) {
@@ -190,7 +190,7 @@ ctr_crypt(CipherSuite suite,
     throw std::runtime_error("CTR size mismatch");
   }
 
-  auto ctx = scoped_evp_ctx(EVP_CIPHER_CTX_new(), evp_cipher_ctx_free);
+  auto ctx = scoped_evp_ctx(EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free);
   if (ctx.get() == nullptr) {
     throw openssl_error();
   }
@@ -261,7 +261,7 @@ seal_aead(CipherSuite suite,
     throw std::runtime_error("Ciphertext buffer too small");
   }
 
-  auto ctx = scoped_evp_ctx(EVP_CIPHER_CTX_new(), evp_cipher_ctx_free);
+  auto ctx = scoped_evp_ctx(EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free);
   if (ctx.get() == nullptr) {
     throw openssl_error();
   }
@@ -378,7 +378,7 @@ open_aead(CipherSuite suite,
     throw std::runtime_error("Plaintext buffer too small");
   }
 
-  auto ctx = scoped_evp_ctx(EVP_CIPHER_CTX_new(), evp_cipher_ctx_free);
+  auto ctx = scoped_evp_ctx(EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free);
   if (ctx.get() == nullptr) {
     throw openssl_error();
   }
