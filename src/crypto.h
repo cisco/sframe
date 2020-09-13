@@ -11,7 +11,8 @@ namespace sframe {
 /// Scoped pointers for OpenSSL objects
 ///
 
-using scoped_evp_ctx = std::unique_ptr<EVP_CIPHER_CTX, decltype(&EVP_CIPHER_CTX_free)>;
+using scoped_evp_ctx =
+  std::unique_ptr<EVP_CIPHER_CTX, decltype(&EVP_CIPHER_CTX_free)>;
 using scoped_hmac_ctx = std::unique_ptr<HMAC_CTX, decltype(&HMAC_CTX_free)>;
 
 ///
