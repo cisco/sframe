@@ -26,8 +26,14 @@ static auto evp_cipher_ctx_free = [](EVP_CIPHER_CTX* ptr) {
   EVP_CIPHER_CTX_free(ptr);
 };
 
+static auto hmac_ctx_free = [](HMAC_CTX* ptr) {
+  HMAC_CTX_free(ptr);
+};
+
 using scoped_evp_ctx =
   std::unique_ptr<EVP_CIPHER_CTX, decltype(evp_cipher_ctx_free)>;
+using scoped_hmac_ctx =
+  std::unique_ptr<HMAC_CTX, decltype(hmac_ctx_free)>;
 
 static std::runtime_error
 openssl_error()
@@ -129,30 +135,41 @@ openssl_digest_size(CipherSuite suite)
   return EVP_MD_size(openssl_digest_type(suite));
 }
 
-static input_bytes
-hmac(CipherSuite suite, input_bytes key, input_bytes data)
-{
-  static auto md = std::array<uint8_t, EVP_MAX_MD_SIZE>();
-
-  unsigned int size = 0;
-  auto type = openssl_digest_type(suite);
-  if (nullptr == HMAC(type,
-                      key.data(),
-                      key.size(),
-                      data.data(),
-                      data.size(),
-                      md.data(),
-                      &size)) {
-    throw std::runtime_error("HMAC failure");
+struct HMAC {
+  HMAC(CipherSuite suite, input_bytes key)
+    : ctx(HMAC_CTX_new(), hmac_ctx_free)
+  {
+    auto type = openssl_digest_type(suite);
+    if (1 != HMAC_Init_ex(ctx.get(), key.data(), key.size(), type, nullptr)) {
+      throw openssl_error();
+    }
   }
 
-  return input_bytes(md.data(), size);
-}
+  HMAC& write(input_bytes data) {
+    if (1 != HMAC_Update(ctx.get(), data.data(), data.size())) {
+      throw openssl_error();
+    }
+
+    return *this;
+  }
+
+  input_bytes digest() {
+    unsigned int size = 0;
+    if (1 != HMAC_Final(ctx.get(), md.data(), &size)) {
+      throw openssl_error();
+    }
+
+    return input_bytes(md.data(), size);
+  }
+
+  scoped_hmac_ctx ctx;
+  std::array<uint8_t, EVP_MAX_MD_SIZE> md;
+};
 
 static bytes
 hkdf_extract(CipherSuite suite, const bytes& salt, const bytes& ikm)
 {
-  auto mac = hmac(suite, salt, ikm);
+  auto mac = HMAC(suite, salt).write(ikm).digest();
   return bytes(mac.begin(), mac.end());
 }
 
@@ -173,7 +190,7 @@ hkdf_expand(CipherSuite suite,
 
   auto label = info;
   label.push_back(0x01);
-  auto mac = hmac(suite, secret, label);
+  auto mac = HMAC(suite, secret).write(label).digest();
   return bytes(mac.begin(), mac.begin() + size);
 }
 
@@ -240,10 +257,7 @@ seal_ctr(CipherSuite suite,
   ctr_crypt(suite, enc_key, nonce, inner_ct, pt);
 
   // Authenticate with truncated HMAC
-  auto mac_input = bytes(aad.begin(), aad.end());
-  mac_input.insert(mac_input.end(), inner_ct.begin(), inner_ct.end());
-  auto mac = hmac(suite, auth_key, mac_input);
-
+  auto mac = HMAC(suite, auth_key).write(aad).write(inner_ct).digest();
   auto tag = ct.subspan(pt.size(), tag_size);
   std::copy(mac.begin(), mac.begin() + tag_size, tag.begin());
 
@@ -352,9 +366,7 @@ open_ctr(CipherSuite suite,
   auto auth_key = key_span.subspan(enc_key_size);
 
   // Authenticate with truncated HMAC
-  auto mac_input = bytes(aad.begin(), aad.end());
-  mac_input.insert(mac_input.end(), inner_ct.begin(), inner_ct.end());
-  auto mac = hmac(suite, auth_key, mac_input);
+  auto mac = HMAC(suite, auth_key).write(aad).write(inner_ct).digest();
   if (CRYPTO_memcmp(mac.data(), tag.data(), tag.size()) != 0) {
     throw std::runtime_error("AEAD authentication failure");
   }
