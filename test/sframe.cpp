@@ -41,6 +41,13 @@ ciphersuite_name(CipherSuite suite)
   }
 }
 
+template<typename T>
+bytes
+to_bytes(const T& range)
+{
+  return bytes(range.begin(), range.end());
+}
+
 TEST_CASE("SFrame Known-Answer")
 {
   struct KnownAnswerTest
@@ -97,6 +104,9 @@ TEST_CASE("SFrame Known-Answer")
       } },
   };
 
+  auto pt_out = bytes(plaintext.size());
+  auto ct_out = bytes(plaintext.size() + max_overhead);
+
   for (auto& pair : cases) {
     auto& suite = pair.first;
     auto& tc = pair.second;
@@ -106,31 +116,31 @@ TEST_CASE("SFrame Known-Answer")
     ctx.add_key(long_kid, tc.key);
 
     // KID=0x07, CTR=0, 1, 2
-    auto ct0 = ctx.protect(short_kid, plaintext);
-    auto ct1 = ctx.protect(short_kid, plaintext);
-    auto ct2 = ctx.protect(short_kid, plaintext);
+    auto ct0 = to_bytes(ctx.protect(short_kid, ct_out, plaintext));
+    auto ct1 = to_bytes(ctx.protect(short_kid, ct_out, plaintext));
+    auto ct2 = to_bytes(ctx.protect(short_kid, ct_out, plaintext));
 
     CHECK(ct0 == tc.short_kid_ctr0);
     CHECK(ct1 == tc.short_kid_ctr1);
     CHECK(ct2 == tc.short_kid_ctr2);
 
-    CHECK(plaintext == ctx.unprotect(ct0));
-    CHECK(plaintext == ctx.unprotect(ct1));
-    CHECK(plaintext == ctx.unprotect(ct2));
+    CHECK(plaintext == to_bytes(ctx.unprotect(pt_out, ct0)));
+    CHECK(plaintext == to_bytes(ctx.unprotect(pt_out, ct1)));
+    CHECK(plaintext == to_bytes(ctx.unprotect(pt_out, ct2)));
 
     // KID=0xffff, CTR=0
-    auto ctLS = ctx.protect(long_kid, plaintext);
+    auto ctLS = to_bytes(ctx.protect(long_kid, ct_out, plaintext));
     for (Counter ctr = 1; ctr < long_ctr; ctr++) {
-      ctx.protect(long_kid, plaintext);
+      ctx.protect(long_kid, ct_out, plaintext);
     }
-    auto ctLL = ctx.protect(long_kid, plaintext);
+    auto ctLL = to_bytes(ctx.protect(long_kid, ct_out, plaintext));
 
-    CHECK(ctLS == tc.long_kid_short_ctr);
-    CHECK(ctLL == tc.long_kid_long_ctr);
+    CHECK(to_bytes(ctLS) == tc.long_kid_short_ctr);
+    CHECK(to_bytes(ctLL) == tc.long_kid_long_ctr);
 
-    CHECK(plaintext == ctx.unprotect(ct0));
-    CHECK(plaintext == ctx.unprotect(ct1));
-    CHECK(plaintext == ctx.unprotect(ct2));
+    CHECK(plaintext == to_bytes(ctx.unprotect(pt_out, ct0)));
+    CHECK(plaintext == to_bytes(ctx.unprotect(pt_out, ct1)));
+    CHECK(plaintext == to_bytes(ctx.unprotect(pt_out, ct2)));
   }
 }
 
@@ -151,6 +161,9 @@ TEST_CASE("SFrame Round-Trip")
                "505152535455565758595a5b5c5d5e5f") },
   };
 
+  auto pt_out = bytes(plaintext.size());
+  auto ct_out = bytes(plaintext.size() + max_overhead);
+
   for (auto& pair : keys) {
     auto& suite = pair.first;
     auto& key = pair.second;
@@ -162,8 +175,8 @@ TEST_CASE("SFrame Round-Trip")
     recv.add_key(kid, key);
 
     for (int i = 0; i < rounds; i++) {
-      auto encrypted = send.protect(kid, plaintext);
-      auto decrypted = recv.unprotect(encrypted);
+      auto encrypted = to_bytes(send.protect(kid, ct_out, plaintext));
+      auto decrypted = to_bytes(recv.unprotect(pt_out, encrypted));
       CHECK(decrypted == plaintext);
     }
   }
