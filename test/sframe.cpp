@@ -181,3 +181,47 @@ TEST_CASE("SFrame Round-Trip")
     }
   }
 }
+
+TEST_CASE("MLS Known-Answer") {
+  // TODO
+}
+
+TEST_CASE("MLS Round-Trip") {
+  const auto epoch_bits = 2;
+  const auto test_epochs = 1 << (epoch_bits + 1);
+  const auto epoch_rounds = 10;
+  const auto plaintext = from_hex("00010203");
+  const auto sender_id_a = MLSContext::SenderID(0xA0A0A0A0);
+  const auto sender_id_b = MLSContext::SenderID(0xA1A1A1A1);
+  const std::vector<CipherSuite> suites{
+    CipherSuite::AES_CM_128_HMAC_SHA256_4,
+    CipherSuite::AES_CM_128_HMAC_SHA256_8,
+    CipherSuite::AES_GCM_128_SHA256,
+    CipherSuite::AES_GCM_256_SHA512,
+  };
+
+  auto pt_out = bytes(plaintext.size());
+  auto ct_out = bytes(plaintext.size() + max_overhead);
+
+  for (auto& suite : suites) {
+    auto member_a = MLSContext(suite, epoch_bits);
+    auto member_b = MLSContext(suite, epoch_bits);
+
+    for (MLSContext::EpochID epoch_id = 0; epoch_id < test_epochs; epoch_id++) {
+      const auto sframe_epoch_secret = bytes(8, uint8_t(epoch_id));
+
+      member_a.add_epoch(epoch_id, sframe_epoch_secret);
+      member_b.add_epoch(epoch_id, sframe_epoch_secret);
+
+      for (int i = 0; i < epoch_rounds; i++) {
+        auto encrypted_ab = member_a.protect(epoch_id, sender_id_a, ct_out, plaintext);
+        auto decrypted_ab = member_b.unprotect(pt_out, encrypted_ab);
+        CHECK(plaintext == to_bytes(decrypted_ab));
+
+        auto encrypted_ba = member_b.protect(epoch_id, sender_id_b, ct_out, plaintext);
+        auto decrypted_ba = member_a.unprotect(pt_out, encrypted_ba);
+        CHECK(plaintext == to_bytes(decrypted_ba));
+      }
+    }
+  }
+}
