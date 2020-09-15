@@ -22,19 +22,37 @@ using bytes = std::vector<uint8_t>;
 using input_bytes = gsl::span<const uint8_t>;
 using output_bytes = gsl::span<uint8_t>;
 
+std::ostream&
+operator<<(std::ostream& str, const input_bytes data);
+
 using KeyID = uint64_t;
 using Counter = uint64_t;
 
-struct KeyState
+class SFrame
 {
-  static KeyState from_base_key(CipherSuite suite, const bytes& base_key);
+protected:
+  CipherSuite suite;
 
-  bytes key;
-  bytes salt;
-  Counter counter;
+  SFrame(CipherSuite suite_in);
+
+  struct KeyState
+  {
+    static KeyState from_base_key(CipherSuite suite, const bytes& base_key);
+
+    bytes key;
+    bytes salt;
+    Counter counter;
+  };
+
+  output_bytes _protect(KeyID key_id,
+                        output_bytes ciphertext,
+                        input_bytes plaintext);
+  output_bytes _unprotect(output_bytes ciphertext, input_bytes plaintext);
+
+  virtual KeyState& get_state(KeyID key_id) = 0;
 };
 
-class Context
+class Context : public SFrame
 {
 public:
   Context(CipherSuite suite);
@@ -47,11 +65,12 @@ public:
   output_bytes unprotect(output_bytes plaintext, input_bytes ciphertext);
 
 private:
-  const CipherSuite suite;
   std::map<KeyID, KeyState> state;
+
+  KeyState& get_state(KeyID key_id) override;
 };
 
-class MLSContext
+class MLSContext : public SFrame
 {
 public:
   using EpochID = uint64_t;
@@ -68,7 +87,6 @@ public:
   output_bytes unprotect(output_bytes plaintext, input_bytes ciphertext);
 
 private:
-  const CipherSuite suite;
   const size_t epoch_bits;
   const size_t epoch_mask;
 
@@ -82,6 +100,7 @@ private:
   };
 
   std::vector<std::optional<EpochKeys>> epoch_cache;
+  KeyState& get_state(KeyID key_id) override;
 };
 
 } // namespace sframe
