@@ -22,11 +22,17 @@ using bytes = std::vector<uint8_t>;
 using input_bytes = gsl::span<const uint8_t>;
 using output_bytes = gsl::span<uint8_t>;
 
-std::ostream&
-operator<<(std::ostream& str, const input_bytes data);
-
 using KeyID = uint64_t;
 using Counter = uint64_t;
+
+struct KeyState
+{
+  static KeyState from_base_key(CipherSuite suite, const bytes& base_key);
+
+  bytes key;
+  bytes salt;
+  Counter counter;
+};
 
 class Context
 {
@@ -41,15 +47,41 @@ public:
   output_bytes unprotect(output_bytes plaintext, input_bytes ciphertext);
 
 private:
-  struct KeyState
-  {
-    bytes key;
-    bytes salt;
-    Counter counter;
-  };
-
   const CipherSuite suite;
   std::map<KeyID, KeyState> state;
+};
+
+class MLSContext
+{
+public:
+  using EpochID = uint64_t;
+  using SenderID = uint32_t;
+
+  MLSContext(CipherSuite suite_in, size_t epoch_bits_in);
+
+  void add_epoch(EpochID epoch_id, const bytes& sframe_epoch_secret);
+
+  output_bytes protect(EpochID epoch_id,
+                       SenderID sender_id,
+                       output_bytes ciphertext,
+                       input_bytes plaintext);
+  output_bytes unprotect(output_bytes plaintext, input_bytes ciphertext);
+
+private:
+  const CipherSuite suite;
+  const size_t epoch_bits;
+  const size_t epoch_mask;
+
+  struct EpochKeys
+  {
+    const bytes sframe_epoch_secret;
+    std::map<SenderID, KeyState> sender_keys;
+
+    EpochKeys(bytes sframe_epoch_secret);
+    KeyState& get(CipherSuite suite, SenderID sender_id);
+  };
+
+  std::vector<std::optional<EpochKeys>> epoch_cache;
 };
 
 } // namespace sframe

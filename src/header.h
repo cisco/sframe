@@ -4,6 +4,9 @@
 
 namespace sframe {
 
+size_t
+encode_uint(uint64_t val, output_bytes buffer);
+
 struct Header
 {
   const KeyID key_id;

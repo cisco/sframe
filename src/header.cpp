@@ -14,8 +14,8 @@ uint_size(uint64_t val)
   return 8;
 }
 
-static size_t
-encode_uint(uint64_t val, output_bytes start)
+size_t
+encode_uint(uint64_t val, output_bytes buffer)
 {
   size_t size = 1;
   while (val >> (8 * size) > 0) {
@@ -23,7 +23,7 @@ encode_uint(uint64_t val, output_bytes start)
   }
 
   for (size_t i = 0; i < size; i++) {
-    start[size - i - 1] = uint8_t(val >> (8 * i));
+    buffer[size - i - 1] = uint8_t(val >> (8 * i));
   }
 
   return size;
