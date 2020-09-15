@@ -182,11 +182,134 @@ TEST_CASE("SFrame Round-Trip")
   }
 }
 
-TEST_CASE("MLS Known-Answer") {
-  // TODO
+TEST_CASE("MLS Known-Answer")
+{
+  struct KnownAnswerTest
+  {
+    using Epoch = std::vector<bytes>;
+    std::vector<Epoch> epochs;
+  };
+
+  const auto plaintext = from_hex("00010203");
+  const auto epoch_bits = 4;
+  const auto epoch_ids = std::vector<MLSContext::EpochID>{
+    0x00,
+    0x0f,
+    0x10,
+  };
+  const auto epoch_secrets = std::vector<bytes>{
+    from_hex("00000000000000000000000000000000"),
+    from_hex("0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f"),
+    from_hex("10101010101010101010101010101010"),
+  };
+  const auto sender_ids = std::vector<MLSContext::SenderID>{
+    0x0a,
+    0xaa,
+    0xaaa,
+  };
+  const std::map<CipherSuite, KnownAnswerTest> cases{
+    { CipherSuite::AES_CM_128_HMAC_SHA256_4,
+      { {
+        {
+          from_hex("19a000c92bf2b7e7ff7380"),
+          from_hex("1a0aa000c84890cf05de8f15"),
+          from_hex("1aaaa0004361be8cdb7110ae"),
+        },
+        {
+          from_hex("19af0086adc8a84a84eca2"),
+          from_hex("1a0aaf006870557d8f7c5a27"),
+          from_hex("1aaaaf00a0e68b606087812a"),
+        },
+        {
+          from_hex("19a0001ad5829bbc85f504"),
+          from_hex("1a0aa0004769a13c89e6ba00"),
+          from_hex("1aaaa000586b97fa780a731a"),
+        },
+      } } },
+    { CipherSuite::AES_CM_128_HMAC_SHA256_8,
+      { {
+        {
+          from_hex("19a000c92bf2b7e7ff7380241209e1"),
+          from_hex("1a0aa000c84890cf05de8f15e2a6a98b"),
+          from_hex("1aaaa0004361be8cdb7110aed8f39907"),
+        },
+        {
+          from_hex("19af0086adc8a84a84eca293b60fbf"),
+          from_hex("1a0aaf006870557d8f7c5a27fe48227b"),
+          from_hex("1aaaaf00a0e68b606087812a9034f06a"),
+        },
+        {
+          from_hex("19a0001ad5829bbc85f504f77f3dc8"),
+          from_hex("1a0aa0004769a13c89e6ba005f2cfe5a"),
+          from_hex("1aaaa000586b97fa780a731a435006cd"),
+        },
+      } } },
+    { CipherSuite::AES_GCM_128_SHA256,
+      { {
+        {
+          from_hex("19a000bb7d6b3b9a9a5f1abc476b5cfaff53a9c3685ad5"),
+          from_hex("1a0aa000382032d06913e59807a6ad0f6193dca0ab8b6ceb"),
+          from_hex("1aaaa0006aa1aa44edf64dd101a31d9f39cd1abe129de1ed"),
+        },
+        {
+          from_hex("19af0077d06820762dfc682df9e0f3bd635b6240840359"),
+          from_hex("1a0aaf00a99857f0b13b2b8b44923c54655494d8270b07a8"),
+          from_hex("1aaaaf00662bf029c244947f2a8cefa3512259a3aff92dd0"),
+        },
+        {
+          from_hex("19a0000661fb1fa3c7bd98032ab3aaea3c1ff4897324fa"),
+          from_hex("1a0aa0008140a14b320f01830bce39727dc17a29e8e08fb7"),
+          from_hex("1aaaa00084da92db90a3a24032a12c2706b90a79327f66fb"),
+        },
+      } } },
+    { CipherSuite::AES_GCM_256_SHA512,
+      { {
+        {
+          from_hex("19a000414462cce78dc5e70db0edb825fdccdb27e0a8f8"),
+          from_hex("1a0aa000c013c6d9609e398adb51aa2df988ab2090615217"),
+          from_hex("1aaaa0009a2a9ab0db57883851ab7d4eb57355cd950e4819"),
+        },
+        {
+          from_hex("19af00466bc33bfe97e91602724b243b90c9a1dcb85416"),
+          from_hex("1a0aaf00f72194872e6a76fcce1a4ca71d4e0e5a48017c67"),
+          from_hex("1aaaaf0043a23ff519b65803318cfc7f661021e18ff19e68"),
+        },
+        {
+          from_hex("19a0004f4d239d117be8ab84e9972868016258b8a9a65f"),
+          from_hex("1a0aa000b592b5e30ce07c102c5ee18fcb99e19be76c7739"),
+          from_hex("1aaaa000fd95ba9a9ab3d82e9efce294a75837d766f75526"),
+        },
+      } } },
+  };
+
+  auto pt_out = bytes(plaintext.size());
+  auto ct_out = bytes(plaintext.size() + max_overhead);
+
+  for (const auto& pair : cases) {
+    auto& suite = pair.first;
+    auto& tc = pair.second;
+
+    auto ctx = MLSContext(suite, epoch_bits);
+
+    CHECK(tc.epochs.size() == epoch_ids.size());
+    for (size_t i = 0; i < tc.epochs.size(); i++) {
+      ctx.add_epoch(epoch_ids[i], epoch_secrets[i]);
+
+      CHECK(tc.epochs[i].size() == sender_ids.size());
+      for (size_t j = 0; j < tc.epochs[i].size(); j++) {
+        auto encrypted =
+          ctx.protect(epoch_ids[i], sender_ids[j], ct_out, plaintext);
+        CHECK(tc.epochs[i][j] == to_bytes(encrypted));
+
+        auto decrypted = ctx.unprotect(pt_out, tc.epochs[i][j]);
+        CHECK(plaintext == to_bytes(decrypted));
+      }
+    }
+  }
 }
 
-TEST_CASE("MLS Round-Trip") {
+TEST_CASE("MLS Round-Trip")
+{
   const auto epoch_bits = 2;
   const auto test_epochs = 1 << (epoch_bits + 1);
   const auto epoch_rounds = 10;
@@ -214,11 +337,13 @@ TEST_CASE("MLS Round-Trip") {
       member_b.add_epoch(epoch_id, sframe_epoch_secret);
 
       for (int i = 0; i < epoch_rounds; i++) {
-        auto encrypted_ab = member_a.protect(epoch_id, sender_id_a, ct_out, plaintext);
+        auto encrypted_ab =
+          member_a.protect(epoch_id, sender_id_a, ct_out, plaintext);
         auto decrypted_ab = member_b.unprotect(pt_out, encrypted_ab);
         CHECK(plaintext == to_bytes(decrypted_ab));
 
-        auto encrypted_ba = member_b.protect(epoch_id, sender_id_b, ct_out, plaintext);
+        auto encrypted_ba =
+          member_b.protect(epoch_id, sender_id_b, ct_out, plaintext);
         auto decrypted_ba = member_a.unprotect(pt_out, encrypted_ba);
         CHECK(plaintext == to_bytes(decrypted_ba));
       }

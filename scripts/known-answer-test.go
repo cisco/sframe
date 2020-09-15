@@ -182,10 +182,21 @@ var (
 	header_7_2        = from_hex("1702")
 	header_long_short = from_hex("1affff00")
 	header_long_long  = from_hex("2affff0100")
+
+	forSender = map[int]string{
+		0xa:   "19a",
+		0xaa:  "1a0aa",
+		0xaaa: "1aaaa",
+	}
+	epochSecret = map[int][]byte{
+		0x00: from_hex("00000000000000000000000000000000"),
+		0x0f: from_hex("0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f"),
+		0x10: from_hex("10101010101010101010101010101010"),
+	}
+	epoch_mask = 0x0f
 )
 
-func protect(suite CipherSuite, ctr uint64, header []byte) []byte {
-	baseKey := baseKeys[suite.ID]
+func protect(suite CipherSuite, baseKey []byte, ctr uint64, header []byte) []byte {
 	secret := suite.Extract(baseKey, []byte("SFrame10"))
 	key := suite.Expand(secret, []byte("key"), suite.Nk)
 	salt := suite.Expand(secret, []byte("salt"), suite.Nn)
@@ -201,6 +212,22 @@ func protect(suite CipherSuite, ctr uint64, header []byte) []byte {
 	return append(header, ct...)
 }
 
+func mlsHeader(epoch, sender int) []byte {
+	epochStr := fmt.Sprintf("%01x", epoch&epoch_mask)
+	return from_hex(forSender[sender] + epochStr + "00")
+}
+
+func mlsBaseKey(suite CipherSuite, epoch, sender int) []byte {
+	sframeEpochSecret := epochSecret[epoch]
+	encSender := []byte{byte(sender >> 24), byte(sender >> 16), byte(sender >> 8), byte(sender)}
+	return suite.Expand(sframeEpochSecret, encSender, suite.Hash.Size())
+}
+
+func mlsProtect(suite CipherSuite, epoch, sender int) []byte {
+	baseKey := mlsBaseKey(suite, epoch, sender)
+	return protect(suite, baseKey, 0, mlsHeader(epoch, sender))
+}
+
 func main() {
 	suites := []CipherSuite{
 		AES_CM_128_HMAC_SHA256_4,
@@ -210,11 +237,11 @@ func main() {
 	}
 
 	for _, suite := range suites {
-		ct_7_0 := protect(suite, 0, header_7_0)
-		ct_7_1 := protect(suite, 1, header_7_1)
-		ct_7_2 := protect(suite, 2, header_7_2)
-		ct_long_short := protect(suite, 0, header_long_short)
-		ct_long_long := protect(suite, 0x0100, header_long_long)
+		ct_7_0 := protect(suite, baseKeys[suite.ID], 0, header_7_0)
+		ct_7_1 := protect(suite, baseKeys[suite.ID], 1, header_7_1)
+		ct_7_2 := protect(suite, baseKeys[suite.ID], 2, header_7_2)
+		ct_long_short := protect(suite, baseKeys[suite.ID], 0, header_long_short)
+		ct_long_long := protect(suite, baseKeys[suite.ID], 0x0100, header_long_long)
 
 		fmt.Printf("{ CipherSuite::%s,\n", suite.Name)
 		fmt.Printf("  {\n")
@@ -226,4 +253,24 @@ func main() {
 		fmt.Printf("    from_hex(\"%x\"),\n", ct_long_long)
 		fmt.Printf("  } },\n")
 	}
+
+	fmt.Printf("\n\n/* ***** ***** ***** ***** */\n\n\n")
+
+	epochs := []int{0x00, 0x0f, 0x10}
+	senders := []int{0xa, 0xaa, 0xaaa}
+
+	for _, suite := range suites {
+		fmt.Printf("{ CipherSuite::%s,\n", suite.Name)
+		fmt.Printf("  { {\n")
+		for _, epoch := range epochs {
+			fmt.Printf("    {\n")
+			for _, sender := range senders {
+				ciphertext := mlsProtect(suite, epoch, sender)
+				fmt.Printf("      from_hex(\"%x\"),\n", ciphertext)
+			}
+			fmt.Printf("    },\n")
+		}
+		fmt.Printf("  } } },\n")
+	}
+
 }

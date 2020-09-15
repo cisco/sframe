@@ -4,7 +4,7 @@
 
 namespace sframe {
 
-size_t
+void
 encode_uint(uint64_t val, output_bytes buffer);
 
 struct Header
