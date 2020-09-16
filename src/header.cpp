@@ -14,19 +14,13 @@ uint_size(uint64_t val)
   return 8;
 }
 
-static size_t
-encode_uint(uint64_t val, output_bytes start)
+void
+encode_uint(uint64_t val, output_bytes buffer)
 {
-  size_t size = 1;
-  while (val >> (8 * size) > 0) {
-    size += 1;
+  size_t size = buffer.size();
+  for (size_t i = 0; i < size && i < 8; i++) {
+    buffer[size - i - 1] = uint8_t(val >> (8 * i));
   }
-
-  for (size_t i = 0; i < size; i++) {
-    start[size - i - 1] = uint8_t(val >> (8 * i));
-  }
-
-  return size;
 }
 
 static uint64_t
@@ -94,19 +88,23 @@ Header::encode(output_bytes buffer) const
     throw std::runtime_error("Buffer too small to encode header");
   }
 
-  auto kid_size = size_t(0);
-  if (key_id > 0x07) {
-    kid_size = encode_uint(key_id, buffer.subspan(1));
-  }
-
-  auto ctr_size = encode_uint(counter, buffer.subspan(1 + kid_size));
-
-  buffer[0] = uint8_t(ctr_size << 4);
+  auto kid_size = uint_size(key_id);
   if (key_id <= 0x07) {
-    buffer[0] |= key_id;
+    kid_size = 0;
+    buffer[0] = key_id;
   } else {
-    buffer[0] |= 0x08 | kid_size;
+    encode_uint(key_id, buffer.subspan(1, kid_size));
+    buffer[0] = 0x08 | kid_size;
   }
+
+  auto ctr_size = uint_size(counter);
+  if (ctr_size == 0) {
+    // Counter always takes at least one byte
+    ctr_size = 1;
+  }
+
+  encode_uint(counter, buffer.subspan(1 + kid_size, ctr_size));
+  buffer[0] |= uint8_t(ctr_size << 4);
 
   return 1 + kid_size + ctr_size;
 }
