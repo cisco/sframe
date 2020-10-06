@@ -34,6 +34,7 @@ protected:
   CipherSuite suite;
 
   SFrame(CipherSuite suite_in);
+  virtual ~SFrame();
 
   struct KeyState
   {

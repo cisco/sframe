@@ -92,6 +92,9 @@ SFrame::SFrame(CipherSuite suite_in)
   : suite(suite_in)
 {}
 
+SFrame::~SFrame()
+{}
+
 output_bytes
 SFrame::_protect(KeyID key_id, output_bytes ciphertext, input_bytes plaintext)
 {
