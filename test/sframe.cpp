@@ -9,7 +9,7 @@
 
 using namespace sframe;
 
-bytes
+static bytes
 from_hex(const std::string& hex)
 {
   if (hex.length() % 2 == 1) {
@@ -26,7 +26,8 @@ from_hex(const std::string& hex)
   return out;
 }
 
-std::string
+#if 0 // currently unused
+static std::string
 ciphersuite_name(CipherSuite suite)
 {
   switch (suite) {
@@ -40,6 +41,7 @@ ciphersuite_name(CipherSuite suite)
       return "Unknown ciphersuite";
   }
 }
+#endif
 
 template<typename T>
 bytes
