@@ -26,23 +26,6 @@ from_hex(const std::string& hex)
   return out;
 }
 
-#if 0 // currently unused
-static std::string
-ciphersuite_name(CipherSuite suite)
-{
-  switch (suite) {
-    case CipherSuite::AES_GCM_128_SHA256:
-      return "AES_GCM_128";
-
-    case CipherSuite::AES_GCM_256_SHA512:
-      return "AES_GCM_256";
-
-    default:
-      return "Unknown ciphersuite";
-  }
-}
-#endif
-
 template<typename T>
 bytes
 to_bytes(const T& range)
