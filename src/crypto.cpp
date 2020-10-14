@@ -52,7 +52,7 @@ openssl_cipher(CipherSuite suite)
   }
 }
 
-size_t
+static size_t
 openssl_tag_size(CipherSuite suite)
 {
   switch (suite) {
@@ -179,7 +179,7 @@ hkdf_expand(CipherSuite suite,
 /// AEAD Algorithms
 ///
 
-void
+static void
 ctr_crypt(CipherSuite suite,
           input_bytes key,
           input_bytes nonce,

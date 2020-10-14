@@ -9,7 +9,7 @@
 
 using namespace sframe;
 
-bytes
+static bytes
 from_hex(const std::string& hex)
 {
   if (hex.length() % 2 == 1) {
@@ -24,21 +24,6 @@ from_hex(const std::string& hex)
   }
 
   return out;
-}
-
-std::string
-ciphersuite_name(CipherSuite suite)
-{
-  switch (suite) {
-    case CipherSuite::AES_GCM_128_SHA256:
-      return "AES_GCM_128";
-
-    case CipherSuite::AES_GCM_256_SHA512:
-      return "AES_GCM_256";
-
-    default:
-      return "Unknown ciphersuite";
-  }
 }
 
 template<typename T>
