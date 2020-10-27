@@ -33,7 +33,7 @@ cipher_nonce_size(CipherSuite suite);
 struct HMAC
 {
   HMAC(CipherSuite suite, input_bytes key);
-  HMAC& write(input_bytes data);
+  void write(input_bytes data);
   input_bytes digest();
 
   scoped_hmac_ctx ctx;

@@ -126,14 +126,12 @@ HMAC::HMAC(CipherSuite suite, input_bytes key)
   }
 }
 
-HMAC&
+void
 HMAC::write(input_bytes data)
 {
   if (1 != HMAC_Update(ctx.get(), data.data(), data.size())) {
     throw openssl_error();
   }
-
-  return *this;
 }
 
 input_bytes
@@ -356,7 +354,10 @@ open_ctr(CipherSuite suite,
   auto auth_key = key_span.subspan(enc_key_size);
 
   // Authenticate with truncated HMAC
-  auto mac = HMAC(suite, auth_key).write(aad).write(inner_ct).digest();
+  auto hmac = HMAC(suite, auth_key);
+  hmac.write(aad);
+  hmac.write(inner_ct);
+  auto mac = hmac.digest();
   if (CRYPTO_memcmp(mac.data(), tag.data(), tag.size()) != 0) {
     throw std::runtime_error("AEAD authentication failure");
   }
