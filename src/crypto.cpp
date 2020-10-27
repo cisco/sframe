@@ -150,7 +150,9 @@ HMAC::digest()
 bytes
 hkdf_extract(CipherSuite suite, const bytes& salt, const bytes& ikm)
 {
-  auto mac = HMAC(suite, salt).write(ikm).digest();
+  auto hmac = HMAC(suite, salt);
+  hmac.write(ikm);
+  auto mac = hmac.digest();
   return bytes(mac.begin(), mac.end());
 }
 
@@ -171,7 +173,9 @@ hkdf_expand(CipherSuite suite,
 
   auto label = info;
   label.push_back(0x01);
-  auto mac = HMAC(suite, secret).write(label).digest();
+  auto hmac = HMAC(suite, secret);
+  hmac.write(label);
+  auto mac = hmac.digest();
   return bytes(mac.begin(), mac.begin() + size);
 }
 
@@ -241,7 +245,10 @@ seal_ctr(CipherSuite suite,
   ctr_crypt(suite, enc_key, nonce, inner_ct, pt);
 
   // Authenticate with truncated HMAC
-  auto mac = HMAC(suite, auth_key).write(aad).write(inner_ct).digest();
+  auto hmac = HMAC(suite, auth_key);
+  hmac.write(aad);
+  hmac.write(inner_ct);
+  auto mac = hmac.digest();
   auto tag = ct.subspan(pt.size(), tag_size);
   std::copy(mac.begin(), mac.begin() + tag_size, tag.begin());
 
