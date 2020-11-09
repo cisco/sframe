@@ -2,6 +2,7 @@
 
 #include <iosfwd>
 #include <map>
+#include <optional>
 #include <vector>
 
 #include <gsl/gsl>
