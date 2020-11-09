@@ -9,12 +9,9 @@ namespace sframe {
 /// Convert between native identifiers / errors and OpenSSL ones
 ///
 
-static std::runtime_error
-openssl_error()
-{
-  auto code = ERR_get_error();
-  return std::runtime_error(ERR_error_string(code, nullptr));
-}
+openssl_error::openssl_error()
+  : std::runtime_error(ERR_error_string(ERR_get_error(), nullptr))
+{}
 
 static const EVP_MD*
 openssl_digest_type(CipherSuite suite)
@@ -29,7 +26,7 @@ openssl_digest_type(CipherSuite suite)
       return EVP_sha512();
 
     default:
-      throw std::runtime_error("Unsupported ciphersuite");
+      throw unsupported_ciphersuite_error();
   }
 }
 
@@ -48,7 +45,7 @@ openssl_cipher(CipherSuite suite)
       return EVP_aes_256_gcm();
 
     default:
-      throw std::runtime_error("Unsupported ciphersuite");
+      throw unsupported_ciphersuite_error();
   }
 }
 
@@ -67,7 +64,7 @@ openssl_tag_size(CipherSuite suite)
       return 16;
 
     default:
-      throw std::runtime_error("Unsupported ciphersuite");
+      throw unsupported_ciphersuite_error();
   }
 }
 
@@ -94,7 +91,7 @@ cipher_key_size(CipherSuite suite)
       return 32;
 
     default:
-      throw std::runtime_error("Unsupported ciphersuite");
+      throw unsupported_ciphersuite_error();
   }
 }
 
@@ -109,7 +106,7 @@ cipher_nonce_size(CipherSuite suite)
       return 12;
 
     default:
-      throw std::runtime_error("Unsupported ciphersuite");
+      throw unsupported_ciphersuite_error();
   }
 }
 
@@ -167,7 +164,7 @@ hkdf_expand(CipherSuite suite,
 {
   // Ensure that we need only one hash invocation
   if (size > cipher_digest_size(suite)) {
-    throw std::runtime_error("Size too big for hkdf_expand");
+    throw invalid_parameter_error("Size too big for hkdf_expand");
   }
 
   auto label = info;
@@ -190,7 +187,7 @@ ctr_crypt(CipherSuite suite,
           input_bytes in)
 {
   if (out.size() != in.size()) {
-    throw std::runtime_error("CTR size mismatch");
+    throw buffer_too_small_error("CTR size mismatch");
   }
 
   auto ctx = scoped_evp_ctx(EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free);
@@ -230,7 +227,7 @@ seal_ctr(CipherSuite suite,
 {
   auto tag_size = openssl_tag_size(suite);
   if (ct.size() < pt.size() + tag_size) {
-    throw std::runtime_error("Ciphertext buffer too small");
+    throw buffer_too_small_error("Ciphertext buffer too small");
   }
 
   // Split the key into enc and auth subkeys
@@ -264,7 +261,7 @@ seal_aead(CipherSuite suite,
 {
   auto tag_size = openssl_tag_size(suite);
   if (ct.size() < pt.size() + tag_size) {
-    throw std::runtime_error("Ciphertext buffer too small");
+    throw buffer_too_small_error("Ciphertext buffer too small");
   }
 
   auto ctx = scoped_evp_ctx(EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free);
@@ -329,7 +326,7 @@ seal(CipherSuite suite,
     }
   }
 
-  throw std::runtime_error("Unknown algorithm");
+  throw unsupported_ciphersuite_error();
 }
 
 static output_bytes
@@ -342,7 +339,7 @@ open_ctr(CipherSuite suite,
 {
   auto tag_size = openssl_tag_size(suite);
   if (ct.size() < tag_size) {
-    throw std::runtime_error("Ciphertext buffer too small");
+    throw buffer_too_small_error("Ciphertext buffer too small");
   }
 
   auto inner_ct_size = ct.size() - tag_size;
@@ -361,7 +358,7 @@ open_ctr(CipherSuite suite,
   hmac.write(inner_ct);
   auto mac = hmac.digest();
   if (CRYPTO_memcmp(mac.data(), tag.data(), tag.size()) != 0) {
-    throw std::runtime_error("AEAD authentication failure");
+    throw authentication_error();
   }
 
   // Decrypt with AES-CM
@@ -380,12 +377,12 @@ open_aead(CipherSuite suite,
 {
   auto tag_size = openssl_tag_size(suite);
   if (ct.size() < tag_size) {
-    throw std::runtime_error("Ciphertext buffer too small");
+    throw buffer_too_small_error("Ciphertext buffer too small");
   }
 
   auto inner_ct_size = ct.size() - tag_size;
   if (pt.size() < inner_ct_size) {
-    throw std::runtime_error("Plaintext buffer too small");
+    throw buffer_too_small_error("Plaintext buffer too small");
   }
 
   auto ctx = scoped_evp_ctx(EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free);
@@ -424,7 +421,7 @@ open_aead(CipherSuite suite,
   // Providing nullptr as an argument is safe here because this
   // function never writes with GCM; it only verifies the tag
   if (1 != EVP_DecryptFinal(ctx.get(), nullptr, &out_size)) {
-    throw std::runtime_error("AEAD authentication failure");
+    throw authentication_error();
   }
 
   return pt.subspan(0, inner_ct_size);
@@ -450,7 +447,7 @@ open(CipherSuite suite,
     }
   }
 
-  throw std::runtime_error("Unknown algorithm");
+  throw unsupported_ciphersuite_error();
 }
 
 } // namespace sframe

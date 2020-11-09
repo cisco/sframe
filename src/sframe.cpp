@@ -22,6 +22,18 @@ operator<<(std::ostream& str, const input_bytes data)
 }
 
 ///
+/// Errors
+///
+
+unsupported_ciphersuite_error::unsupported_ciphersuite_error()
+  : std::runtime_error("Unsupported ciphersuite")
+{}
+
+authentication_error::authentication_error()
+  : std::runtime_error("AEAD authentication failure")
+{}
+
+///
 /// Context
 ///
 
@@ -139,7 +151,7 @@ Context::get_state(KeyID key_id)
 {
   auto it = state.find(key_id);
   if (it == state.end()) {
-    throw std::runtime_error("Unknown key");
+    throw invalid_parameter_error("Unknown key");
   }
 
   return it->second;
@@ -212,7 +224,7 @@ MLSContext::get_state(KeyID key_id)
 
   auto& epoch = epoch_cache.at(epoch_index);
   if (!epoch.has_value()) {
-    throw std::runtime_error("Unknown epoch");
+    throw invalid_parameter_error("Unknown epoch");
   }
 
   return epoch->get(suite, sender_id);

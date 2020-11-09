@@ -43,7 +43,7 @@ Header::size() const
 
   const auto ctr_size = uint_size(counter);
   if ((kid_size > 0x07) || (ctr_size > 0x07)) {
-    throw std::runtime_error("Header overflow");
+    throw buffer_too_small_error("Header overflow");
   }
 
   return 1 + kid_size + ctr_size;
@@ -53,7 +53,7 @@ std::tuple<Header, input_bytes>
 Header::decode(input_bytes buffer)
 {
   if (buffer.size() < Header::min_size) {
-    throw std::runtime_error("Ciphertext too small to decode header");
+    throw buffer_too_small_error("Ciphertext too small to decode header");
   }
 
   auto cfg = buffer[0];
@@ -64,7 +64,7 @@ Header::decode(input_bytes buffer)
   auto key_id = KeyID(kid_size);
   if (kid_long) {
     if (buffer.size() < 1 + kid_size) {
-      throw std::runtime_error("Ciphertext too small to decode KID");
+      throw buffer_too_small_error("Ciphertext too small to decode KID");
     }
 
     key_id = KeyID(decode_uint(buffer.subspan(1, kid_size)));
@@ -73,7 +73,7 @@ Header::decode(input_bytes buffer)
   }
 
   if (buffer.size() < 1 + kid_size + ctr_size) {
-    throw std::runtime_error("Ciphertext too small to decode CTR");
+    throw buffer_too_small_error("Ciphertext too small to decode CTR");
   }
   auto counter = Counter(decode_uint(buffer.subspan(1 + kid_size, ctr_size)));
 
@@ -85,7 +85,7 @@ size_t
 Header::encode(output_bytes buffer) const
 {
   if (buffer.size() < size()) {
-    throw std::runtime_error("Buffer too small to encode header");
+    throw buffer_too_small_error("Buffer too small to encode header");
   }
 
   auto kid_size = uint_size(key_id);

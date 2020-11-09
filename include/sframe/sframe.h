@@ -9,6 +9,33 @@
 
 namespace sframe {
 
+struct openssl_error : std::runtime_error
+{
+  openssl_error();
+};
+
+struct unsupported_ciphersuite_error : std::runtime_error
+{
+  unsupported_ciphersuite_error();
+};
+
+struct authentication_error : std::runtime_error
+{
+  authentication_error();
+};
+
+struct buffer_too_small_error : std::runtime_error
+{
+  using parent = std::runtime_error;
+  using parent::parent;
+};
+
+struct invalid_parameter_error : std::runtime_error
+{
+  using parent = std::runtime_error;
+  using parent::parent;
+};
+
 enum class CipherSuite : uint16_t
 {
   AES_CM_128_HMAC_SHA256_4 = 1,
