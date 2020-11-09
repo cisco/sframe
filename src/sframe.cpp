@@ -152,8 +152,8 @@ Context::get_state(KeyID key_id)
 MLSContext::MLSContext(CipherSuite suite_in, size_t epoch_bits_in)
   : SFrame(suite_in)
   , epoch_bits(epoch_bits_in)
-  , epoch_mask((1 << epoch_bits_in) - 1)
-  , epoch_cache(1 << epoch_bits_in, std::nullopt)
+  , epoch_mask((size_t(1) << epoch_bits_in) - 1)
+  , epoch_cache(size_t(1) << epoch_bits_in, std::nullopt)
 {}
 
 void
@@ -185,20 +185,20 @@ MLSContext::EpochKeys::EpochKeys(bytes sframe_epoch_secret_in)
 {}
 
 SFrame::KeyState&
-MLSContext::EpochKeys::get(CipherSuite suite, SenderID sender_id)
+MLSContext::EpochKeys::get(CipherSuite ciphersuite, SenderID sender_id)
 {
   auto it = sender_keys.find(sender_id);
   if (it != sender_keys.end()) {
     return it->second;
   }
 
-  auto hash_size = cipher_digest_size(suite);
+  auto hash_size = cipher_digest_size(ciphersuite);
   auto enc_sender_id = bytes(4);
   encode_uint(sender_id, enc_sender_id);
 
   auto sender_base_key =
-    hkdf_expand(suite, sframe_epoch_secret, enc_sender_id, hash_size);
-  auto key_state = KeyState::from_base_key(suite, sender_base_key);
+    hkdf_expand(ciphersuite, sframe_epoch_secret, enc_sender_id, hash_size);
+  auto key_state = KeyState::from_base_key(ciphersuite, sender_base_key);
   sender_keys.insert({ sender_id, std::move(key_state) });
 
   return sender_keys.at(sender_id);

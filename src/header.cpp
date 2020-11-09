@@ -91,10 +91,10 @@ Header::encode(output_bytes buffer) const
   auto kid_size = uint_size(key_id);
   if (key_id <= 0x07) {
     kid_size = 0;
-    buffer[0] = key_id;
+    buffer[0] = static_cast<uint8_t>(key_id);
   } else {
     encode_uint(key_id, buffer.subspan(1, kid_size));
-    buffer[0] = 0x08 | kid_size;
+    buffer[0] = static_cast<uint8_t>(0x08 | kid_size);
   }
 
   auto ctr_size = uint_size(counter);
