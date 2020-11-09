@@ -121,9 +121,8 @@ HMAC::HMAC(CipherSuite suite, input_bytes key)
   : ctx(HMAC_CTX_new(), HMAC_CTX_free)
 {
   auto type = openssl_digest_type(suite);
-  if (1 !=
-      HMAC_Init_ex(
-        ctx.get(), key.data(), static_cast<int>(key.size()), type, nullptr)) {
+  auto key_size = static_cast<int>(key.size());
+  if (1 != HMAC_Init_ex(ctx.get(), key.data(), key_size, type, nullptr)) {
     throw openssl_error();
   }
 }
@@ -301,10 +300,9 @@ seal_aead(CipherSuite suite,
 
   auto tag = ct.subspan(pt.size(), tag_size);
   auto tag_ptr = const_cast<void*>(static_cast<const void*>(tag.data()));
-  if (1 != EVP_CIPHER_CTX_ctrl(ctx.get(),
-                               EVP_CTRL_GCM_GET_TAG,
-                               static_cast<int>(tag.size()),
-                               tag_ptr)) {
+  auto tag_size = static_cast<int>(tag.size());
+  if (1 != EVP_CIPHER_CTX_ctrl(
+             ctx.get(), EVP_CTRL_GCM_GET_TAG, tag_size, tag_ptr)) {
     throw openssl_error();
   }
 
@@ -402,10 +400,9 @@ open_aead(CipherSuite suite,
 
   auto tag = ct.subspan(inner_ct_size, tag_size);
   auto tag_ptr = const_cast<void*>(static_cast<const void*>(tag.data()));
-  if (1 != EVP_CIPHER_CTX_ctrl(ctx.get(),
-                               EVP_CTRL_GCM_SET_TAG,
-                               static_cast<int>(tag.size()),
-                               tag_ptr)) {
+  auto tag_size = static_cast<int>(tag.size());
+  if (1 != EVP_CIPHER_CTX_ctrl(
+             ctx.get(), EVP_CTRL_GCM_SET_TAG, tag_size, tag_ptr)) {
     throw openssl_error();
   }
 

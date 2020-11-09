@@ -152,8 +152,8 @@ Context::get_state(KeyID key_id)
 MLSContext::MLSContext(CipherSuite suite_in, size_t epoch_bits_in)
   : SFrame(suite_in)
   , epoch_bits(epoch_bits_in)
-  , epoch_mask(((size_t)1 << epoch_bits_in) - 1)
-  , epoch_cache((size_t)1 << epoch_bits_in, std::nullopt)
+  , epoch_mask((size_t(1) << epoch_bits_in) - 1)
+  , epoch_cache(size_t(1) << epoch_bits_in, std::nullopt)
 {}
 
 void
