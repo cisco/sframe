@@ -2,7 +2,7 @@
 
 #include <iosfwd>
 #include <map>
-#include <optional>
+#include <memory>
 #include <vector>
 
 #include <gsl/gsl>
@@ -128,7 +128,7 @@ private:
     KeyState& get(CipherSuite suite, SenderID sender_id);
   };
 
-  std::vector<std::optional<EpochKeys>> epoch_cache;
+  std::vector<std::unique_ptr<EpochKeys>> epoch_cache;
   KeyState& get_state(KeyID key_id) override;
 };
 

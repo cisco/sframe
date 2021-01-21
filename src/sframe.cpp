@@ -86,7 +86,7 @@ void
 Context::add_key(KeyID key_id, const bytes& base_key)
 {
   auto key_state = KeyState::from_base_key(suite, base_key);
-  state.insert_or_assign(key_id, std::move(key_state));
+  state[key_id] = std::move(key_state);
 }
 
 static bytes
@@ -126,7 +126,10 @@ SFrame::_protect(KeyID key_id, output_bytes ciphertext, input_bytes plaintext)
 output_bytes
 SFrame::_unprotect(output_bytes plaintext, input_bytes ciphertext)
 {
-  auto [header, aad] = Header::decode(ciphertext);
+  const auto header_aad = Header::decode(ciphertext);
+  const auto& header = std::get<0>(header_aad);
+  const auto& aad = std::get<1>(header_aad);
+
   auto inner_ciphertext = ciphertext.subspan(aad.size());
 
   auto& state = get_state(header.key_id);
@@ -165,14 +168,18 @@ MLSContext::MLSContext(CipherSuite suite_in, size_t epoch_bits_in)
   : SFrame(suite_in)
   , epoch_bits(epoch_bits_in)
   , epoch_mask((size_t(1) << epoch_bits_in) - 1)
-  , epoch_cache(size_t(1) << epoch_bits_in, std::nullopt)
-{}
+  , epoch_cache(size_t(1) << epoch_bits_in)
+{
+  std::for_each(epoch_cache.begin(),
+                epoch_cache.end(),
+                [&](std::unique_ptr<EpochKeys>& ptr) { ptr.reset(nullptr); });
+}
 
 void
 MLSContext::add_epoch(EpochID epoch_id, const bytes& sframe_epoch_secret)
 {
   auto epoch_index = epoch_id & epoch_mask;
-  epoch_cache.at(epoch_index).emplace(sframe_epoch_secret);
+  epoch_cache.at(epoch_index).reset(new EpochKeys(sframe_epoch_secret));
 }
 
 output_bytes
@@ -223,7 +230,7 @@ MLSContext::get_state(KeyID key_id)
   const auto sender_id = SenderID(key_id >> epoch_bits);
 
   auto& epoch = epoch_cache.at(epoch_index);
-  if (!epoch.has_value()) {
+  if (!epoch) {
     throw invalid_parameter_error("Unknown epoch");
   }
 
