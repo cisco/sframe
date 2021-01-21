@@ -1,0 +1,9 @@
+{
+  "name": "sframe",
+  "version-string": "0.1",
+  "description": "Cisco SFrame C++ library",
+  "dependencies": [
+    "openssl",
+    "doctest"
+  ]
+}

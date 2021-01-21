@@ -12,5 +12,4 @@ target_link_libraries(${TEST_APP_NAME} ${LIB_NAME} gsl doctest::doctest OpenSSL:
 
 # Enable CTest
 include(doctest)
-enable_testing()
 doctest_discover_tests(${TEST_APP_NAME})

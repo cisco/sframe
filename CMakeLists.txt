@@ -6,7 +6,7 @@ project(sframe
 )
 
 option(CLANG_TIDY "Perform linting with clang-tidy" OFF)
-option(ADDRESS_SANITIZER "Enable address sanitizer" OFF)
+option(SANITIZERS "Enable sanitizers" OFF)
 
 ###
 ### Global Config
@@ -21,12 +21,13 @@ elseif(MSVC)
   add_compile_options(/W4 /WX)
 endif()
 
-if (ADDRESS_SANITIZER)
-  set (CMAKE_C_FLAGS              "${CMAKE_C_FLAGS} -fsanitize=address")
-  set (CMAKE_CXX_FLAGS            "${CMAKE_CXX_FLAGS} -fsanitize=address")
-  set (CMAKE_EXE_LINKER_FLAGS     "${CMAKE_EXE_LINKER_FLAGS}    -fsanitize=address")
-  set (CMAKE_SHARED_LINKER_FLAGS  "${CMAKE_SHARED_LINKER_FLAGS} -fsanitize=address")
-  set (CMAKE_MODULE_LINKER_FLAGS  "${CMAKE_MODULE_LINKER_FLAGS} -fsanitize=address")
+if (SANITIZERS AND (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU"))
+  set (SANITIZERS "-fsanitize=address -fsanitize=undefined")
+  set (CMAKE_C_FLAGS              "${CMAKE_C_FLAGS}             ${SANITIZERS}")
+  set (CMAKE_CXX_FLAGS            "${CMAKE_CXX_FLAGS}           ${SANITIZERS}")
+  set (CMAKE_EXE_LINKER_FLAGS     "${CMAKE_EXE_LINKER_FLAGS}    ${SANITIZERS}")
+  set (CMAKE_SHARED_LINKER_FLAGS  "${CMAKE_SHARED_LINKER_FLAGS} ${SANITIZERS}")
+  set (CMAKE_MODULE_LINKER_FLAGS  "${CMAKE_MODULE_LINKER_FLAGS} ${SANITIZERS}")
 endif()
 
 if(CLANG_TIDY)
@@ -37,6 +38,11 @@ if(CLANG_TIDY)
     message(WARNING "clang-tidy requested, but not found")
   endif()
 endif()
+
+###
+### Enable testing
+###
+enable_testing()
 
 ###
 ### Dependencies
@@ -90,6 +96,5 @@ target_include_directories(${LIB_NAME}
 ###
 ### Tests
 ###
-
 add_subdirectory(test)
 
