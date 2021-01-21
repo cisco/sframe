@@ -21,7 +21,7 @@ jobs:
         include:
             - os: windows-latest
               vcpkg-cmake-file: "$env:VCPKG_INSTALLATION_ROOT\\scripts\\buildsystems\\vcpkg.cmake"
-              ctest-target: RUN_TESTS
+              ctest-target: test 
             - os: ubuntu-latest
               vcpkg-cmake-file: "$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
               ctest-target: test
