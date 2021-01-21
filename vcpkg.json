@@ -1,7 +1,7 @@
 {
-  "name": "mlspp",
+  "name": "sframe",
   "version-string": "0.1",
-  "description": "Cisco MLS C++ library",
+  "description": "Cisco SFrame C++ library",
   "dependencies": [
     "openssl",
     "doctest"

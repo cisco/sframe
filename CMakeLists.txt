@@ -6,7 +6,7 @@ project(sframe
 )
 
 option(CLANG_TIDY "Perform linting with clang-tidy" OFF)
-option(ADDRESS_SANITIZER "Enable address sanitizer" OFF)
+option(SANITIZERS "Enable sanitizers" OFF)
 
 ###
 ### Global Config
@@ -38,6 +38,11 @@ if(CLANG_TIDY)
     message(WARNING "clang-tidy requested, but not found")
   endif()
 endif()
+
+###
+### Enable testing
+###
+enable_testing()
 
 ###
 ### Dependencies
@@ -91,6 +96,5 @@ target_include_directories(${LIB_NAME}
 ###
 ### Tests
 ###
-
 add_subdirectory(test)
 
