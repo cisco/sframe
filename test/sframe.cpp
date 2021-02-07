@@ -1,5 +1,5 @@
 
-#include <doctest/doctest.h>
+#include "doctest.h"
 #include <sframe/sframe.h>
 
 #include <iostream>  // for string, operator<<
