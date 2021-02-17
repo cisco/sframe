@@ -182,6 +182,19 @@ MLSContext::add_epoch(EpochID epoch_id, const bytes& sframe_epoch_secret)
   epoch_cache.at(epoch_index).reset(new EpochKeys(sframe_epoch_secret));
 }
 
+void
+MLSContext::purge_except(EpochID keeper)
+{
+  const auto keeper_index = EpochID(keeper & epoch_mask);
+  for (size_t i = 0; i < epoch_cache.size(); i++) {
+    if (i == keeper_index) {
+      continue;
+    }
+
+    epoch_cache.at(i).reset(nullptr);
+  }
+}
+
 output_bytes
 MLSContext::protect(EpochID epoch_id,
                     SenderID sender_id,

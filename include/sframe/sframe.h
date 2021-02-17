@@ -108,6 +108,7 @@ public:
   MLSContext(CipherSuite suite_in, size_t epoch_bits_in);
 
   void add_epoch(EpochID epoch_id, const bytes& sframe_epoch_secret);
+  void purge_except(EpochID keeper);
 
   output_bytes protect(EpochID epoch_id,
                        SenderID sender_id,
