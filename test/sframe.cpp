@@ -366,8 +366,8 @@ TEST_CASE("MLS Failure after Purge")
   member_b.add_epoch(epoch_id_2, sframe_epoch_secret_2);
 
   // Purge epoch 1 and verify failure
-  member_a.purge_except(epoch_id_2);
-  member_b.purge_except(epoch_id_2);
+  member_a.purge_before(epoch_id_2);
+  member_b.purge_before(epoch_id_2);
 
   CHECK_THROWS_AS(member_a.protect(epoch_id_1, sender_id_a, ct_out, plaintext),
                   invalid_parameter_error);

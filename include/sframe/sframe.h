@@ -108,7 +108,7 @@ public:
   MLSContext(CipherSuite suite_in, size_t epoch_bits_in);
 
   void add_epoch(EpochID epoch_id, const bytes& sframe_epoch_secret);
-  void purge_except(EpochID keeper);
+  void purge_before(EpochID keeper);
 
   output_bytes protect(EpochID epoch_id,
                        SenderID sender_id,
@@ -122,10 +122,11 @@ private:
 
   struct EpochKeys
   {
+    const EpochID full_epoch;
     const bytes sframe_epoch_secret;
     std::map<SenderID, KeyState> sender_keys;
 
-    EpochKeys(bytes sframe_epoch_secret);
+    EpochKeys(EpochID full_epoch_in, bytes sframe_epoch_secret_in);
     KeyState& get(CipherSuite suite, SenderID sender_id);
   };
 
