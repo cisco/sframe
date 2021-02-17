@@ -358,6 +358,7 @@ TEST_CASE("MLS Failure after Purge")
 
   const auto enc_ab_1 =
     member_a.protect(epoch_id_1, sender_id_a, ct_out, plaintext);
+  const auto enc_ab_1_data = to_bytes(enc_ab_1);
 
   // Install epoch 2
   const auto epoch_id_2 = MLSContext::EpochID(2);
@@ -370,7 +371,7 @@ TEST_CASE("MLS Failure after Purge")
 
   CHECK_THROWS_AS(member_a.protect(epoch_id_1, sender_id_a, ct_out, plaintext),
                   invalid_parameter_error);
-  CHECK_THROWS_AS(member_b.unprotect(pt_out, enc_ab_1),
+  CHECK_THROWS_AS(member_b.unprotect(pt_out, enc_ab_1_data),
                   invalid_parameter_error);
 
   const auto enc_ab_2 =
