@@ -179,7 +179,8 @@ void
 MLSContext::add_epoch(EpochID epoch_id, const bytes& sframe_epoch_secret)
 {
   auto epoch_index = epoch_id & epoch_mask;
-  epoch_cache.at(epoch_index).reset(new EpochKeys(epoch_id, sframe_epoch_secret));
+  epoch_cache.at(epoch_index)
+    .reset(new EpochKeys(epoch_id, sframe_epoch_secret));
 }
 
 void
