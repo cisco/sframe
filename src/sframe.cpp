@@ -179,7 +179,18 @@ void
 MLSContext::add_epoch(EpochID epoch_id, const bytes& sframe_epoch_secret)
 {
   auto epoch_index = epoch_id & epoch_mask;
-  epoch_cache.at(epoch_index).reset(new EpochKeys(sframe_epoch_secret));
+  epoch_cache.at(epoch_index)
+    .reset(new EpochKeys(epoch_id, sframe_epoch_secret));
+}
+
+void
+MLSContext::purge_before(EpochID keeper)
+{
+  for (auto& ptr : epoch_cache) {
+    if (ptr && ptr->full_epoch < keeper) {
+      ptr.reset(nullptr);
+    }
+  }
 }
 
 output_bytes
@@ -199,8 +210,10 @@ MLSContext::unprotect(output_bytes plaintext, input_bytes ciphertext)
   return _unprotect(plaintext, ciphertext);
 }
 
-MLSContext::EpochKeys::EpochKeys(bytes sframe_epoch_secret_in)
-  : sframe_epoch_secret(std::move(sframe_epoch_secret_in))
+MLSContext::EpochKeys::EpochKeys(MLSContext::EpochID full_epoch_in,
+                                 bytes sframe_epoch_secret_in)
+  : full_epoch(full_epoch_in)
+  , sframe_epoch_secret(std::move(sframe_epoch_secret_in))
 {}
 
 SFrame::KeyState&

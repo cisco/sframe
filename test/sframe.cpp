@@ -335,3 +335,47 @@ TEST_CASE("MLS Round-Trip")
     }
   }
 }
+
+TEST_CASE("MLS Failure after Purge")
+{
+  const auto suite = CipherSuite::AES_GCM_128_SHA256;
+  const auto epoch_bits = 2;
+  const auto plaintext = from_hex("00010203");
+  const auto sender_id_a = MLSContext::SenderID(0xA0A0A0A0);
+  const auto sframe_epoch_secret_1 = bytes(32, 1);
+  const auto sframe_epoch_secret_2 = bytes(32, 2);
+
+  auto pt_out = bytes(plaintext.size());
+  auto ct_out = bytes(plaintext.size() + max_overhead);
+
+  auto member_a = MLSContext(suite, epoch_bits);
+  auto member_b = MLSContext(suite, epoch_bits);
+
+  // Install epoch 1 and create a cipihertext
+  const auto epoch_id_1 = MLSContext::EpochID(1);
+  member_a.add_epoch(epoch_id_1, sframe_epoch_secret_1);
+  member_b.add_epoch(epoch_id_1, sframe_epoch_secret_1);
+
+  const auto enc_ab_1 =
+    member_a.protect(epoch_id_1, sender_id_a, ct_out, plaintext);
+  const auto enc_ab_1_data = to_bytes(enc_ab_1);
+
+  // Install epoch 2
+  const auto epoch_id_2 = MLSContext::EpochID(2);
+  member_a.add_epoch(epoch_id_2, sframe_epoch_secret_2);
+  member_b.add_epoch(epoch_id_2, sframe_epoch_secret_2);
+
+  // Purge epoch 1 and verify failure
+  member_a.purge_before(epoch_id_2);
+  member_b.purge_before(epoch_id_2);
+
+  CHECK_THROWS_AS(member_a.protect(epoch_id_1, sender_id_a, ct_out, plaintext),
+                  invalid_parameter_error);
+  CHECK_THROWS_AS(member_b.unprotect(pt_out, enc_ab_1_data),
+                  invalid_parameter_error);
+
+  const auto enc_ab_2 =
+    member_a.protect(epoch_id_2, sender_id_a, ct_out, plaintext);
+  const auto dec_ab_2 = member_b.unprotect(pt_out, enc_ab_2);
+  CHECK(plaintext == to_bytes(dec_ab_2));
+}
