@@ -187,11 +187,9 @@ void
 MLSContext::purge_before(EpochID keeper)
 {
   for (auto& ptr : epoch_cache) {
-    if (!ptr || ptr->full_epoch >= keeper) {
-      continue;
+    if (ptr && ptr->full_epoch < keeper) {
+      ptr.reset(nullptr);
     }
-
-    ptr.reset(nullptr);
   }
 }
 
