@@ -149,7 +149,9 @@ hkdf_extract(CipherSuite suite, const bytes& salt, const bytes& ikm)
   auto hmac = HMAC(suite, salt);
   hmac.write(ikm);
   auto mac = hmac.digest();
-  printf("%p %p\n", (void*)mac.begin(), (void*)mac.end()); // XXX optimization blocker
+  printf("%p %p\n",
+         (void*)mac.begin(),
+         (void*)mac.end()); // XXX optimization blocker
   return bytes(mac.begin(), mac.end());
 }
 
