@@ -146,7 +146,7 @@ HMAC::HMAC(CipherSuite suite, input_bytes key)
 void
 HMAC::write(input_bytes data)
 {
-  //RAIILog log("HMAC::write");
+  RAIILog log("HMAC::write");
   if (1 != HMAC_Update(ctx.get(), data.data(), data.size())) {
     throw openssl_error("HMAC update");
   }
@@ -155,7 +155,7 @@ HMAC::write(input_bytes data)
 input_bytes
 HMAC::digest()
 {
-  //RAIILog log("HMAC::digest");
+  RAIILog log("HMAC::digest");
   unsigned int size = 0;
   if (1 != HMAC_Final(ctx.get(), md.data(), &size)) {
     throw openssl_error("HMAC final");
@@ -208,7 +208,7 @@ ctr_crypt(CipherSuite suite,
           output_bytes out,
           input_bytes in)
 {
-  //RAIILog log("ctr_crypt");
+  RAIILog log("ctr_crypt");
   if (out.size() != in.size()) {
     throw buffer_too_small_error("CTR size mismatch");
   }
@@ -283,7 +283,7 @@ seal_aead(CipherSuite suite,
           input_bytes aad,
           input_bytes pt)
 {
-  //RAIILog log("seal_aead");
+  RAIILog log("seal_aead");
   auto tag_size = openssl_tag_size(suite);
   if (ct.size() < pt.size() + tag_size) {
     throw buffer_too_small_error("Ciphertext buffer too small");
@@ -402,7 +402,7 @@ open_aead(CipherSuite suite,
           input_bytes aad,
           input_bytes ct)
 {
-  //RAIILog log("open_aead");
+  RAIILog log("open_aead");
   auto tag_size = openssl_tag_size(suite);
   if (ct.size() < tag_size) {
     throw buffer_too_small_error("Ciphertext buffer too small");
