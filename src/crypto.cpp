@@ -154,7 +154,8 @@ bytes
 HMAC::digest_data()
 {
   auto mac_in = digest();
-  return bytes(mac_in.begin(), mac_in.end());
+  auto mac_data = bytes(mac_in.begin(), mac_in.end());
+  return mac_data;
 }
 
 bytes
