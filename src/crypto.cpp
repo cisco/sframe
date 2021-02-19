@@ -8,12 +8,12 @@ namespace sframe {
 
 struct RAIILog {
   RAIILog(std::string label_in)
-    : label(label_in)
+    //: label(label_in)
   {}
 
   ~RAIILog() = default;
 
-  std::string label;
+  //std::string label;
 };
 
 ///
@@ -167,7 +167,7 @@ HMAC::digest()
 bytes
 hkdf_extract(CipherSuite suite, const bytes& salt, const bytes& ikm)
 {
-  printf("hkdf_extract: %d %p %lu\n", (uint16_t)suite, (void*)salt.data(), salt.size());
+  printf("hkdf_extract: %d %p %lu\n", (uint16_t)suite, (void*)salt.data(), (unsigned long)salt.size());
   auto hmac = HMAC(suite, salt);
   hmac.write(ikm);
   auto mac = hmac.digest();
@@ -192,7 +192,7 @@ hkdf_expand(CipherSuite suite,
 
   auto label = info;
   label.push_back(0x01);
-  printf("hkdf_expand: %d %p %lu\n", (uint16_t)suite, (void*)secret.data(), secret.size());
+  printf("hkdf_expand: %d %p %lu\n", (uint16_t)suite, (void*)secret.data(), (unsigned long)secret.size());
   auto hmac = HMAC(suite, secret);
   hmac.write(label);
   auto mac = hmac.digest();
@@ -267,7 +267,7 @@ seal_ctr(CipherSuite suite,
   ctr_crypt(suite, enc_key, nonce, inner_ct, pt);
 
   // Authenticate with truncated HMAC
-  printf("seal_ctr: %d %p %lu\n", (uint16_t)suite, (void*)auth_key.data(), auth_key.size());
+  printf("seal_ctr: %d %p %lu\n", (uint16_t)suite, (void*)auth_key.data(), (unsigned long)auth_key.size());
   auto hmac = HMAC(suite, auth_key);
   hmac.write(aad);
   hmac.write(inner_ct);
@@ -383,7 +383,7 @@ open_ctr(CipherSuite suite,
   auto auth_key = key_span.subspan(enc_key_size);
 
   // Authenticate with truncated HMAC
-  printf("open_ctr: %d %p %lu\n", (uint16_t)suite, (void*)auth_key.data(), auth_key.size());
+  printf("open_ctr: %d %p %lu\n", (uint16_t)suite, (void*)auth_key.data(), (unsigned long)auth_key.size());
   auto hmac = HMAC(suite, auth_key);
   hmac.write(aad);
   hmac.write(inner_ct);
