@@ -8,7 +8,7 @@ namespace sframe {
 
 struct RAIILog {
   RAIILog(std::string label_in)
-    //: label(label_in)
+    : label(label_in)
   {
     /*
     depth += 1;
@@ -28,14 +28,14 @@ struct RAIILog {
     const auto symbol = (inout)? "> " : "< ";
     std::cout << pad << symbol << label << std::endl;
   }
-
-  std::string label;
   */
 
-  static int depth;
+  std::string label;
+
+  // static int depth;
 };
 
-int RAIILog::depth = 0;
+// int RAIILog::depth = 0;
 
 ///
 /// Convert between native identifiers / errors and OpenSSL ones
