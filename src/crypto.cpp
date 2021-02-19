@@ -164,12 +164,9 @@ hkdf_extract(CipherSuite suite, const bytes& salt, const bytes& ikm)
 {
   auto hmac = HMAC(suite, salt);
   hmac.write(ikm);
-  return hmac.digest_data();
-  /*
-  auto mac = hmac.digest();
+  auto mac = hmac.digest_data();
   printf("hkdf_extract (2): %p %p\n", (void*)mac.begin(), (void*)mac.end());
-  return bytes(mac.begin(), mac.end());
-  */
+  return mac;
 }
 
 // For simplicity, we enforce that size <= Hash.length, so that
