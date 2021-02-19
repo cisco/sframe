@@ -35,6 +35,7 @@ struct HMAC
   HMAC(CipherSuite suite, input_bytes key);
   void write(input_bytes data);
   input_bytes digest();
+  bytes digest_data();
 
   scoped_hmac_ctx ctx;
   std::array<uint8_t, EVP_MAX_MD_SIZE> md;
