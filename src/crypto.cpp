@@ -283,7 +283,7 @@ seal_aead(CipherSuite suite,
           input_bytes aad,
           input_bytes pt)
 {
-  RAIILog log("seal_aead");
+  //RAIILog log("seal_aead");
   auto tag_size = openssl_tag_size(suite);
   if (ct.size() < pt.size() + tag_size) {
     throw buffer_too_small_error("Ciphertext buffer too small");
@@ -402,7 +402,7 @@ open_aead(CipherSuite suite,
           input_bytes aad,
           input_bytes ct)
 {
-  RAIILog log("open_aead");
+  //RAIILog log("open_aead");
   auto tag_size = openssl_tag_size(suite);
   if (ct.size() < tag_size) {
     throw buffer_too_small_error("Ciphertext buffer too small");
