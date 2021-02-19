@@ -17,17 +17,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
+        os: [windows-latest]
         include:
             - os: windows-latest
               vcpkg-cmake-file: "$env:VCPKG_INSTALLATION_ROOT\\scripts\\buildsystems\\vcpkg.cmake"
               ctest-target: RUN_TESTS
-            - os: ubuntu-latest
-              vcpkg-cmake-file: "$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
-              ctest-target: test
-            - os: macos-latest
-              vcpkg-cmake-file: "$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
-              ctest-target: test
      
     env:
       CMAKE_BUILD_DIR: ${{ github.workspace }}/build
