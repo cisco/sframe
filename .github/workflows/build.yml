@@ -52,13 +52,13 @@ jobs:
 
     - name: configure to use clang-tidy and sanitizers      
       run: |
-        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DCLANG_TIDY=ON -DSANITIZERS=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE="${{ matrix.vcpkg-cmake-file}}" .
+        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DCLANG_TIDY=ON -DSANITIZERS=ON -DCMAKE_TOOLCHAIN_FILE="${{ matrix.vcpkg-cmake-file}}" .
 
     - name: build
       run: |
-        cmake --build "${{ env.CMAKE_BUILD_DIR }}"
+        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --config Release
 
     - name: Unit tests
       run: |
-         cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target "${{ matrix.ctest-target}}"
+         cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target "${{ matrix.ctest-target}}" --config Release
 
