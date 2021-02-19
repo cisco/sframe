@@ -5,6 +5,7 @@
 #   CMAKE_GENERATOR=Ninja
 
 BUILD_DIR=build
+BUILD_TYPE=Release
 CLANG_FORMAT=clang-format -i
 
 TEST_VECTOR_DIR=./build/test
@@ -16,7 +17,7 @@ all: ${BUILD_DIR}
 	cmake --build ${BUILD_DIR} --target sframe
 
 ${BUILD_DIR}: CMakeLists.txt test/CMakeLists.txt
-	cmake -B${BUILD_DIR} -DCMAKE_BUILD_TYPE=Debug .
+	cmake -B${BUILD_DIR} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} .
 
 tidy:
 	cmake -B${BUILD_DIR} -DCLANG_TIDY=ON -DCMAKE_BUILD_TYPE=Debug .
