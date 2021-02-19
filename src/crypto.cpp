@@ -30,12 +30,12 @@ struct RAIILog {
   }
 
   std::string label;
+  */
 
   static int depth;
-  */
 };
 
-//int RAIILog::depth = 0;
+int RAIILog::depth = 0;
 
 ///
 /// Convert between native identifiers / errors and OpenSSL ones
