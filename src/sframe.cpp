@@ -62,17 +62,26 @@ SFrame::KeyState::from_base_key(CipherSuite suite, const bytes& base_key)
   auto nonce_size = cipher_nonce_size(suite);
   auto hash_size = cipher_digest_size(suite);
 
+  printf("from_base_key (1): %d %p %lu\n", (uint16_t)suite, (void*)sframe_label.data(), (unsigned long)sframe_label.size());
   auto secret = hkdf_extract(suite, sframe_label, base_key);
+
+  printf("from_base_key (2): %d %p %lu\n", (uint16_t)suite, (void*)secret.data(), (unsigned long)secret.size());
   auto key = hkdf_expand(suite, secret, sframe_key_label, key_size);
+
+  printf("from_base_key (3): %d %p %lu\n", (uint16_t)suite, (void*)secret.data(), (unsigned long)secret.size());
   auto salt = hkdf_expand(suite, secret, sframe_salt_label, nonce_size);
 
   // If using CTR+HMAC, set key = enc_key || auth_key
   if (suite == CipherSuite::AES_CM_128_HMAC_SHA256_4 ||
       suite == CipherSuite::AES_CM_128_HMAC_SHA256_8) {
+    printf("from_base_key (4): %d %p %lu\n", (uint16_t)suite, (void*)sframe_ctr_label.data(), (unsigned long)sframe_ctr_label.size());
     secret = hkdf_extract(suite, sframe_ctr_label, key);
 
     auto main_key = key;
+    printf("from_base_key (5): %d %p %lu\n", (uint16_t)suite, (void*)secret.data(), (unsigned long)secret.size());
     auto enc_key = hkdf_expand(suite, secret, sframe_enc_label, key_size);
+
+    printf("from_base_key (6): %d %p %lu\n", (uint16_t)suite, (void*)secret.data(), (unsigned long)secret.size());
     auto auth_key = hkdf_expand(suite, secret, sframe_auth_label, hash_size);
 
     key = enc_key;
@@ -228,6 +237,7 @@ MLSContext::EpochKeys::get(CipherSuite ciphersuite, SenderID sender_id)
   auto enc_sender_id = bytes(4);
   encode_uint(sender_id, enc_sender_id);
 
+  printf("EpochKeys::get: %d %p %lu\n", (uint16_t)ciphersuite, (void*)sframe_epoch_secret.data(), (unsigned long)sframe_epoch_secret.size());
   auto sender_base_key =
     hkdf_expand(ciphersuite, sframe_epoch_secret, enc_sender_id, hash_size);
   auto key_state = KeyState::from_base_key(ciphersuite, sender_base_key);

@@ -7,7 +7,7 @@
 namespace sframe {
 
 struct RAIILog {
-  RAIILog(std::string label_in)
+  RAIILog(std::string /* label_in */)
     //: label(label_in)
   {}
 
