@@ -124,7 +124,6 @@ cipher_nonce_size(CipherSuite suite)
 HMAC::HMAC(CipherSuite suite, input_bytes key)
   : ctx(HMAC_CTX_new(), HMAC_CTX_free)
 {
-  RAIILog log("HMAC::HMAC");
   auto type = openssl_digest_type(suite);
   auto key_size = static_cast<int>(key.size());
   if (1 != HMAC_Init_ex(ctx.get(), key.data(), key_size, type, nullptr)) {
@@ -135,7 +134,6 @@ HMAC::HMAC(CipherSuite suite, input_bytes key)
 void
 HMAC::write(input_bytes data)
 {
-  RAIILog log("HMAC::write");
   if (1 != HMAC_Update(ctx.get(), data.data(), data.size())) {
     throw openssl_error("HMAC update");
   }
@@ -144,7 +142,6 @@ HMAC::write(input_bytes data)
 input_bytes
 HMAC::digest()
 {
-  RAIILog log("HMAC::digest");
   unsigned int size = 0;
   if (1 != HMAC_Final(ctx.get(), md.data(), &size)) {
     throw openssl_error("HMAC final");
