@@ -126,6 +126,7 @@ HMAC::HMAC(CipherSuite suite, input_bytes key)
   auto type = openssl_digest_type(suite);
   auto key_size = static_cast<int>(key.size());
   if (1 != HMAC_Init_ex(ctx.get(), key.data(), key_size, type, nullptr)) {
+    printf("%p %p %d %d\n", ctx.get(), key.data(), key_size, type);
     throw openssl_error("HMAC init");
   }
 }
