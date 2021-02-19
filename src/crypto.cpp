@@ -6,16 +6,6 @@
 
 namespace sframe {
 
-struct RAIILog {
-  RAIILog(std::string /* label_in */)
-    //: label(label_in)
-  {}
-
-  ~RAIILog() = default;
-
-  //std::string label;
-};
-
 ///
 /// Convert between native identifiers / errors and OpenSSL ones
 ///
@@ -138,7 +128,6 @@ HMAC::HMAC(CipherSuite suite, input_bytes key)
   auto type = openssl_digest_type(suite);
   auto key_size = static_cast<int>(key.size());
   if (1 != HMAC_Init_ex(ctx.get(), key.data(), key_size, type, nullptr)) {
-    //printf("HMAC::HMAC: %p %p %d %p %d\n", (void*)ctx.get(), (void*)key.data(), key_size, (void*)type, EVP_MD_type(type));
     throw openssl_error("HMAC init");
   }
 }
@@ -167,7 +156,6 @@ HMAC::digest()
 bytes
 hkdf_extract(CipherSuite suite, const bytes& salt, const bytes& ikm)
 {
-  //printf("hkdf_extract: %d %p %lu\n", (uint16_t)suite, (void*)salt.data(), (unsigned long)salt.size());
   auto hmac = HMAC(suite, salt);
   hmac.write(ikm);
   auto mac = hmac.digest();
@@ -185,7 +173,6 @@ hkdf_expand(CipherSuite suite,
             const bytes& info,
             size_t size)
 {
-  RAIILog log("hkdf_expand");
   // Ensure that we need only one hash invocation
   if (size > cipher_digest_size(suite)) {
     throw invalid_parameter_error("Size too big for hkdf_expand");
@@ -193,7 +180,6 @@ hkdf_expand(CipherSuite suite,
 
   auto label = info;
   label.push_back(0x01);
-  //printf("hkdf_expand: %d %p %lu\n", (uint16_t)suite, (void*)secret.data(), (unsigned long)secret.size());
   auto hmac = HMAC(suite, secret);
   hmac.write(label);
   auto mac = hmac.digest();
@@ -211,7 +197,6 @@ ctr_crypt(CipherSuite suite,
           output_bytes out,
           input_bytes in)
 {
-  RAIILog log("ctr_crypt");
   if (out.size() != in.size()) {
     throw buffer_too_small_error("CTR size mismatch");
   }
@@ -251,7 +236,6 @@ seal_ctr(CipherSuite suite,
          input_bytes aad,
          input_bytes pt)
 {
-  RAIILog log("seal_ctr");
   auto tag_size = openssl_tag_size(suite);
   if (ct.size() < pt.size() + tag_size) {
     throw buffer_too_small_error("Ciphertext buffer too small");
@@ -268,7 +252,6 @@ seal_ctr(CipherSuite suite,
   ctr_crypt(suite, enc_key, nonce, inner_ct, pt);
 
   // Authenticate with truncated HMAC
-  //printf("seal_ctr: %d %p %lu\n", (uint16_t)suite, (void*)auth_key.data(), (unsigned long)auth_key.size());
   auto hmac = HMAC(suite, auth_key);
   hmac.write(aad);
   hmac.write(inner_ct);
@@ -287,7 +270,6 @@ seal_aead(CipherSuite suite,
           input_bytes aad,
           input_bytes pt)
 {
-  RAIILog log("seal_aead");
   auto tag_size = openssl_tag_size(suite);
   if (ct.size() < pt.size() + tag_size) {
     throw buffer_too_small_error("Ciphertext buffer too small");
@@ -343,7 +325,6 @@ seal(CipherSuite suite,
      input_bytes aad,
      input_bytes pt)
 {
-  RAIILog log("seal");
   switch (suite) {
     case CipherSuite::AES_CM_128_HMAC_SHA256_4:
     case CipherSuite::AES_CM_128_HMAC_SHA256_8: {
@@ -367,7 +348,6 @@ open_ctr(CipherSuite suite,
          input_bytes aad,
          input_bytes ct)
 {
-  RAIILog log("open_ctr");
   auto tag_size = openssl_tag_size(suite);
   if (ct.size() < tag_size) {
     throw buffer_too_small_error("Ciphertext buffer too small");
@@ -384,7 +364,6 @@ open_ctr(CipherSuite suite,
   auto auth_key = key_span.subspan(enc_key_size);
 
   // Authenticate with truncated HMAC
-  //printf("open_ctr: %d %p %lu\n", (uint16_t)suite, (void*)auth_key.data(), (unsigned long)auth_key.size());
   auto hmac = HMAC(suite, auth_key);
   hmac.write(aad);
   hmac.write(inner_ct);
@@ -407,7 +386,6 @@ open_aead(CipherSuite suite,
           input_bytes aad,
           input_bytes ct)
 {
-  RAIILog log("open_aead");
   auto tag_size = openssl_tag_size(suite);
   if (ct.size() < tag_size) {
     throw buffer_too_small_error("Ciphertext buffer too small");
@@ -468,7 +446,6 @@ open(CipherSuite suite,
      input_bytes aad,
      input_bytes ct)
 {
-  RAIILog log("open");
   switch (suite) {
     case CipherSuite::AES_CM_128_HMAC_SHA256_4:
     case CipherSuite::AES_CM_128_HMAC_SHA256_8: {
