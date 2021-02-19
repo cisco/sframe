@@ -196,6 +196,7 @@ hkdf_expand(CipherSuite suite,
   auto hmac = HMAC(suite, secret);
   hmac.write(label);
   auto mac = hmac.digest();
+  printf("hkdf_expand (2): %p %p\n", (void*)mac.begin(), (void*)mac.end());
   return bytes(mac.begin(), mac.begin() + size);
 }
 
