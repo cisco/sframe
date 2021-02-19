@@ -9,8 +9,14 @@ namespace sframe {
 /// Convert between native identifiers / errors and OpenSSL ones
 ///
 
-openssl_error::openssl_error()
-  : std::runtime_error(ERR_error_string(ERR_get_error(), nullptr))
+static std::string
+openssl_error_string(const std::string& label, int error) {
+  const auto err_string = std::string(ERR_error_string(error, nullptr));
+  return label + ": " + err_string;
+}
+
+openssl_error::openssl_error(const std::string& label)
+  : std::runtime_error(openssl_error_string(label, ERR_get_error()))
 {}
 
 static const EVP_MD*
@@ -120,7 +126,7 @@ HMAC::HMAC(CipherSuite suite, input_bytes key)
   auto type = openssl_digest_type(suite);
   auto key_size = static_cast<int>(key.size());
   if (1 != HMAC_Init_ex(ctx.get(), key.data(), key_size, type, nullptr)) {
-    throw openssl_error();
+    throw openssl_error("HMAC init");
   }
 }
 
@@ -128,7 +134,7 @@ void
 HMAC::write(input_bytes data)
 {
   if (1 != HMAC_Update(ctx.get(), data.data(), data.size())) {
-    throw openssl_error();
+    throw openssl_error("HMAC update");
   }
 }
 
@@ -137,7 +143,7 @@ HMAC::digest()
 {
   unsigned int size = 0;
   if (1 != HMAC_Final(ctx.get(), md.data(), &size)) {
-    throw openssl_error();
+    throw openssl_error("HMAC final");
   }
 
   return input_bytes(md.data(), size);
@@ -192,7 +198,7 @@ ctr_crypt(CipherSuite suite,
 
   auto ctx = scoped_evp_ctx(EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free);
   if (ctx.get() == nullptr) {
-    throw openssl_error();
+    throw openssl_error("CTR alloc");
   }
 
   static auto padded_nonce =
@@ -202,18 +208,18 @@ ctr_crypt(CipherSuite suite,
   auto cipher = openssl_cipher(suite);
   if (1 !=
       EVP_EncryptInit(ctx.get(), cipher, key.data(), padded_nonce.data())) {
-    throw openssl_error();
+    throw openssl_error("CTR init");
   }
 
   int outlen = 0;
   auto in_size_int = static_cast<int>(in.size());
   if (1 != EVP_EncryptUpdate(
              ctx.get(), out.data(), &outlen, in.data(), in_size_int)) {
-    throw openssl_error();
+    throw openssl_error("CTR update");
   }
 
   if (1 != EVP_EncryptFinal(ctx.get(), nullptr, &outlen)) {
-    throw openssl_error();
+    throw openssl_error("CTR final");
   }
 }
 
@@ -266,12 +272,12 @@ seal_aead(CipherSuite suite,
 
   auto ctx = scoped_evp_ctx(EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free);
   if (ctx.get() == nullptr) {
-    throw openssl_error();
+    throw openssl_error("AEAD seal alloc");
   }
 
   auto cipher = openssl_cipher(suite);
   if (1 != EVP_EncryptInit(ctx.get(), cipher, key.data(), nonce.data())) {
-    throw openssl_error();
+    throw openssl_error("AEAD seal init");
   }
 
   int outlen = 0;
@@ -279,20 +285,20 @@ seal_aead(CipherSuite suite,
   if (aad.size() > 0) {
     if (1 != EVP_EncryptUpdate(
                ctx.get(), nullptr, &outlen, aad.data(), aad_size_int)) {
-      throw openssl_error();
+      throw openssl_error("AEAD seal update (1)");
     }
   }
 
   auto pt_size_int = static_cast<int>(pt.size());
   if (1 != EVP_EncryptUpdate(
              ctx.get(), ct.data(), &outlen, pt.data(), pt_size_int)) {
-    throw openssl_error();
+    throw openssl_error("AEAD seal update (2)");
   }
 
   // Providing nullptr as an argument is safe here because this
   // function never writes with GCM; it only computes the tag
   if (1 != EVP_EncryptFinal(ctx.get(), nullptr, &outlen)) {
-    throw openssl_error();
+    throw openssl_error("AEAD seal final");
   }
 
   auto tag = ct.subspan(pt.size(), tag_size);
@@ -300,7 +306,7 @@ seal_aead(CipherSuite suite,
   auto tag_size_downcast = static_cast<int>(tag.size());
   if (1 != EVP_CIPHER_CTX_ctrl(
              ctx.get(), EVP_CTRL_GCM_GET_TAG, tag_size_downcast, tag_ptr)) {
-    throw openssl_error();
+    throw openssl_error("AEAD seal tag");
   }
 
   return ct.subspan(0, pt.size() + tag_size);
@@ -387,12 +393,12 @@ open_aead(CipherSuite suite,
 
   auto ctx = scoped_evp_ctx(EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free);
   if (ctx.get() == nullptr) {
-    throw openssl_error();
+    throw openssl_error("AEAD open alloc");
   }
 
   auto cipher = openssl_cipher(suite);
   if (1 != EVP_DecryptInit(ctx.get(), cipher, key.data(), nonce.data())) {
-    throw openssl_error();
+    throw openssl_error("AEAD open init");
   }
 
   auto tag = ct.subspan(inner_ct_size, tag_size);
@@ -400,7 +406,7 @@ open_aead(CipherSuite suite,
   auto tag_size_downcast = static_cast<int>(tag.size());
   if (1 != EVP_CIPHER_CTX_ctrl(
              ctx.get(), EVP_CTRL_GCM_SET_TAG, tag_size_downcast, tag_ptr)) {
-    throw openssl_error();
+    throw openssl_error("AEAD open tag");
   }
 
   int out_size;
@@ -408,14 +414,14 @@ open_aead(CipherSuite suite,
   if (aad.size() > 0) {
     if (1 != EVP_DecryptUpdate(
                ctx.get(), nullptr, &out_size, aad.data(), aad_size_int)) {
-      throw openssl_error();
+      throw openssl_error("AEAD open update");
     }
   }
 
   auto inner_ct_size_int = static_cast<int>(inner_ct_size);
   if (1 != EVP_DecryptUpdate(
              ctx.get(), pt.data(), &out_size, ct.data(), inner_ct_size_int)) {
-    throw openssl_error();
+    throw openssl_error("AEAD open final");
   }
 
   // Providing nullptr as an argument is safe here because this

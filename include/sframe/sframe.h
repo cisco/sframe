@@ -11,7 +11,7 @@ namespace sframe {
 
 struct openssl_error : std::runtime_error
 {
-  openssl_error();
+  openssl_error(const std::string& label);
 };
 
 struct unsupported_ciphersuite_error : std::runtime_error
