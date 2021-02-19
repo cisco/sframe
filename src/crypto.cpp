@@ -138,7 +138,7 @@ HMAC::HMAC(CipherSuite suite, input_bytes key)
   auto type = openssl_digest_type(suite);
   auto key_size = static_cast<int>(key.size());
   if (1 != HMAC_Init_ex(ctx.get(), key.data(), key_size, type, nullptr)) {
-    printf("%p %p %d %p %d\n", (void*)ctx.get(), (void*)key.data(), key_size, (void*)type, EVP_MD_type(type));
+    printf("HMAC::HMAC: %p %p %d %p %d\n", (void*)ctx.get(), (void*)key.data(), key_size, (void*)type, EVP_MD_type(type));
     throw openssl_error("HMAC init");
   }
 }
@@ -146,7 +146,7 @@ HMAC::HMAC(CipherSuite suite, input_bytes key)
 void
 HMAC::write(input_bytes data)
 {
-  //RAIILog log("HMAC::write");
+  RAIILog log("HMAC::write");
   if (1 != HMAC_Update(ctx.get(), data.data(), data.size())) {
     throw openssl_error("HMAC update");
   }
@@ -155,7 +155,7 @@ HMAC::write(input_bytes data)
 input_bytes
 HMAC::digest()
 {
-  //RAIILog log("HMAC::digest");
+  RAIILog log("HMAC::digest");
   unsigned int size = 0;
   if (1 != HMAC_Final(ctx.get(), md.data(), &size)) {
     throw openssl_error("HMAC final");
@@ -167,6 +167,7 @@ HMAC::digest()
 bytes
 hkdf_extract(CipherSuite suite, const bytes& salt, const bytes& ikm)
 {
+  printf("hkdf_extract: %d %p %lu\n", (uint16_t)suite, (void*)salt.data(), salt.size());
   auto hmac = HMAC(suite, salt);
   hmac.write(ikm);
   auto mac = hmac.digest();
@@ -191,6 +192,7 @@ hkdf_expand(CipherSuite suite,
 
   auto label = info;
   label.push_back(0x01);
+  printf("hkdf_expand: %d %p %lu\n", (uint16_t)suite, (void*)secret.data(), secret.size());
   auto hmac = HMAC(suite, secret);
   hmac.write(label);
   auto mac = hmac.digest();
@@ -265,6 +267,7 @@ seal_ctr(CipherSuite suite,
   ctr_crypt(suite, enc_key, nonce, inner_ct, pt);
 
   // Authenticate with truncated HMAC
+  printf("seal_ctr: %d %p %lu\n", (uint16_t)suite, (void*)auth_key.data(), auth_key.size());
   auto hmac = HMAC(suite, auth_key);
   hmac.write(aad);
   hmac.write(inner_ct);
@@ -283,7 +286,7 @@ seal_aead(CipherSuite suite,
           input_bytes aad,
           input_bytes pt)
 {
-  //RAIILog log("seal_aead");
+  RAIILog log("seal_aead");
   auto tag_size = openssl_tag_size(suite);
   if (ct.size() < pt.size() + tag_size) {
     throw buffer_too_small_error("Ciphertext buffer too small");
@@ -380,6 +383,7 @@ open_ctr(CipherSuite suite,
   auto auth_key = key_span.subspan(enc_key_size);
 
   // Authenticate with truncated HMAC
+  printf("open_ctr: %d %p %lu\n", (uint16_t)suite, (void*)auth_key.data(), auth_key.size());
   auto hmac = HMAC(suite, auth_key);
   hmac.write(aad);
   hmac.write(inner_ct);
@@ -402,7 +406,7 @@ open_aead(CipherSuite suite,
           input_bytes aad,
           input_bytes ct)
 {
-  //RAIILog log("open_aead");
+  RAIILog log("open_aead");
   auto tag_size = openssl_tag_size(suite);
   if (ct.size() < tag_size) {
     throw buffer_too_small_error("Ciphertext buffer too small");
