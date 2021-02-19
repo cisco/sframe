@@ -17,7 +17,7 @@ all: ${BUILD_DIR}
 	cmake --build ${BUILD_DIR} --target sframe --config ${BUILD_CONFIG}
 
 ${BUILD_DIR}: CMakeLists.txt test/CMakeLists.txt
-	cmake -B${BUILD_DIR} -DCMAKE_BUILD_TYPE=Debug .
+	cmake -B${BUILD_DIR} --config ${BUILD_CONFIG} .
 
 tidy:
 	cmake -B${BUILD_DIR} -DCLANG_TIDY=ON -DCMAKE_BUILD_TYPE=Debug .
