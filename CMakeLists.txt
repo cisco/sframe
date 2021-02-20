@@ -5,6 +5,7 @@ project(sframe
   LANGUAGES CXX
 )
 
+option(TESTING    "Build tests" OFF)
 option(CLANG_TIDY "Perform linting with clang-tidy" OFF)
 option(SANITIZERS "Enable sanitizers" OFF)
 
@@ -38,11 +39,6 @@ if(CLANG_TIDY)
     message(WARNING "clang-tidy requested, but not found")
   endif()
 endif()
-
-###
-### Enable testing
-###
-enable_testing()
 
 ###
 ### Dependencies
@@ -96,5 +92,7 @@ target_include_directories(${LIB_NAME}
 ###
 ### Tests
 ###
-add_subdirectory(test)
-
+if(TESTING)
+  enable_testing()
+  add_subdirectory(test)
+endif()
