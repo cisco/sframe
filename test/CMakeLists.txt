@@ -7,8 +7,7 @@ find_package(doctest REQUIRED)
 file(GLOB TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
 
 add_executable(${TEST_APP_NAME} ${TEST_SOURCES})
-add_dependencies(${TEST_APP_NAME} ${LIB_NAME} gsl)
-target_link_libraries(${TEST_APP_NAME} ${LIB_NAME} gsl doctest::doctest OpenSSL::Crypto)
+target_link_libraries(${TEST_APP_NAME} ${LIB_NAME} doctest::doctest OpenSSL::Crypto)
 
 # Enable CTest
 include(doctest)

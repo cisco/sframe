@@ -5,7 +5,7 @@
 #include <memory>
 #include <vector>
 
-#include <gsl/gsl>
+#include <gsl/gsl-lite.hpp>
 
 namespace sframe {
 
