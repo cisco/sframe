@@ -148,11 +148,13 @@ hkdf_extract(CipherSuite suite, const bytes& salt, const bytes& ikm)
 {
   auto hmac = HMAC(suite, salt);
   hmac.write(ikm);
+// XXX(RLB) The MSVC optimizer thinks that the variable `mac` is unnecessary for
+// some reason, so if it is allowed to optimize these lines, the returned
+// `bytes` vector is empty.
+#pragma optimize("", off)
   auto mac = hmac.digest();
-  printf("%p %p\n",
-         (void*)mac.begin(),
-         (void*)mac.end()); // XXX optimization blocker
   return bytes(mac.begin(), mac.end());
+#pragma optimize("", on)
 }
 
 // For simplicity, we enforce that size <= Hash.length, so that
