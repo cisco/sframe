@@ -143,7 +143,6 @@ HMAC::digest()
   return input_bytes(md.data(), size);
 }
 
-#pragma optimize("", off)
 bytes
 hkdf_extract(CipherSuite suite, const bytes& salt, const bytes& ikm)
 {
@@ -153,9 +152,10 @@ hkdf_extract(CipherSuite suite, const bytes& salt, const bytes& ikm)
 // some reason, so if it is allowed to optimize these lines, the returned
 // `bytes` vector is empty.
   auto mac = hmac.digest();
-  return bytes(mac.begin(), mac.end());
+  volatile const auto begin = mac.begin();
+  volatile const auto end = mac.end();
+  return bytes(begin, end);
 }
-#pragma optimize("", on)
 
 // For simplicity, we enforce that size <= Hash.length, so that
 // HKDF-Expand(Secret, Label) reduces to:
