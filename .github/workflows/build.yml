@@ -56,9 +56,9 @@ jobs:
 
     - name: build
       run: |
-        cmake --build "${{ env.CMAKE_BUILD_DIR }}"
+        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --config Release
 
     - name: Unit tests
       run: |
-         cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target "${{ matrix.ctest-target}}"
+         cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target "${{ matrix.ctest-target }}" --config Release
 

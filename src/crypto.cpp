@@ -148,8 +148,13 @@ hkdf_extract(CipherSuite suite, const bytes& salt, const bytes& ikm)
 {
   auto hmac = HMAC(suite, salt);
   hmac.write(ikm);
+  // XXX(RLB) The MSVC optimizer thinks that the variable `mac` is unnecessary
+  // for some reason, so we have to connect it to something volatile to prevent
+  // it from being optimized out.
   auto mac = hmac.digest();
-  return bytes(mac.begin(), mac.end());
+  volatile const auto begin = mac.begin();
+  volatile const auto end = mac.end();
+  return bytes(begin, end);
 }
 
 // For simplicity, we enforce that size <= Hash.length, so that
