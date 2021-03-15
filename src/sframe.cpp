@@ -244,7 +244,9 @@ MLSContext::get_state(KeyID key_id)
 
   auto& epoch = epoch_cache.at(epoch_index);
   if (!epoch) {
-    throw invalid_parameter_error("Unknown epoch");
+    throw invalid_parameter_error(
+      "Unknown epoch. epoch_index: " + std::to_string(epoch_index) +
+      ", sender_id:" + std::to_string(sender_id));
   }
 
   return epoch->get(suite, sender_id);
