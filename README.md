@@ -4,8 +4,8 @@
 This repository contains an implementation of [the draft SFrame
 standard](https://datatracker.ietf.org/doc/html/draft-omara-sframe) for
 end-to-end media encryption.  Since the spec is still in progress, the
-implementation here might not match exactly.  iThese differences will resolve as
-the specification and this implementaiton evolve together.
+implementation here might not match exactly.  These differences will resolve as
+the specification and this implementation evolve together.
 
 ## Building and Running Tests
 
