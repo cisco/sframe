@@ -3,6 +3,7 @@
 #include "crypto.h"
 #include "header.h"
 
+#include <algorithm>
 #include <array>
 #include <iomanip>
 #include <iostream>
