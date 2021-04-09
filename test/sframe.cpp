@@ -1,4 +1,5 @@
-
+#include <openssl/crypto.h>
+#include <openssl/err.h>
 #include <doctest/doctest.h>
 #include <sframe/sframe.h>
 
@@ -129,8 +130,26 @@ TEST_CASE("SFrame Known-Answer")
   }
 }
 
-TEST_CASE("SFrame Round-Trip")
+static void
+enable_fips(bool fips)
 {
+  if (!fips) {
+    return;
+  }
+
+  auto rv = FIPS_mode_set(1);
+  if (rv != 1) {
+    std::cout << ERR_error_string(ERR_get_error(), nullptr) << std::endl;
+  }
+
+  REQUIRE(rv == 1);
+}
+
+static void
+sframe_round_trip(bool fips)
+{
+  enable_fips(fips);
+
   const auto rounds = 1 << 9;
   const auto kid = KeyID(0x42);
   const auto plaintext = from_hex("00010203");
@@ -166,6 +185,9 @@ TEST_CASE("SFrame Round-Trip")
     }
   }
 }
+
+TEST_CASE("SFrame Round-Trip") { sframe_round_trip(false); }
+TEST_CASE("SFrame Round-Trip (FIPS)") { sframe_round_trip(true); }
 
 TEST_CASE("MLS Known-Answer")
 {
@@ -293,8 +315,11 @@ TEST_CASE("MLS Known-Answer")
   }
 }
 
-TEST_CASE("MLS Round-Trip")
+static void
+mls_round_trip(bool fips)
 {
+  enable_fips(fips);
+
   const auto epoch_bits = 2;
   const auto test_epochs = 1 << (epoch_bits + 1);
   const auto epoch_rounds = 10;
@@ -335,6 +360,9 @@ TEST_CASE("MLS Round-Trip")
     }
   }
 }
+
+TEST_CASE("MLS Round-Trip") { mls_round_trip(false); }
+TEST_CASE("MLS Round-Trip (FIPS)") { mls_round_trip(true); }
 
 TEST_CASE("MLS Failure after Purge")
 {
