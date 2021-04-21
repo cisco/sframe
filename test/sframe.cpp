@@ -1,6 +1,6 @@
+#include <doctest/doctest.h>
 #include <openssl/crypto.h>
 #include <openssl/err.h>
-#include <doctest/doctest.h>
 #include <sframe/sframe.h>
 
 #include <iostream>  // for string, operator<<
@@ -12,7 +12,8 @@ using namespace sframe;
 
 // Use RAII to enable FIPS at the beginning of a context, and disable it again
 // when the lock goes out of scope.
-struct FIPSLock {
+struct FIPSLock
+{
   FIPSLock(bool enabled)
   {
     if (!enabled) {
@@ -27,14 +28,15 @@ struct FIPSLock {
     }
   }
 
-  ~FIPSLock() {
+  ~FIPSLock()
+  {
     refcount -= 1;
     if (refcount == 0) {
       FIPS_mode_set(0);
     }
   }
 
-  private:
+private:
   static int refcount;
 };
 
@@ -201,8 +203,14 @@ sframe_round_trip(bool fips)
   }
 }
 
-TEST_CASE("SFrame Round-Trip") { sframe_round_trip(false); }
-TEST_CASE("SFrame Round-Trip (FIPS)") { sframe_round_trip(true); }
+TEST_CASE("SFrame Round-Trip")
+{
+  sframe_round_trip(false);
+}
+TEST_CASE("SFrame Round-Trip (FIPS)")
+{
+  sframe_round_trip(true);
+}
 
 TEST_CASE("MLS Known-Answer")
 {
@@ -376,8 +384,14 @@ mls_round_trip(bool fips)
   }
 }
 
-TEST_CASE("MLS Round-Trip") { mls_round_trip(false); }
-TEST_CASE("MLS Round-Trip (FIPS)") { mls_round_trip(true); }
+TEST_CASE("MLS Round-Trip")
+{
+  mls_round_trip(false);
+}
+TEST_CASE("MLS Round-Trip (FIPS)")
+{
+  mls_round_trip(true);
+}
 
 TEST_CASE("MLS Failure after Purge")
 {
