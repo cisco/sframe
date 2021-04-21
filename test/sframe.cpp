@@ -10,6 +10,36 @@
 
 using namespace sframe;
 
+// Use RAII to enable FIPS at the beginning of a context, and disable it again
+// when the lock goes out of scope.
+struct FIPSLock {
+  FIPSLock(bool enabled)
+  {
+    if (!enabled) {
+      return;
+    }
+
+    const auto* require = std::getenv("REQUIRE_FIPS");
+
+    auto rv = FIPS_mode_set(1);
+    if (require) {
+      REQUIRE(rv == 1);
+    }
+  }
+
+  ~FIPSLock() {
+    refcount -= 1;
+    if (refcount == 0) {
+      FIPS_mode_set(0);
+    }
+  }
+
+  private:
+  static int refcount;
+};
+
+int FIPSLock::refcount = 0;
+
 static bytes
 from_hex(const std::string& hex)
 {
@@ -131,24 +161,9 @@ TEST_CASE("SFrame Known-Answer")
 }
 
 static void
-enable_fips(bool fips)
-{
-  if (!fips) {
-    return;
-  }
-
-  auto rv = FIPS_mode_set(1);
-  if (rv != 1) {
-    std::cout << ERR_error_string(ERR_get_error(), nullptr) << std::endl;
-  }
-
-  REQUIRE(rv == 1);
-}
-
-static void
 sframe_round_trip(bool fips)
 {
-  enable_fips(fips);
+  auto fips_lock = FIPSLock(fips);
 
   const auto rounds = 1 << 9;
   const auto kid = KeyID(0x42);
@@ -318,7 +333,7 @@ TEST_CASE("MLS Known-Answer")
 static void
 mls_round_trip(bool fips)
 {
-  enable_fips(fips);
+  auto fips_lock = FIPSLock(fips);
 
   const auto epoch_bits = 2;
   const auto test_epochs = 1 << (epoch_bits + 1);
