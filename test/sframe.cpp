@@ -10,36 +10,12 @@
 
 using namespace sframe;
 
-// Use RAII to enable FIPS at the beginning of a context, and disable it again
-// when the lock goes out of scope.
-struct FIPSLock
-{
-  FIPSLock(bool enabled)
-  {
-    if (!enabled) {
-      FIPS_mode_set(0);
-      return;
-    }
-
-    const auto* require = std::getenv("REQUIRE_FIPS");
-    if (require && FIPS_mode() == 0) {
-      REQUIRE(FIPS_mode_set(1) == 1);
-    }
+void ensure_fips_if_required() {
+  const auto* require = std::getenv("REQUIRE_FIPS");
+  if (require && FIPS_mode() == 0) {
+    REQUIRE(FIPS_mode_set(1) == 1);
   }
-
-  ~FIPSLock()
-  {
-    refcount -= 1;
-    if (refcount == 0) {
-      FIPS_mode_set(0);
-    }
-  }
-
-private:
-  static int refcount;
-};
-
-int FIPSLock::refcount = 0;
+}
 
 static bytes
 from_hex(const std::string& hex)
@@ -67,6 +43,8 @@ to_bytes(const T& range)
 
 TEST_CASE("SFrame Known-Answer")
 {
+  ensure_fips_if_required();
+
   struct KnownAnswerTest
   {
     bytes key;
@@ -161,10 +139,9 @@ TEST_CASE("SFrame Known-Answer")
   }
 }
 
-static void
-sframe_round_trip(bool fips)
+TEST_CASE("SFrame Round-Trip")
 {
-  auto fips_lock = FIPSLock(fips);
+  ensure_fips_if_required();
 
   const auto rounds = 1 << 9;
   const auto kid = KeyID(0x42);
@@ -202,17 +179,10 @@ sframe_round_trip(bool fips)
   }
 }
 
-TEST_CASE("SFrame Round-Trip")
-{
-  sframe_round_trip(false);
-}
-TEST_CASE("SFrame Round-Trip (FIPS)")
-{
-  sframe_round_trip(true);
-}
-
 TEST_CASE("MLS Known-Answer")
 {
+  ensure_fips_if_required();
+
   struct KnownAnswerTest
   {
     using Epoch = std::vector<bytes>;
@@ -337,10 +307,9 @@ TEST_CASE("MLS Known-Answer")
   }
 }
 
-static void
-mls_round_trip(bool fips)
+TEST_CASE("MLS Round-Trip")
 {
-  auto fips_lock = FIPSLock(fips);
+  ensure_fips_if_required();
 
   const auto epoch_bits = 2;
   const auto test_epochs = 1 << (epoch_bits + 1);
@@ -383,17 +352,11 @@ mls_round_trip(bool fips)
   }
 }
 
-TEST_CASE("MLS Round-Trip")
-{
-  mls_round_trip(false);
-}
-TEST_CASE("MLS Round-Trip (FIPS)")
-{
-  mls_round_trip(true);
-}
 
 TEST_CASE("MLS Failure after Purge")
 {
+  ensure_fips_if_required();
+
   const auto suite = CipherSuite::AES_GCM_128_SHA256;
   const auto epoch_bits = 2;
   const auto plaintext = from_hex("00010203");

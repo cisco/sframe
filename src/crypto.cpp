@@ -143,8 +143,6 @@ HMAC::digest()
   return input_bytes(md.data(), size);
 }
 
-#define FIPS_HMAC_MIN_KEY_LEN 14 // 112 bits
-
 static bytes
 hmac_for_hkdf(CipherSuite suite, input_bytes key, input_bytes data)
 {
@@ -159,8 +157,15 @@ hmac_for_hkdf(CipherSuite suite, input_bytes key, input_bytes data)
   // https://doi.org/10.6028/NIST.SP.800-131Ar2
   static const auto fips_min_hmac_key_len = 14;
   auto key_size = static_cast<int>(key.size());
-  if (key_size < fips_min_hmac_key_len) {
+  if (FIPS_mode() != 0 && key_size < fips_min_hmac_key_len) {
     HMAC_CTX_set_flags(ctx.get(), EVP_MD_CTX_FLAG_NON_FIPS_ALLOW);
+  }
+
+  // Guard against sending nullptr to HMAC_Init_ex
+  auto* key_data = key.data();
+  static const auto dummy_key = bytes{0};
+  if (key_data == nullptr) {
+    key_data = dummy_key.data();
   }
 
   if (1 != HMAC_Init_ex(ctx.get(), key.data(), key_size, type, nullptr)) {
