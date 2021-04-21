@@ -163,7 +163,7 @@ hmac_for_hkdf(CipherSuite suite, input_bytes key, input_bytes data)
 
   // Guard against sending nullptr to HMAC_Init_ex
   auto* key_data = key.data();
-  static const auto dummy_key = bytes{0};
+  static const auto dummy_key = bytes{ 0 };
   if (key_data == nullptr) {
     key_data = dummy_key.data();
   }

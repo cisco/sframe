@@ -10,7 +10,9 @@
 
 using namespace sframe;
 
-void ensure_fips_if_required() {
+void
+ensure_fips_if_required()
+{
   const auto* require = std::getenv("REQUIRE_FIPS");
   if (require && FIPS_mode() == 0) {
     REQUIRE(FIPS_mode_set(1) == 1);
@@ -351,7 +353,6 @@ TEST_CASE("MLS Round-Trip")
     }
   }
 }
-
 
 TEST_CASE("MLS Failure after Purge")
 {
