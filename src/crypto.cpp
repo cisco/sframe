@@ -2,6 +2,7 @@
 
 #include <openssl/err.h>
 #include <openssl/evp.h>
+#include <openssl/kdf.h>
 
 namespace sframe {
 
@@ -143,41 +144,80 @@ HMAC::digest()
   return input_bytes(md.data(), size);
 }
 
+using scoped_evp_pkey_ctx = std::unique_ptr<EVP_PKEY_CTX, decltype(&EVP_PKEY_CTX_free)>;
+
 bytes
 hkdf_extract(CipherSuite suite, const bytes& salt, const bytes& ikm)
 {
-  auto hmac = HMAC(suite, salt);
-  hmac.write(ikm);
-  // XXX(RLB) The MSVC optimizer thinks that the variable `mac` is unnecessary
-  // for some reason, so we have to connect it to something volatile to prevent
-  // it from being optimized out.
-  auto mac = hmac.digest();
-  volatile const auto begin = mac.begin();
-  volatile const auto end = mac.end();
-  return bytes(begin, end);
+  auto pctx = scoped_evp_pkey_ctx(EVP_PKEY_CTX_new_id(EVP_PKEY_HKDF, NULL),
+                                  EVP_PKEY_CTX_free);
+
+  if (EVP_PKEY_derive_init(pctx.get()) <= 0) {
+    throw openssl_error();
+  }
+
+  if (EVP_PKEY_CTX_hkdf_mode(pctx.get(), EVP_PKEY_HKDEF_MODE_EXTRACT_ONLY) <= 0) {
+    throw openssl_error();
+  }
+
+  auto type = openssl_digest_type(suite);
+  if (EVP_PKEY_CTX_set_hkdf_md(pctx.get(), type) <= 0) {
+    throw openssl_error();
+  }
+
+  if (EVP_PKEY_CTX_set1_hkdf_salt(pctx.get(), salt.data(), salt.size()) <= 0) {
+    throw openssl_error();
+  }
+
+  if (EVP_PKEY_CTX_set1_hkdf_key(pctx.get(), ikm.data(), ikm.size()) <= 0) {
+    throw openssl_error();
+  }
+
+  auto out = bytes(cipher_digest_size(suite));
+  auto outlen = out.size();
+  if (EVP_PKEY_derive(pctx.get(), out.data(), &outlen) <= 0) {
+    throw openssl_error();
+  }
+
+  return out;
 }
 
-// For simplicity, we enforce that size <= Hash.length, so that
-// HKDF-Expand(Secret, Label) reduces to:
-//
-//   HMAC(Secret, Label || 0x01)
 bytes
 hkdf_expand(CipherSuite suite,
             const bytes& secret,
             const bytes& info,
             size_t size)
 {
-  // Ensure that we need only one hash invocation
-  if (size > cipher_digest_size(suite)) {
-    throw invalid_parameter_error("Size too big for hkdf_expand");
+  auto pctx = scoped_evp_pkey_ctx(EVP_PKEY_CTX_new_id(EVP_PKEY_HKDF, NULL),
+                                  EVP_PKEY_CTX_free);
+
+  if (EVP_PKEY_derive_init(pctx.get()) <= 0) {
+    throw openssl_error();
   }
 
-  auto label = info;
-  label.push_back(0x01);
-  auto hmac = HMAC(suite, secret);
-  hmac.write(label);
-  auto mac = hmac.digest();
-  return bytes(mac.begin(), mac.begin() + size);
+  if (EVP_PKEY_CTX_hkdf_mode(pctx.get(), EVP_PKEY_HKDEF_MODE_EXPAND_ONLY) <= 0) {
+    throw openssl_error();
+  }
+
+  auto type = openssl_digest_type(suite);
+  if (EVP_PKEY_CTX_set_hkdf_md(pctx.get(), type) <= 0) {
+    throw openssl_error();
+  }
+
+  if (EVP_PKEY_CTX_add1_hkdf_info(pctx.get(), info.data(), info.size()) <= 0) {
+    throw openssl_error();
+  }
+
+  if (EVP_PKEY_CTX_set1_hkdf_key(pctx.get(), secret.data(), secret.size()) <= 0) {
+    throw openssl_error();
+  }
+
+  auto out = bytes(size);
+  if (EVP_PKEY_derive(pctx.get(), out.data(), &size) <= 0) {
+    throw openssl_error();
+  }
+
+  return out;
 }
 
 ///
