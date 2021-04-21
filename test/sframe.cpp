@@ -17,14 +17,13 @@ struct FIPSLock
   FIPSLock(bool enabled)
   {
     if (!enabled) {
+      FIPS_mode_set(0);
       return;
     }
 
     const auto* require = std::getenv("REQUIRE_FIPS");
-
-    auto rv = FIPS_mode_set(1);
-    if (require) {
-      REQUIRE(rv == 1);
+    if (require && FIPS_mode() == 0) {
+      REQUIRE(FIPS_mode_set(1) == 1);
     }
   }
 
