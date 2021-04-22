@@ -1,11 +1,7 @@
-
 #include <doctest/doctest.h>
 #include <sframe/sframe.h>
 
-#include <iomanip>
-#include <iostream> // for string, operator<<
-#include <map>      // for map
-#include <sstream>
+#include <map>       // for map
 #include <stdexcept> // for invalid_argument
 #include <string>    // for basic_string, operator==
 
@@ -26,17 +22,6 @@ from_hex(const std::string& hex)
   }
 
   return out;
-}
-
-std::string
-to_hex(const bytes& data)
-{
-  std::stringstream hex(std::ios_base::out);
-  hex.flags(std::ios::hex);
-  for (const auto& byte : data) {
-    hex << std::setw(2) << std::setfill('0') << int(byte);
-  }
-  return hex.str();
 }
 
 template<typename T>
@@ -289,24 +274,20 @@ TEST_CASE("MLS Known-Answer")
 
     auto ctx = MLSContext(suite, epoch_bits);
 
-    //CHECK(tc.epochs.size() == epoch_ids.size());
+    CHECK(tc.epochs.size() == epoch_ids.size());
     for (size_t i = 0; i < tc.epochs.size(); i++) {
       ctx.add_epoch(epoch_ids[i], epoch_secrets[i]);
 
-      //CHECK(tc.epochs[i].size() == sender_ids.size());
+      CHECK(tc.epochs[i].size() == sender_ids.size());
       for (size_t j = 0; j < tc.epochs[i].size(); j++) {
         auto encrypted =
           ctx.protect(epoch_ids[i], sender_ids[j], ct_out, plaintext);
-        //CHECK(tc.epochs[i][j] == to_bytes(encrypted));
+        CHECK(tc.epochs[i][j] == to_bytes(encrypted));
 
-        //auto decrypted = ctx.unprotect(pt_out, tc.epochs[i][j]);
-        //CHECK(plaintext == to_bytes(decrypted));
-
-        std::cout << "          from_hex(\"" << to_bytes(encrypted) << "\")," << std::endl;
+        auto decrypted = ctx.unprotect(pt_out, tc.epochs[i][j]);
+        CHECK(plaintext == to_bytes(decrypted));
       }
-      std::cout << std::endl;
     }
-    std::cout << std::endl;
   }
 }
 
