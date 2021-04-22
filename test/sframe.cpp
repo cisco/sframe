@@ -1,4 +1,6 @@
 #include <doctest/doctest.h>
+#include <openssl/crypto.h>
+#include <openssl/err.h>
 #include <sframe/sframe.h>
 
 #include <map>       // for map
@@ -6,6 +8,15 @@
 #include <string>    // for basic_string, operator==
 
 using namespace sframe;
+
+static void
+ensure_fips_if_required()
+{
+  const auto* require = std::getenv("REQUIRE_FIPS");
+  if (require && FIPS_mode() == 0) {
+    REQUIRE(FIPS_mode_set(1) == 1);
+  }
+}
 
 static bytes
 from_hex(const std::string& hex)
@@ -33,6 +44,8 @@ to_bytes(const T& range)
 
 TEST_CASE("SFrame Known-Answer")
 {
+  ensure_fips_if_required();
+
   struct KnownAnswerTest
   {
     bytes key;
@@ -129,6 +142,8 @@ TEST_CASE("SFrame Known-Answer")
 
 TEST_CASE("SFrame Round-Trip")
 {
+  ensure_fips_if_required();
+
   const auto rounds = 1 << 9;
   const auto kid = KeyID(0x42);
   const auto plaintext = from_hex("00010203");
@@ -167,6 +182,8 @@ TEST_CASE("SFrame Round-Trip")
 
 TEST_CASE("MLS Known-Answer")
 {
+  ensure_fips_if_required();
+
   struct KnownAnswerTest
   {
     using Epoch = std::vector<bytes>;
@@ -293,6 +310,8 @@ TEST_CASE("MLS Known-Answer")
 
 TEST_CASE("MLS Round-Trip")
 {
+  ensure_fips_if_required();
+
   const auto epoch_bits = 2;
   const auto test_epochs = 1 << (epoch_bits + 1);
   const auto epoch_rounds = 10;
@@ -336,6 +355,8 @@ TEST_CASE("MLS Round-Trip")
 
 TEST_CASE("MLS Failure after Purge")
 {
+  ensure_fips_if_required();
+
   const auto suite = CipherSuite::AES_GCM_128_SHA256;
   const auto epoch_bits = 2;
   const auto plaintext = from_hex("00010203");
