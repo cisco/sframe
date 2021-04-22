@@ -177,16 +177,16 @@ var (
 	}
 
 	plaintext         = from_hex("00010203")
-	header_7_0        = from_hex("1700")
-	header_7_1        = from_hex("1701")
-	header_7_2        = from_hex("1702")
-	header_long_short = from_hex("1affff00")
-	header_long_long  = from_hex("2affff0100")
+	header_7_0        = from_hex("0700")
+	header_7_1        = from_hex("0701")
+	header_7_2        = from_hex("0702")
+	header_long_short = from_hex("0affff00")
+	header_long_long  = from_hex("1affff0100")
 
 	forSender = map[int]string{
-		0xa:   "19a",
-		0xaa:  "1a0aa",
-		0xaaa: "1aaaa",
+		0xa:   "09a",
+		0xaa:  "0a0aa",
+		0xaaa: "0aaaa",
 	}
 	epochSecret = map[int][]byte{
 		0x00: from_hex("00000000000000000000000000000000"),
