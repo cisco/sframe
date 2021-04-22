@@ -57,7 +57,7 @@ Header::decode(input_bytes buffer)
   }
 
   auto cfg = buffer[0];
-  auto ctr_size = size_t((cfg >> 4) & 0x07);
+  auto ctr_size = size_t((cfg >> 4) & 0x07) + 1;
   auto kid_long = (cfg & 0x08) > 0;
   auto kid_size = size_t(cfg & 0x07);
 
@@ -104,7 +104,7 @@ Header::encode(output_bytes buffer) const
   }
 
   encode_uint(counter, buffer.subspan(1 + kid_size, ctr_size));
-  buffer[0] |= uint8_t(ctr_size << 4);
+  buffer[0] |= uint8_t((ctr_size - 1) << 4);
 
   return 1 + kid_size + ctr_size;
 }

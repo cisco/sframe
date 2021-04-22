@@ -1,8 +1,6 @@
-
 #include <doctest/doctest.h>
 #include <sframe/sframe.h>
 
-#include <iostream>  // for string, operator<<
 #include <map>       // for map
 #include <stdexcept> // for invalid_argument
 #include <string>    // for basic_string, operator==
@@ -53,39 +51,39 @@ TEST_CASE("SFrame Known-Answer")
     { CipherSuite::AES_CM_128_HMAC_SHA256_4,
       {
         from_hex("101112131415161718191a1b1c1d1e1f"),
-        from_hex("170023b51101e8cf3180"),
-        from_hex("1701aa0743f6fed8c056"),
-        from_hex("1702eae8243335f26dc9"),
-        from_hex("1affff0023b51101b0927605"),
-        from_hex("2affff01001981bb4f5d35ad0c"),
+        from_hex("070023b51101cc7ebc3d"),
+        from_hex("0701aa0743f6aa3a2b9b"),
+        from_hex("0702eae82433853983b7"),
+        from_hex("0affff0023b51101efb2441d"),
+        from_hex("1affff01001981bb4f7281d098"),
       } },
     { CipherSuite::AES_CM_128_HMAC_SHA256_8,
       {
         from_hex("202122232425262728292a2b2c2d2e2f"),
-        from_hex("170022067e9270080090597dfadc"),
-        from_hex("1701d868b21f5e80434093d12eef"),
-        from_hex("170266de5b9332a80dea44a6407c"),
-        from_hex("1affff0022067e92500ce44901a10eef"),
-        from_hex("2affff01005ba58d1302a41630f1214e17"),
+        from_hex("070022067e92bbacd94627c087b8"),
+        from_hex("0701d868b21f4ba897d19490eaa5"),
+        from_hex("070266de5b93b640ba637ae569dc"),
+        from_hex("0affff0022067e92dac1fe9af8fd6a07"),
+        from_hex("1affff01005ba58d136415a9799dc921f9"),
       } },
     { CipherSuite::AES_GCM_128_SHA256,
       {
         from_hex("303132333435363738393a3b3c3d3e3f"),
-        from_hex("170048310f3b8c8a7297a92b3ed392938f9d0d087118"),
-        from_hex("170145c8c2cd5ef5773e38f23ee6236a623f8351cfce"),
-        from_hex("17021ea6e7b05246606050b44fe105f419dea85b4b7a"),
-        from_hex("1affff0048310f3b542c2bc859816a10ee5f83f4f840f6e5"),
-        from_hex("2affff0100f1f838df14b1e675fb0b0618291838e628fea346"),
+        from_hex("070048310f3bb26f3ee3ceed7756efe2f32078766c56"),
+        from_hex("070145c8c2cd60103b4a5f3477635e1b1e82f62fd280"),
+        from_hex("07021ea6e7b06ca32c143772066478856563dd255634"),
+        from_hex("0affff0048310f3b6ac967bc3e472395932eff498d3eebab"),
+        from_hex("1affff0100f1f838df579e32e95341dc97ae8bbd21b77c8494"),
       } },
     { CipherSuite::AES_GCM_256_SHA512,
       {
         from_hex(
           "404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f"),
-        from_hex("1700b591faafe60c9c3a7d8dd1c18f91a72c510c8e63"),
-        from_hex("1701d555e665358a2486d99ac7272bedd503f53ec9d7"),
-        from_hex("170222e5fcd4709da8cc4d4a4e6e38a0b16afd0063fc"),
-        from_hex("1affff00b591faafc843b5831c7fc08b477d926f8c4c8f9b"),
-        from_hex("2affff01007b0e9ee905ab26c73927d7ece036a08c618610e4"),
+        from_hex("0700b591faaff9b9965fcabfd0949a2bb67be4179753"),
+        from_hex("0701d555e6652a3f2ee36ea8c6723e57c4544025d0e7"),
+        from_hex("070222e5fcd46f28a2a9fa784f3b2d1aa03d481b7acc"),
+        from_hex("0affff00b591faafd7f6bfe6ab4dc1de52c78338395796ab"),
+        from_hex("1affff01007b0e9ee925743869e071d413def89374beab3bb4"),
       } },
   };
 
@@ -196,73 +194,73 @@ TEST_CASE("MLS Known-Answer")
     { CipherSuite::AES_CM_128_HMAC_SHA256_4,
       { {
         {
-          from_hex("19a000c92bf2b7e7ff7380"),
-          from_hex("1a0aa000c84890cf05de8f15"),
-          from_hex("1aaaa0004361be8cdb7110ae"),
+          from_hex("09a000c92bf2b7154e0356"),
+          from_hex("0a0aa000c84890cf4a814ce0"),
+          from_hex("0aaaa0004361be8c2c549ae5"),
         },
         {
-          from_hex("19af0086adc8a84a84eca2"),
-          from_hex("1a0aaf006870557d8f7c5a27"),
-          from_hex("1aaaaf00a0e68b606087812a"),
+          from_hex("09af0086adc8a87988307c"),
+          from_hex("0a0aaf006870557dd62e9409"),
+          from_hex("0aaaaf00a0e68b60eab24b27"),
         },
         {
-          from_hex("19a0001ad5829bbc85f504"),
-          from_hex("1a0aa0004769a13c89e6ba00"),
-          from_hex("1aaaa000586b97fa780a731a"),
+          from_hex("09a0001ad5829b23a11c33"),
+          from_hex("0a0aa0004769a13c95568e30"),
+          from_hex("0aaaa000586b97fa7f7fe096"),
         },
       } } },
     { CipherSuite::AES_CM_128_HMAC_SHA256_8,
       { {
         {
-          from_hex("19a000c92bf2b7e7ff7380241209e1"),
-          from_hex("1a0aa000c84890cf05de8f15e2a6a98b"),
-          from_hex("1aaaa0004361be8cdb7110aed8f39907"),
+          from_hex("09a000c92bf2b7154e0356b4be009e"),
+          from_hex("0a0aa000c84890cf4a814ce031fae9f7"),
+          from_hex("0aaaa0004361be8c2c549ae53384b5f1"),
         },
         {
-          from_hex("19af0086adc8a84a84eca293b60fbf"),
-          from_hex("1a0aaf006870557d8f7c5a27fe48227b"),
-          from_hex("1aaaaf00a0e68b606087812a9034f06a"),
+          from_hex("09af0086adc8a87988307c147e8138"),
+          from_hex("0a0aaf006870557dd62e94097fdfaae8"),
+          from_hex("0aaaaf00a0e68b60eab24b275b63f964"),
         },
         {
-          from_hex("19a0001ad5829bbc85f504f77f3dc8"),
-          from_hex("1a0aa0004769a13c89e6ba005f2cfe5a"),
-          from_hex("1aaaa000586b97fa780a731a435006cd"),
+          from_hex("09a0001ad5829b23a11c33a5ac2f11"),
+          from_hex("0a0aa0004769a13c95568e30f9bafee2"),
+          from_hex("0aaaa000586b97fa7f7fe0965aee99da"),
         },
       } } },
     { CipherSuite::AES_GCM_128_SHA256,
       { {
         {
-          from_hex("19a000bb7d6b3b9a9a5f1abc476b5cfaff53a9c3685ad5"),
-          from_hex("1a0aa000382032d06913e59807a6ad0f6193dca0ab8b6ceb"),
-          from_hex("1aaaa0006aa1aa44edf64dd101a31d9f39cd1abe129de1ed"),
+          from_hex("09a000bb7d6b3b4f32219f00516841cca349101f942ba1"),
+          from_hex("0a0aa000382032d088cb627c73b2c55968092d7039538f02"),
+          from_hex("0aaaa0006aa1aa44bbd1911b07ad876350c29790dad1fa04"),
         },
         {
-          from_hex("19af0077d06820762dfc682df9e0f3bd635b6240840359"),
-          from_hex("1a0aaf00a99857f0b13b2b8b44923c54655494d8270b07a8"),
-          from_hex("1aaaaf00662bf029c244947f2a8cefa3512259a3aff92dd0"),
+          from_hex("09af0077d0682046fdb1e08315c63b6c5f9f205a9e76c4"),
+          from_hex("0a0aaf00a99857f0a8aa0b2d0b5825ea2c0d71621f2bb7aa"),
+          from_hex("0aaaaf00662bf029595d34ea58a68edc7390c78e0fcc6de4"),
         },
         {
-          from_hex("19a0000661fb1fa3c7bd98032ab3aaea3c1ff4897324fa"),
-          from_hex("1a0aa0008140a14b320f01830bce39727dc17a29e8e08fb7"),
-          from_hex("1aaaa00084da92db90a3a24032a12c2706b90a79327f66fb"),
+          from_hex("09a0000661fb1f7b2b2dd820b225f5239cafc817da7821"),
+          from_hex("0a0aa0008140a14bb80a6d5793637d820de7c01df4f7f676"),
+          from_hex("0aaaa00084da92dbd31c174d3d7423c9470a48849c5c83b3"),
         },
       } } },
     { CipherSuite::AES_GCM_256_SHA512,
       { {
         {
-          from_hex("19a000414462cce78dc5e70db0edb825fdccdb27e0a8f8"),
-          from_hex("1a0aa000c013c6d9609e398adb51aa2df988ab2090615217"),
-          from_hex("1aaaa0009a2a9ab0db57883851ab7d4eb57355cd950e4819"),
+          from_hex("09a000414462ccdfcb5473b8e0e4f686362e35a2985182"),
+          from_hex("0a0aa000c013c6d92f0683dbf87ccca3c2c11d3eca3c382f"),
+          from_hex("0aaaa0009a2a9ab03c3eca040928d8ef17ea531696b8163a"),
         },
         {
-          from_hex("19af00466bc33bfe97e91602724b243b90c9a1dcb85416"),
-          from_hex("1a0aaf00f72194872e6a76fcce1a4ca71d4e0e5a48017c67"),
-          from_hex("1aaaaf0043a23ff519b65803318cfc7f661021e18ff19e68"),
+          from_hex("09af00466bc33b10ec4405e4ff7241d11c63b21192b535"),
+          from_hex("0a0aaf00f7219487f1bf6ccec5c40888bcd79bb135900e02"),
+          from_hex("0aaaaf0043a23ff53ae88f41084ad503f1ec82613983b00b"),
         },
         {
-          from_hex("19a0004f4d239d117be8ab84e9972868016258b8a9a65f"),
-          from_hex("1a0aa000b592b5e30ce07c102c5ee18fcb99e19be76c7739"),
-          from_hex("1aaaa000fd95ba9a9ab3d82e9efce294a75837d766f75526"),
+          from_hex("09a0004f4d239d260255899228d119099fa23f09d8b880"),
+          from_hex("0a0aa000b592b5e3bc31c7ac13eea1e69e83826233f90a4d"),
+          from_hex("0aaaa000fd95ba9acefc244e4652db355d4ce0a5c5137492"),
         },
       } } },
   };
