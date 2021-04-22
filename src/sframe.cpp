@@ -185,7 +185,9 @@ MLSContext::add_epoch(EpochID epoch_id, const bytes& sframe_epoch_secret)
 }
 
 void
-MLSContext::add_epoch(EpochID epoch_id, const bytes& sframe_epoch_secret, size_t sender_bits)
+MLSContext::add_epoch(EpochID epoch_id,
+                      const bytes& sframe_epoch_secret,
+                      size_t sender_bits)
 {
   auto epoch_index = epoch_id & epoch_mask;
   epoch_cache.at(epoch_index)
@@ -231,8 +233,9 @@ MLSContext::protect(EpochID epoch_id,
   auto sender_bits = epoch->sender_bits;
   if (sender_id >= (uint64_t(1) << sender_bits)) {
     throw invalid_parameter_error(
-      "Sender ID too large: " + std::to_string(sender_id) +
-      " > " + std::to_string(1 << sender_bits) + " sender_bits:" + std::to_string(sender_bits));
+      "Sender ID too large: " + std::to_string(sender_id) + " > " +
+      std::to_string(1 << sender_bits) +
+      " sender_bits:" + std::to_string(sender_bits));
   }
 
   auto context_part = uint64_t(context_id) << (epoch_bits + sender_bits);
