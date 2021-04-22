@@ -183,10 +183,24 @@ var (
 	header_long_short = from_hex("0affff00")
 	header_long_long  = from_hex("1affff0100")
 
-	forSender = map[int]string{
+	forSender = map[uint64]string{
+		// Without context
 		0xa:   "09a",
 		0xaa:  "0a0aa",
 		0xaaa: "0aaaa",
+
+		// With context
+		0xb00a:   "0b0b00a",
+		0xbb00a:  "0bbb00a",
+		0xbbb00a: "0c0bbb00a",
+
+		0xb0aa:   "0b0b0aa",
+		0xbb0aa:  "0bbb0aa",
+		0xbbb0aa: "0c0bbb0aa",
+
+		0xbaaa:   "0b0baaa",
+		0xbbaaa:  "0bbbaaa",
+		0xbbbaaa: "0c0bbbaaa",
 	}
 	epochSecret = map[int][]byte{
 		0x00: from_hex("00000000000000000000000000000000"),
@@ -212,20 +226,38 @@ func protect(suite CipherSuite, baseKey []byte, ctr uint64, header []byte) []byt
 	return append(header, ct...)
 }
 
+func senderWithContext(sender, senderBits, context int) uint64 {
+	return (uint64(context) << senderBits) | uint64(sender)
+}
+
 func mlsHeader(epoch, sender int) []byte {
+	return mlsHeaderWithContext(epoch, sender, 32, 0)
+}
+
+func mlsHeaderWithContext(epoch, sender, senderBits, context int) []byte {
 	epochStr := fmt.Sprintf("%01x", epoch&epoch_mask)
-	return from_hex(forSender[sender] + epochStr + "00")
+	senderIx := senderWithContext(sender, senderBits, context)
+	return from_hex(forSender[senderIx] + epochStr + "00")
 }
 
 func mlsBaseKey(suite CipherSuite, epoch, sender int) []byte {
+	return mlsBaseKeyWithContext(suite, epoch, sender, 32, 0)
+}
+
+func mlsBaseKeyWithContext(suite CipherSuite, epoch, sender, senderBits, context int) []byte {
 	sframeEpochSecret := epochSecret[epoch]
-	encSender := []byte{byte(sender >> 24), byte(sender >> 16), byte(sender >> 8), byte(sender)}
+	encSender := make([]byte, 8)
+	binary.BigEndian.PutUint64(encSender, senderWithContext(sender, senderBits, context))
 	return suite.Expand(sframeEpochSecret, encSender, suite.Hash.Size())
 }
 
 func mlsProtect(suite CipherSuite, epoch, sender int) []byte {
-	baseKey := mlsBaseKey(suite, epoch, sender)
-	return protect(suite, baseKey, 0, mlsHeader(epoch, sender))
+	return mlsProtectWithContext(suite, epoch, sender, 32, 0)
+}
+
+func mlsProtectWithContext(suite CipherSuite, epoch, sender, senderBits, context int) []byte {
+	baseKey := mlsBaseKeyWithContext(suite, epoch, sender, senderBits, context)
+	return protect(suite, baseKey, 0, mlsHeaderWithContext(epoch, sender, senderBits, context))
 }
 
 func main() {
@@ -235,6 +267,8 @@ func main() {
 		AES_GCM_128_SHA256,
 		AES_GCM_256_SHA512,
 	}
+
+	fmt.Printf("\n\n/* ***** ***** BASE ***** ***** */\n\n\n")
 
 	for _, suite := range suites {
 		ct_7_0 := protect(suite, baseKeys[suite.ID], 0, header_7_0)
@@ -254,7 +288,7 @@ func main() {
 		fmt.Printf("  } },\n")
 	}
 
-	fmt.Printf("\n\n/* ***** ***** ***** ***** */\n\n\n")
+	fmt.Printf("\n\n/* ***** ***** MLS ***** ***** */\n\n\n")
 
 	epochs := []int{0x00, 0x0f, 0x10}
 	senders := []int{0xa, 0xaa, 0xaaa}
@@ -267,6 +301,29 @@ func main() {
 			for _, sender := range senders {
 				ciphertext := mlsProtect(suite, epoch, sender)
 				fmt.Printf("      from_hex(\"%x\"),\n", ciphertext)
+			}
+			fmt.Printf("    },\n")
+		}
+		fmt.Printf("  } } },\n")
+	}
+
+	fmt.Printf("\n\n/* ***** ***** MLS+CONTEXT ***** ***** */\n\n\n")
+
+	contexts := []int{0xb, 0xbb, 0xbbb}
+	senderBits := 12
+
+	for _, suite := range suites {
+		fmt.Printf("{ CipherSuite::%s,\n", suite.Name)
+		fmt.Printf("  { {\n")
+		for _, epoch := range epochs {
+			fmt.Printf("    {\n")
+			for _, sender := range senders {
+				fmt.Printf("      {\n")
+				for _, context := range contexts {
+					ciphertext := mlsProtectWithContext(suite, epoch, sender, senderBits, context)
+					fmt.Printf("        from_hex(\"%x\"),\n", ciphertext)
+				}
+				fmt.Printf("      },\n")
 			}
 			fmt.Printf("    },\n")
 		}

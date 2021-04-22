@@ -264,7 +264,7 @@ MLSContext::EpochKeys::get(CipherSuite ciphersuite, SenderID sender_id)
   }
 
   auto hash_size = cipher_digest_size(ciphersuite);
-  auto enc_sender_id = bytes(4);
+  auto enc_sender_id = bytes(8);
   encode_uint(sender_id, enc_sender_id);
 
   auto sender_base_key =
