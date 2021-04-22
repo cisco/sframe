@@ -9,7 +9,7 @@
 
 using namespace sframe;
 
-void
+static void
 ensure_fips_if_required()
 {
   const auto* require = std::getenv("REQUIRE_FIPS");
