@@ -181,7 +181,15 @@ MLSContext::add_epoch(EpochID epoch_id, const bytes& sframe_epoch_secret)
 {
   auto epoch_index = epoch_id & epoch_mask;
   epoch_cache.at(epoch_index)
-    .reset(new EpochKeys(epoch_id, sframe_epoch_secret));
+    .reset(new EpochKeys(epoch_id, sframe_epoch_secret, 0));
+}
+
+void
+MLSContext::add_epoch(EpochID epoch_id, const bytes& sframe_epoch_secret, size_t sender_bits)
+{
+  auto epoch_index = epoch_id & epoch_mask;
+  epoch_cache.at(epoch_index)
+    .reset(new EpochKeys(epoch_id, sframe_epoch_secret, sender_bits));
 }
 
 void
@@ -206,15 +214,45 @@ MLSContext::protect(EpochID epoch_id,
 }
 
 output_bytes
+MLSContext::protect(EpochID epoch_id,
+                    SenderID sender_id,
+                    ContextID context_id,
+                    output_bytes ciphertext,
+                    input_bytes plaintext)
+{
+  auto epoch_index = epoch_id & epoch_mask;
+  auto& epoch = epoch_cache.at(epoch_index);
+  if (!epoch) {
+    throw invalid_parameter_error(
+      "Unknown epoch. epoch_index: " + std::to_string(epoch_index) +
+      ", sender_id:" + std::to_string(sender_id));
+  }
+
+  auto sender_bits = epoch->sender_bits;
+  if (sender_id >= (uint64_t(1) << sender_bits)) {
+    throw invalid_parameter_error(
+      "Sender ID too large: " + std::to_string(sender_id) +
+      " > " + std::to_string(1 << sender_bits) + " sender_bits:" + std::to_string(sender_bits));
+  }
+
+  auto context_part = uint64_t(context_id) << (epoch_bits + sender_bits);
+  auto sender_part = uint64_t(sender_id) << epoch_bits;
+  auto key_id = KeyID(context_part | sender_part | epoch_index);
+  return _protect(key_id, ciphertext, plaintext);
+}
+
+output_bytes
 MLSContext::unprotect(output_bytes plaintext, input_bytes ciphertext)
 {
   return _unprotect(plaintext, ciphertext);
 }
 
 MLSContext::EpochKeys::EpochKeys(MLSContext::EpochID full_epoch_in,
-                                 bytes sframe_epoch_secret_in)
+                                 bytes sframe_epoch_secret_in,
+                                 size_t sender_bits_in)
   : full_epoch(full_epoch_in)
   , sframe_epoch_secret(std::move(sframe_epoch_secret_in))
+  , sender_bits(sender_bits_in)
 {}
 
 SFrame::KeyState&

@@ -295,7 +295,7 @@ TEST_CASE("MLS Known-Answer")
 
 TEST_CASE("MLS Round-Trip")
 {
-  const auto epoch_bits = 2;
+  const auto epoch_bits = 4;
   const auto test_epochs = 1 << (epoch_bits + 1);
   const auto epoch_rounds = 10;
   const auto plaintext = from_hex("00010203");
@@ -331,6 +331,65 @@ TEST_CASE("MLS Round-Trip")
           member_b.protect(epoch_id, sender_id_b, ct_out, plaintext);
         auto decrypted_ba = member_a.unprotect(pt_out, encrypted_ba);
         CHECK(plaintext == to_bytes(decrypted_ba));
+      }
+    }
+  }
+}
+
+TEST_CASE("MLS Round-Trip with context")
+{
+  const auto epoch_bits = 4;
+  const auto test_epochs = 1 << (epoch_bits + 1);
+  const auto epoch_rounds = 10;
+  const auto plaintext = from_hex("00010203");
+  const auto sender_id_a = MLSContext::SenderID(0xA0A0A0A0);
+  const auto sender_id_b = MLSContext::SenderID(0xA1A1A1A1);
+  const auto sender_id_bits = size_t(32);
+  const auto context_id_0 = 0xB0B0;
+  const auto context_id_1 = 0xB1B1;
+
+  const std::vector<CipherSuite> suites{
+    CipherSuite::AES_CM_128_HMAC_SHA256_4,
+    CipherSuite::AES_CM_128_HMAC_SHA256_8,
+    CipherSuite::AES_GCM_128_SHA256,
+    CipherSuite::AES_GCM_256_SHA512,
+  };
+
+  auto pt_out = bytes(plaintext.size());
+  auto ct_out_1 = bytes(plaintext.size() + max_overhead);
+  auto ct_out_0 = bytes(plaintext.size() + max_overhead);
+
+  for (auto& suite : suites) {
+    auto member_a_0 = MLSContext(suite, epoch_bits);
+    auto member_a_1 = MLSContext(suite, epoch_bits);
+    auto member_b = MLSContext(suite, epoch_bits);
+
+    for (MLSContext::EpochID epoch_id = 0; epoch_id < test_epochs; epoch_id++) {
+      const auto sframe_epoch_secret = bytes(8, uint8_t(epoch_id));
+
+      member_a_0.add_epoch(epoch_id, sframe_epoch_secret, sender_id_bits);
+      member_a_1.add_epoch(epoch_id, sframe_epoch_secret, sender_id_bits);
+      member_b.add_epoch(epoch_id, sframe_epoch_secret);
+
+      for (int i = 0; i < epoch_rounds; i++) {
+        auto encrypted_ab_0 =
+          member_a_0.protect(epoch_id, sender_id_a, context_id_0, ct_out_0, plaintext);
+        auto decrypted_ab_0 = to_bytes(member_b.unprotect(pt_out, encrypted_ab_0));
+        CHECK(plaintext == decrypted_ab_0);
+
+        auto encrypted_ab_1 =
+          member_a_1.protect(epoch_id, sender_id_a, context_id_1, ct_out_1, plaintext);
+        auto decrypted_ab_1 = to_bytes(member_b.unprotect(pt_out, encrypted_ab_1));
+        CHECK(plaintext == decrypted_ab_1);
+
+        CHECK(to_bytes(encrypted_ab_0) != to_bytes(encrypted_ab_1));
+
+        auto encrypted_ba =
+          member_b.protect(epoch_id, sender_id_b, ct_out_0, plaintext);
+        auto decrypted_ba_0 = to_bytes(member_a_0.unprotect(pt_out, encrypted_ba));
+        auto decrypted_ba_1 = to_bytes(member_a_1.unprotect(pt_out, encrypted_ba));
+        CHECK(plaintext == decrypted_ba_0);
+        CHECK(plaintext == decrypted_ba_1);
       }
     }
   }

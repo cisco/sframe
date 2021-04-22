@@ -5,7 +5,7 @@
 #include <memory>
 #include <vector>
 
-#include <gsl/gsl>
+#include <gsl/gsl-lite.hpp>
 
 namespace sframe {
 
@@ -103,17 +103,25 @@ class MLSContext : public SFrame
 {
 public:
   using EpochID = uint64_t;
-  using SenderID = uint32_t;
+  using SenderID = uint64_t;
+  using ContextID = uint64_t;
 
   MLSContext(CipherSuite suite_in, size_t epoch_bits_in);
 
   void add_epoch(EpochID epoch_id, const bytes& sframe_epoch_secret);
+  void add_epoch(EpochID epoch_id, const bytes& sframe_epoch_secret, size_t sender_bits);
   void purge_before(EpochID keeper);
 
   output_bytes protect(EpochID epoch_id,
                        SenderID sender_id,
                        output_bytes ciphertext,
                        input_bytes plaintext);
+  output_bytes protect(EpochID epoch_id,
+                       SenderID sender_id,
+                       ContextID context_id,
+                       output_bytes ciphertext,
+                       input_bytes plaintext);
+
   output_bytes unprotect(output_bytes plaintext, input_bytes ciphertext);
 
 private:
@@ -124,9 +132,10 @@ private:
   {
     const EpochID full_epoch;
     const bytes sframe_epoch_secret;
+    const size_t sender_bits;
     std::map<SenderID, KeyState> sender_keys;
 
-    EpochKeys(EpochID full_epoch_in, bytes sframe_epoch_secret_in);
+    EpochKeys(EpochID full_epoch_in, bytes sframe_epoch_secret_in, size_t sender_bits_in);
     KeyState& get(CipherSuite suite, SenderID sender_id);
   };
 
