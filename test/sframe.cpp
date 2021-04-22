@@ -312,13 +312,9 @@ TEST_CASE("MLS Known-Answer")
 
 TEST_CASE("MLS Round-Trip")
 {
-<<<<<<< HEAD
-  const auto epoch_bits = 4;
-=======
   ensure_fips_if_required();
 
   const auto epoch_bits = 2;
->>>>>>> master
   const auto test_epochs = 1 << (epoch_bits + 1);
   const auto epoch_rounds = 10;
   const auto plaintext = from_hex("00010203");
@@ -363,6 +359,8 @@ TEST_CASE("MLS Round-Trip")
 
 TEST_CASE("MLS Known-Answer with Context")
 {
+  ensure_fips_if_required();
+
   struct KnownAnswerTest
   {
     using ContextCases = std::vector<bytes>;
@@ -645,6 +643,8 @@ TEST_CASE("MLS Known-Answer with Context")
 
 TEST_CASE("MLS Round-Trip with context")
 {
+  ensure_fips_if_required();
+
   const auto epoch_bits = 4;
   const auto test_epochs = 1 << (epoch_bits + 1);
   const auto epoch_rounds = 10;
