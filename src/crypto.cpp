@@ -143,18 +143,52 @@ HMAC::digest()
   return input_bytes(md.data(), size);
 }
 
+static bytes
+hmac_for_hkdf(CipherSuite suite, input_bytes key, input_bytes data)
+{
+  const auto type = openssl_digest_type(suite);
+  auto ctx = scoped_hmac_ctx(HMAC_CTX_new(), HMAC_CTX_free);
+
+  // Some FIPS-enabled libraries are overly conservative in their interpretation
+  // of NIST SP 800-131A, which requires HMAC keys to be at least 112 bits long.
+  // That document does not impose that requirement on HKDF, so we disable FIPS
+  // enforcement for purposes of HKDF.
+  //
+  // https://doi.org/10.6028/NIST.SP.800-131Ar2
+  static const auto fips_min_hmac_key_len = 14;
+  auto key_size = static_cast<int>(key.size());
+  if (FIPS_mode() != 0 && key_size < fips_min_hmac_key_len) {
+    HMAC_CTX_set_flags(ctx.get(), EVP_MD_CTX_FLAG_NON_FIPS_ALLOW);
+  }
+
+  // Guard against sending nullptr to HMAC_Init_ex
+  auto* key_data = key.data();
+  static const auto dummy_key = bytes{ 0 };
+  if (key_data == nullptr) {
+    key_data = dummy_key.data();
+  }
+
+  if (1 != HMAC_Init_ex(ctx.get(), key.data(), key_size, type, nullptr)) {
+    throw openssl_error();
+  }
+
+  if (1 != HMAC_Update(ctx.get(), data.data(), data.size())) {
+    throw openssl_error();
+  }
+
+  auto md = bytes(cipher_digest_size(suite));
+  unsigned int size = 0;
+  if (1 != HMAC_Final(ctx.get(), md.data(), &size)) {
+    throw openssl_error();
+  }
+
+  return md;
+}
+
 bytes
 hkdf_extract(CipherSuite suite, const bytes& salt, const bytes& ikm)
 {
-  auto hmac = HMAC(suite, salt);
-  hmac.write(ikm);
-  // XXX(RLB) The MSVC optimizer thinks that the variable `mac` is unnecessary
-  // for some reason, so we have to connect it to something volatile to prevent
-  // it from being optimized out.
-  auto mac = hmac.digest();
-  volatile const auto begin = mac.begin();
-  volatile const auto end = mac.end();
-  return bytes(begin, end);
+  return hmac_for_hkdf(suite, salt, ikm);
 }
 
 // For simplicity, we enforce that size <= Hash.length, so that
@@ -174,10 +208,9 @@ hkdf_expand(CipherSuite suite,
 
   auto label = info;
   label.push_back(0x01);
-  auto hmac = HMAC(suite, secret);
-  hmac.write(label);
-  auto mac = hmac.digest();
-  return bytes(mac.begin(), mac.begin() + size);
+  auto mac = hmac_for_hkdf(suite, secret, label);
+  mac.resize(size);
+  return mac;
 }
 
 ///
