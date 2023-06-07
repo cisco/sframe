@@ -56,8 +56,8 @@ static const bytes sframe_ctr_label{
 static const bytes sframe_enc_label{ 0x65, 0x6e, 0x63 };        // "enc"
 static const bytes sframe_auth_label{ 0x61, 0x75, 0x74, 0x68 }; // "auth"
 
-SFrame::KeyState
-SFrame::KeyState::from_base_key(CipherSuite suite, const bytes& base_key)
+SFrame::KeyAndSalt
+SFrame::KeyAndSalt::from_base_key(CipherSuite suite, const bytes& base_key)
 {
   auto key_size = cipher_key_size(suite);
   auto nonce_size = cipher_nonce_size(suite);
@@ -80,14 +80,7 @@ SFrame::KeyState::from_base_key(CipherSuite suite, const bytes& base_key)
     key.insert(key.end(), auth_key.begin(), auth_key.end());
   }
 
-  return KeyState{ key, salt, 0 };
-}
-
-void
-Context::add_key(KeyID key_id, const bytes& base_key)
-{
-  auto key_state = KeyState::from_base_key(suite, base_key);
-  state[key_id] = std::move(key_state);
+  return KeyAndSalt{ key, salt, 0 };
 }
 
 static bytes
@@ -107,41 +100,62 @@ SFrame::SFrame(CipherSuite suite_in)
 
 SFrame::~SFrame() = default;
 
-output_bytes
-SFrame::_protect(KeyID key_id, output_bytes ciphertext, input_bytes plaintext)
+void
+SFrame::add_key(KeyID key_id, const bytes& base_key)
 {
-  auto& state = get_state(key_id);
-  const auto ctr = state.counter;
-  state.counter += 1;
+  keys.emplace(key_id, KeyAndSalt::from_base_key(suite, base_key));
+}
 
-  auto hdr_size = Header{ key_id, ctr }.encode(ciphertext);
-  auto header = ciphertext.subspan(0, hdr_size);
-  auto inner_ciphertext = ciphertext.subspan(hdr_size);
+output_bytes
+SFrame::_protect(KeyID key_id, Counter ctr, output_bytes ciphertext, input_bytes plaintext)
+{
+  const auto& key_and_salt = keys.at(key_id);
+  const auto header = Header{ key_id, ctr };
+  const auto aad = header.encoded();
 
-  const auto nonce = form_nonce(ctr, state.salt);
+  if (ciphertext.size() < aad.size()) {
+    throw buffer_too_small_error("Ciphertext too small for SFrame header");
+  }
+
+  std::copy(aad.begin(), aad.end(), ciphertext.begin());
+  auto inner_ciphertext = ciphertext.subspan(aad.size());
+
+  if (inner_ciphertext.size() < plaintext.size() + overhead(suite)) {
+    throw buffer_too_small_error("Ciphertext too small for ciphertext");
+  }
+
+  const auto nonce = form_nonce(ctr, key_and_salt.salt);
   auto final_ciphertext =
-    seal(suite, state.key, nonce, inner_ciphertext, header, plaintext);
-  return ciphertext.subspan(0, hdr_size + final_ciphertext.size());
+    seal(suite, key_and_salt.key, nonce, inner_ciphertext, aad, plaintext);
+  return ciphertext.subspan(0, aad.size() + final_ciphertext.size());
 }
 
 output_bytes
 SFrame::_unprotect(output_bytes plaintext, input_bytes ciphertext)
 {
-  const auto header_aad = Header::decode(ciphertext);
-  const auto& header = std::get<0>(header_aad);
-  const auto& aad = std::get<1>(header_aad);
+  const auto header = Header::parse(ciphertext);
+  const auto aad = header.encoded();
+  const auto inner_ciphertext = ciphertext.subspan(aad.size());
 
-  auto inner_ciphertext = ciphertext.subspan(aad.size());
+  const auto& key_and_salt = keys.at(header.key_id);
+  const auto nonce = form_nonce(header.counter, key_and_salt.salt);
+  return open(suite, key_and_salt.key, nonce, plaintext, aad, inner_ciphertext);
+}
 
-  auto& state = get_state(header.key_id);
-  const auto nonce = form_nonce(header.counter, state.salt);
-  return open(suite, state.key, nonce, plaintext, aad, inner_ciphertext);
+void
+Context::add_key(KeyID key_id, const bytes& base_key)
+{
+  SFrame::add_key(key_id, base_key);
+  counters.emplace(key_id, 0);
 }
 
 output_bytes
 Context::protect(KeyID key_id, output_bytes ciphertext, input_bytes plaintext)
 {
-  return _protect(key_id, ciphertext, plaintext);
+  const auto ctr = counters.at(key_id);
+  counters.at(key_id) += 1;
+
+  return _protect(key_id, ctr, ciphertext, plaintext);
 }
 
 output_bytes
@@ -150,17 +164,7 @@ Context::unprotect(output_bytes plaintext, input_bytes ciphertext)
   return _unprotect(plaintext, ciphertext);
 }
 
-SFrame::KeyState&
-Context::get_state(KeyID key_id)
-{
-  auto it = state.find(key_id);
-  if (it == state.end()) {
-    throw invalid_parameter_error("Unknown key");
-  }
-
-  return it->second;
-}
-
+#if 0
 ///
 /// MLSContext
 ///
@@ -293,5 +297,6 @@ MLSContext::get_state(KeyID key_id)
 
   return epoch->get(suite, sender_id);
 }
+#endif // 0
 
 } // namespace sframe

@@ -59,26 +59,28 @@ using Counter = uint64_t;
 class SFrame
 {
 protected:
-  CipherSuite suite;
-
   SFrame(CipherSuite suite_in);
   virtual ~SFrame();
 
-  struct KeyState
+  struct KeyAndSalt
   {
-    static KeyState from_base_key(CipherSuite suite, const bytes& base_key);
+    static KeyAndSalt from_base_key(CipherSuite suite, const bytes& base_key);
 
     bytes key;
     bytes salt;
     Counter counter;
   };
 
+  void add_key(KeyID kid, const bytes& key);
+
   output_bytes _protect(KeyID key_id,
+                        Counter ctr,
                         output_bytes ciphertext,
                         input_bytes plaintext);
   output_bytes _unprotect(output_bytes ciphertext, input_bytes plaintext);
 
-  virtual KeyState& get_state(KeyID key_id) = 0;
+  CipherSuite suite;
+  std::map<KeyID, KeyAndSalt> keys;
 };
 
 class Context : public SFrame
@@ -94,11 +96,10 @@ public:
   output_bytes unprotect(output_bytes plaintext, input_bytes ciphertext);
 
 private:
-  std::map<KeyID, KeyState> state;
-
-  KeyState& get_state(KeyID key_id) override;
+  std::map<KeyID, Counter> counters;
 };
 
+#if 0
 class MLSContext : public SFrame
 {
 public:
@@ -146,5 +147,6 @@ private:
   std::vector<std::unique_ptr<EpochKeys>> epoch_cache;
   KeyState& get_state(KeyID key_id) override;
 };
+#endif // 0
 
 } // namespace sframe
