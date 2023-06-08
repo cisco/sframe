@@ -76,7 +76,11 @@ private:
   const size_t counter_size;
   std::array<uint8_t, max_size> buffer;
 
-  Header(KeyID key_id_in, Counter counter_in, input_bytes encoded);
+  Header(KeyID key_id_in,
+         Counter counter_in,
+         size_t key_id_size_in,
+         size_t counter_size_in,
+         input_bytes encoded);
 };
 
 // ContextBase represents the core SFrame encryption logic.  It remembers a set
@@ -136,8 +140,8 @@ protected:
 };
 
 // MLSContext augments Context with logic for deriving keys from MLS.  Instead
-// of adding individual keys, salts, and key IDs, the caller adds a secret for an epoch,
-// and keys / salts / key IDs are derived as needed.
+// of adding individual keys, salts, and key IDs, the caller adds a secret for
+// an epoch, and keys / salts / key IDs are derived as needed.
 class MLSContext : protected Context
 {
 public:

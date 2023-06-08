@@ -66,8 +66,8 @@ form_nonce(Counter ctr, const bytes& salt)
 
 output_bytes
 ContextBase::protect(const Header& header,
-                 output_bytes ciphertext,
-                 input_bytes plaintext)
+                     output_bytes ciphertext,
+                     input_bytes plaintext)
 {
   if (ciphertext.size() < plaintext.size() + overhead(suite)) {
     throw buffer_too_small_error("Ciphertext too small for cipher overhead");
@@ -81,8 +81,8 @@ ContextBase::protect(const Header& header,
 
 output_bytes
 ContextBase::unprotect(const Header& header,
-                   output_bytes plaintext,
-                   input_bytes ciphertext)
+                       output_bytes plaintext,
+                       input_bytes ciphertext)
 {
   if (ciphertext.size() < overhead(suite)) {
     throw buffer_too_small_error("Ciphertext too small for cipher overhead");
@@ -171,7 +171,8 @@ Context::protect(KeyID key_id, output_bytes ciphertext, input_bytes plaintext)
 
   std::copy(aad.begin(), aad.end(), ciphertext.begin());
   auto inner_ciphertext = ciphertext.subspan(aad.size());
-  auto final_ciphertext = ContextBase::protect(header, inner_ciphertext, plaintext);
+  auto final_ciphertext =
+    ContextBase::protect(header, inner_ciphertext, plaintext);
   return ciphertext.subspan(0, aad.size() + final_ciphertext.size());
 }
 

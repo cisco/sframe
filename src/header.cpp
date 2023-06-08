@@ -103,14 +103,18 @@ Header::parse(input_bytes buffer)
   }
   auto counter = Counter(decode_uint(buffer.subspan(1 + kid_size, ctr_size)));
 
-  return Header(key_id, counter, buffer.subspan(0, total_size));
+  return Header(key_id, counter, kid_size, ctr_size, buffer.subspan(0, total_size));
 }
 
-Header::Header(KeyID key_id_in, Counter counter_in, input_bytes encoded)
+Header::Header(KeyID key_id_in,
+               Counter counter_in,
+               size_t key_id_size,
+               size_t counter_size,
+               input_bytes encoded)
   : key_id(key_id_in)
   , counter(counter_in)
-  , key_id_size(kid_size(key_id))
-  , counter_size(ctr_size(counter))
+  , key_id_size(key_id_size)
+  , counter_size(counter_size)
 {
   std::copy(encoded.begin(), encoded.end(), buffer.begin());
 }
