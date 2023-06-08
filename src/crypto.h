@@ -53,6 +53,9 @@ hkdf_expand(CipherSuite suite,
 /// AEAD Algorithms
 ///
 
+size_t
+overhead(CipherSuite suite);
+
 output_bytes
 seal(CipherSuite suite,
      const bytes& key,

@@ -33,26 +33,50 @@ decode_uint(input_bytes data)
   return val;
 }
 
-size_t
-Header::size() const
+static size_t
+kid_size(KeyID key_id)
 {
-  auto kid_size = size_t(0);
-  if (key_id > 0x07) {
-    kid_size = uint_size(key_id);
+  if (key_id < 0x08) {
+    return 0;
+  } else {
+    return uint_size(key_id);
   }
-
-  const auto ctr_size = uint_size(counter);
-  if ((kid_size > 0x07) || (ctr_size > 0x07)) {
-    throw buffer_too_small_error("Header overflow");
-  }
-
-  return 1 + kid_size + ctr_size;
 }
 
-std::tuple<Header, input_bytes>
-Header::decode(input_bytes buffer)
+static size_t
+ctr_size(Counter counter)
 {
-  if (buffer.size() < Header::min_size) {
+  const auto ctr_size = uint_size(counter);
+  if (ctr_size == 0) {
+    // CTR always takes at least one byte
+    return 1;
+  }
+
+  return ctr_size;
+}
+
+Header::Header(KeyID key_id_in, Counter counter_in)
+  : key_id(key_id_in)
+  , counter(counter_in)
+  , key_id_size(kid_size(key_id))
+  , counter_size(ctr_size(counter))
+{
+  auto buffer_out = output_bytes(buffer);
+  buffer_out[0] = uint8_t((counter_size - 1) << 4);
+  if (key_id < 0x08) {
+    buffer_out[0] |= static_cast<uint8_t>(key_id);
+  } else {
+    buffer_out[0] |= static_cast<uint8_t>(0x08 | key_id_size);
+    encode_uint(key_id, buffer_out.subspan(1, key_id_size));
+  }
+
+  encode_uint(counter, buffer_out.subspan(1 + key_id_size, counter_size));
+}
+
+Header
+Header::parse(input_bytes buffer)
+{
+  if (buffer.size() < min_size) {
     throw buffer_too_small_error("Ciphertext too small to decode header");
   }
 
@@ -72,41 +96,39 @@ Header::decode(input_bytes buffer)
     kid_size = 0;
   }
 
+  auto total_size = 1 + ctr_size + kid_size;
+
   if (buffer.size() < 1 + kid_size + ctr_size) {
     throw buffer_too_small_error("Ciphertext too small to decode CTR");
   }
   auto counter = Counter(decode_uint(buffer.subspan(1 + kid_size, ctr_size)));
 
-  return std::make_tuple(Header{ key_id, counter },
-                         buffer.subspan(0, 1 + kid_size + ctr_size));
+  return Header(key_id, counter, kid_size, ctr_size, buffer.subspan(0, total_size));
+}
+
+Header::Header(KeyID key_id_in,
+               Counter counter_in,
+               size_t key_id_size,
+               size_t counter_size,
+               input_bytes encoded)
+  : key_id(key_id_in)
+  , counter(counter_in)
+  , key_id_size(key_id_size)
+  , counter_size(counter_size)
+{
+  std::copy(encoded.begin(), encoded.end(), buffer.begin());
+}
+
+input_bytes
+Header::encoded() const
+{
+  return input_bytes(buffer).subspan(0, size());
 }
 
 size_t
-Header::encode(output_bytes buffer) const
+Header::size() const
 {
-  if (buffer.size() < size()) {
-    throw buffer_too_small_error("Buffer too small to encode header");
-  }
-
-  auto kid_size = uint_size(key_id);
-  if (key_id <= 0x07) {
-    kid_size = 0;
-    buffer[0] = static_cast<uint8_t>(key_id);
-  } else {
-    encode_uint(key_id, buffer.subspan(1, kid_size));
-    buffer[0] = static_cast<uint8_t>(0x08 | kid_size);
-  }
-
-  auto ctr_size = uint_size(counter);
-  if (ctr_size == 0) {
-    // Counter always takes at least one byte
-    ctr_size = 1;
-  }
-
-  encode_uint(counter, buffer.subspan(1 + kid_size, ctr_size));
-  buffer[0] |= uint8_t((ctr_size - 1) << 4);
-
-  return 1 + kid_size + ctr_size;
+  return 1 + key_id_size + counter_size;
 }
 
 } // namespace sframe

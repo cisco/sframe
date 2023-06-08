@@ -11,7 +11,8 @@ namespace sframe {
 
 openssl_error::openssl_error()
   : std::runtime_error(ERR_error_string(ERR_get_error(), nullptr))
-{}
+{
+}
 
 static const EVP_MD*
 openssl_digest_type(CipherSuite suite)
@@ -342,6 +343,22 @@ seal_aead(CipherSuite suite,
   }
 
   return ct.subspan(0, pt.size() + tag_size);
+}
+
+size_t
+overhead(CipherSuite suite)
+{
+  switch (suite) {
+    case CipherSuite::AES_CM_128_HMAC_SHA256_4:
+      return 4;
+
+    case CipherSuite::AES_CM_128_HMAC_SHA256_8:
+      return 8;
+
+    case CipherSuite::AES_GCM_128_SHA256:
+    case CipherSuite::AES_GCM_256_SHA512:
+      return 16;
+  }
 }
 
 output_bytes

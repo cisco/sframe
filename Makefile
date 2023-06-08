@@ -19,7 +19,7 @@ ${BUILD_DIR}: CMakeLists.txt test/CMakeLists.txt
 	cmake -B${BUILD_DIR} .
 
 dev: CMakeLists.txt test/CMakeLists.txt
-	cmake -B${BUILD_DIR} -DCLANG_TIDY=ON -DTESTING=ON -DSANITIZERS=ON .
+	cmake -B${BUILD_DIR} -DCMAKE_BUILD_TYPE=Debug -DCLANG_TIDY=ON -DTESTING=ON -DSANITIZERS=ON .
 
 test: ${BUILD_DIR} test/*
 	cmake --build ${BUILD_DIR} --target sframe_test

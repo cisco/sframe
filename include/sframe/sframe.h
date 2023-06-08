@@ -56,35 +56,77 @@ operator<<(std::ostream& str, const input_bytes data);
 using KeyID = uint64_t;
 using Counter = uint64_t;
 
-class SFrame
+class Header
 {
+public:
+  const KeyID key_id;
+  const Counter counter;
+
+  Header(KeyID key_id_in, Counter counter_in);
+  static Header parse(input_bytes buffer);
+
+  input_bytes encoded() const;
+  size_t size() const;
+
+private:
+  static constexpr size_t min_size = 1;
+  static constexpr size_t max_size = 1 + 7 + 7;
+
+  const size_t key_id_size;
+  const size_t counter_size;
+  std::array<uint8_t, max_size> buffer;
+
+  Header(KeyID key_id_in,
+         Counter counter_in,
+         size_t key_id_size_in,
+         size_t counter_size_in,
+         input_bytes encoded);
+};
+
+// ContextBase represents the core SFrame encryption logic.  It remembers a set
+// of keys and salts identified by key IDs, and uses them to protect and
+// unprotect payloads.  The SFrame header is **not** written by the protect
+// method or read by the unprotect method.  It is assumed that the application
+// carries the header values in some other way.
+//
+// In general, you should prefer Context to ContextBase.
+class ContextBase
+{
+public:
+  ContextBase(CipherSuite suite_in);
+  virtual ~ContextBase();
+
+  void add_key(KeyID kid, const bytes& key);
+
+  output_bytes protect(const Header& header,
+                       output_bytes ciphertext,
+                       input_bytes plaintext);
+  output_bytes unprotect(const Header& header,
+                         output_bytes ciphertext,
+                         input_bytes plaintext);
+
 protected:
-  CipherSuite suite;
-
-  SFrame(CipherSuite suite_in);
-  virtual ~SFrame();
-
-  struct KeyState
+  struct KeyAndSalt
   {
-    static KeyState from_base_key(CipherSuite suite, const bytes& base_key);
+    static KeyAndSalt from_base_key(CipherSuite suite, const bytes& base_key);
 
     bytes key;
     bytes salt;
     Counter counter;
   };
 
-  output_bytes _protect(KeyID key_id,
-                        output_bytes ciphertext,
-                        input_bytes plaintext);
-  output_bytes _unprotect(output_bytes ciphertext, input_bytes plaintext);
-
-  virtual KeyState& get_state(KeyID key_id) = 0;
+  CipherSuite suite;
+  std::map<KeyID, KeyAndSalt> keys;
 };
 
-class Context : public SFrame
+// Context applies the full SFrame transform.  It tracks a counter for each key
+// to ensure nonce uniqueness, adds the SFrame header on protect, and
+// reads/strips the SFrame header on unprotect.
+class Context : protected ContextBase
 {
 public:
   Context(CipherSuite suite);
+  virtual ~Context();
 
   void add_key(KeyID kid, const bytes& key);
 
@@ -93,13 +135,14 @@ public:
                        input_bytes plaintext);
   output_bytes unprotect(output_bytes plaintext, input_bytes ciphertext);
 
-private:
-  std::map<KeyID, KeyState> state;
-
-  KeyState& get_state(KeyID key_id) override;
+protected:
+  std::map<KeyID, Counter> counters;
 };
 
-class MLSContext : public SFrame
+// MLSContext augments Context with logic for deriving keys from MLS.  Instead
+// of adding individual keys, salts, and key IDs, the caller adds a secret for
+// an epoch, and keys / salts / key IDs are derived as needed.
+class MLSContext : protected Context
 {
 public:
   using EpochID = uint64_t;
@@ -127,24 +170,32 @@ public:
   output_bytes unprotect(output_bytes plaintext, input_bytes ciphertext);
 
 private:
-  const size_t epoch_bits;
-  const size_t epoch_mask;
-
   struct EpochKeys
   {
     const EpochID full_epoch;
     const bytes sframe_epoch_secret;
-    const size_t sender_bits;
-    std::map<SenderID, KeyState> sender_keys;
+    size_t sender_bits;
+    size_t context_bits;
+    uint64_t max_sender_id;
+    uint64_t max_context_id;
 
     EpochKeys(EpochID full_epoch_in,
               bytes sframe_epoch_secret_in,
+              size_t epoch_bits,
               size_t sender_bits_in);
-    KeyState& get(CipherSuite suite, SenderID sender_id);
+    bytes base_key(CipherSuite suite, SenderID sender_id) const;
   };
 
+  void purge_epoch(EpochID epoch_id);
+
+  KeyID form_key_id(EpochID epoch_id,
+                    SenderID sender_id,
+                    ContextID context_id) const;
+  void ensure_key(KeyID key_id);
+
+  const size_t epoch_bits;
+  const size_t epoch_mask;
   std::vector<std::unique_ptr<EpochKeys>> epoch_cache;
-  KeyState& get_state(KeyID key_id) override;
 };
 
 } // namespace sframe
