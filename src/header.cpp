@@ -34,7 +34,8 @@ decode_uint(input_bytes data)
 }
 
 static size_t
-kid_size(KeyID key_id) {
+kid_size(KeyID key_id)
+{
   if (key_id < 0x08) {
     return 0;
   } else {
@@ -43,7 +44,8 @@ kid_size(KeyID key_id) {
 }
 
 static size_t
-ctr_size(Counter counter) {
+ctr_size(Counter counter)
+{
   const auto ctr_size = uint_size(counter);
   if (ctr_size == 0) {
     // CTR always takes at least one byte

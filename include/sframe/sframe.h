@@ -56,6 +56,8 @@ operator<<(std::ostream& str, const input_bytes data);
 using KeyID = uint64_t;
 using Counter = uint64_t;
 
+struct Header;
+
 class SFrame
 {
 protected:
@@ -73,17 +75,18 @@ protected:
 
   void add_key(KeyID kid, const bytes& key);
 
-  output_bytes _protect(KeyID key_id,
-                        Counter ctr,
+  output_bytes _protect(const Header& header,
                         output_bytes ciphertext,
                         input_bytes plaintext);
-  output_bytes _unprotect(output_bytes ciphertext, input_bytes plaintext);
+  output_bytes _unprotect(const Header& header,
+                          output_bytes ciphertext,
+                          input_bytes plaintext);
 
   CipherSuite suite;
   std::map<KeyID, KeyAndSalt> keys;
 };
 
-class Context : public SFrame
+class Context : protected SFrame
 {
 public:
   Context(CipherSuite suite);
@@ -95,12 +98,11 @@ public:
                        input_bytes plaintext);
   output_bytes unprotect(output_bytes plaintext, input_bytes ciphertext);
 
-private:
+protected:
   std::map<KeyID, Counter> counters;
 };
 
-#if 0
-class MLSContext : public SFrame
+class MLSContext : protected Context
 {
 public:
   using EpochID = uint64_t;
@@ -135,18 +137,29 @@ private:
   {
     const EpochID full_epoch;
     const bytes sframe_epoch_secret;
-    const size_t sender_bits;
-    std::map<SenderID, KeyState> sender_keys;
+    size_t sender_bits;
+    size_t context_bits;
+    uint64_t max_sender_id;
+    uint64_t max_context_id;
+    std::map<SenderID, KeyAndSalt> sender_keys;
 
     EpochKeys(EpochID full_epoch_in,
               bytes sframe_epoch_secret_in,
+              size_t epoch_bits,
               size_t sender_bits_in);
-    KeyState& get(CipherSuite suite, SenderID sender_id);
+    bytes base_key(CipherSuite suite, SenderID sender_id) const;
+    KeyAndSalt& get(CipherSuite suite, SenderID sender_id);
   };
 
+  void purge_epoch(EpochID epoch_id);
+
+  KeyID form_key_id(EpochID epoch_id,
+                    SenderID sender_id,
+                    ContextID context_id) const;
+  void ensure_key(KeyID key_id);
+
   std::vector<std::unique_ptr<EpochKeys>> epoch_cache;
-  KeyState& get_state(KeyID key_id) override;
+  KeyAndSalt& get_state(KeyID key_id);
 };
-#endif // 0
 
 } // namespace sframe
