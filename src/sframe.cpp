@@ -37,30 +37,83 @@ authentication_error::authentication_error()
 }
 
 ///
-/// Context
+/// ContextBase
 ///
 
-Context::Context(CipherSuite suite_in)
-  : SFrame(suite_in)
+ContextBase::ContextBase(CipherSuite suite_in)
+  : suite(suite_in)
 {
 }
 
+ContextBase::~ContextBase() = default;
+
+void
+ContextBase::add_key(KeyID key_id, const bytes& base_key)
+{
+  keys.emplace(key_id, KeyAndSalt::from_base_key(suite, base_key));
+}
+
+static bytes
+form_nonce(Counter ctr, const bytes& salt)
+{
+  auto nonce = salt;
+  for (size_t i = 0; i < sizeof(ctr); i++) {
+    nonce[nonce.size() - i - 1] ^= uint8_t(ctr >> (8 * i));
+  }
+
+  return nonce;
+}
+
+output_bytes
+ContextBase::protect(const Header& header,
+                 output_bytes ciphertext,
+                 input_bytes plaintext)
+{
+  if (ciphertext.size() < plaintext.size() + overhead(suite)) {
+    throw buffer_too_small_error("Ciphertext too small for cipher overhead");
+  }
+
+  const auto& key_and_salt = keys.at(header.key_id);
+  const auto aad = header.encoded();
+  const auto nonce = form_nonce(header.counter, key_and_salt.salt);
+  return seal(suite, key_and_salt.key, nonce, ciphertext, aad, plaintext);
+}
+
+output_bytes
+ContextBase::unprotect(const Header& header,
+                   output_bytes plaintext,
+                   input_bytes ciphertext)
+{
+  if (ciphertext.size() < overhead(suite)) {
+    throw buffer_too_small_error("Ciphertext too small for cipher overhead");
+  }
+
+  if (plaintext.size() < ciphertext.size() - overhead(suite)) {
+    throw buffer_too_small_error("Plaintext too small for decrypted value");
+  }
+
+  const auto& key_and_salt = keys.at(header.key_id);
+  const auto aad = header.encoded();
+  const auto nonce = form_nonce(header.counter, key_and_salt.salt);
+  return open(suite, key_and_salt.key, nonce, plaintext, aad, ciphertext);
+}
+
 static const bytes sframe_label{
-  0x53, 0x46, 0x72, 0x61, 0x6d, 0x65, 0x31, 0x30 // "SFrame10"
+  0x53, 0x46, 0x72, 0x61, 0x6d, 0x65, 0x31, 0x30 // "ContextBase10"
 };
 static const bytes sframe_key_label{ 0x6b, 0x65, 0x79 };        // "key"
 static const bytes sframe_salt_label{ 0x73, 0x61, 0x6c, 0x74 }; // "salt"
 
 static const bytes sframe_ctr_label{
-  // "SFrame10 AES CM AEAD"
+  // "ContextBase10 AES CM AEAD"
   0x53, 0x46, 0x72, 0x61, 0x6d, 0x65, 0x31, 0x30, 0x20, 0x41,
   0x45, 0x53, 0x20, 0x43, 0x4d, 0x20, 0x41, 0x45, 0x41, 0x44,
 };
 static const bytes sframe_enc_label{ 0x65, 0x6e, 0x63 };        // "enc"
 static const bytes sframe_auth_label{ 0x61, 0x75, 0x74, 0x68 }; // "auth"
 
-SFrame::KeyAndSalt
-SFrame::KeyAndSalt::from_base_key(CipherSuite suite, const bytes& base_key)
+ContextBase::KeyAndSalt
+ContextBase::KeyAndSalt::from_base_key(CipherSuite suite, const bytes& base_key)
 {
   auto key_size = cipher_key_size(suite);
   auto nonce_size = cipher_nonce_size(suite);
@@ -86,76 +139,21 @@ SFrame::KeyAndSalt::from_base_key(CipherSuite suite, const bytes& base_key)
   return KeyAndSalt{ key, salt, 0 };
 }
 
-static bytes
-form_nonce(Counter ctr, const bytes& salt)
-{
-  auto nonce = salt;
-  for (size_t i = 0; i < sizeof(ctr); i++) {
-    nonce[nonce.size() - i - 1] ^= uint8_t(ctr >> (8 * i));
-  }
+///
+/// Context
+///
 
-  return nonce;
-}
-
-SFrame::SFrame(CipherSuite suite_in)
-  : suite(suite_in)
+Context::Context(CipherSuite suite_in)
+  : ContextBase(suite_in)
 {
 }
 
-SFrame::~SFrame() = default;
-
-void
-SFrame::add_key(KeyID key_id, const bytes& base_key)
-{
-  keys.emplace(key_id, KeyAndSalt::from_base_key(suite, base_key));
-}
-
-output_bytes
-SFrame::_protect(const Header& header,
-                 output_bytes ciphertext,
-                 input_bytes plaintext)
-{
-  if (ciphertext.size() < plaintext.size() + overhead(suite)) {
-    throw buffer_too_small_error("Ciphertext too small for cipher overhead");
-  }
-
-  const auto& key_and_salt = keys.at(header.key_id);
-  const auto aad = header.encoded();
-  const auto nonce = form_nonce(header.counter, key_and_salt.salt);
-  const auto ct = seal(suite, key_and_salt.key, nonce, ciphertext, aad, plaintext);
-
-  std::cout << "===" << std::endl
-            << "key " << key_and_salt.key << std::endl
-            << "salt " << key_and_salt.salt << std::endl
-            << "ct " << ct << std::endl
-            << std::endl;
-
-  return ct;
-}
-
-output_bytes
-SFrame::_unprotect(const Header& header,
-                   output_bytes plaintext,
-                   input_bytes ciphertext)
-{
-  if (ciphertext.size() < overhead(suite)) {
-    throw buffer_too_small_error("Ciphertext too small for cipher overhead");
-  }
-
-  if (plaintext.size() < ciphertext.size() - overhead(suite)) {
-    throw buffer_too_small_error("Plaintext too small for decrypted value");
-  }
-
-  const auto& key_and_salt = keys.at(header.key_id);
-  const auto aad = header.encoded();
-  const auto nonce = form_nonce(header.counter, key_and_salt.salt);
-  return open(suite, key_and_salt.key, nonce, plaintext, aad, ciphertext);
-}
+Context::~Context() = default;
 
 void
 Context::add_key(KeyID key_id, const bytes& base_key)
 {
-  SFrame::add_key(key_id, base_key);
+  ContextBase::add_key(key_id, base_key);
   counters.emplace(key_id, 0);
 }
 
@@ -173,7 +171,7 @@ Context::protect(KeyID key_id, output_bytes ciphertext, input_bytes plaintext)
 
   std::copy(aad.begin(), aad.end(), ciphertext.begin());
   auto inner_ciphertext = ciphertext.subspan(aad.size());
-  auto final_ciphertext = _protect(header, inner_ciphertext, plaintext);
+  auto final_ciphertext = ContextBase::protect(header, inner_ciphertext, plaintext);
   return ciphertext.subspan(0, aad.size() + final_ciphertext.size());
 }
 
@@ -182,7 +180,7 @@ Context::unprotect(output_bytes plaintext, input_bytes ciphertext)
 {
   const auto header = Header::parse(ciphertext);
   const auto inner_ciphertext = ciphertext.subspan(header.size());
-  return _unprotect(header, plaintext, inner_ciphertext);
+  return ContextBase::unprotect(header, plaintext, inner_ciphertext);
 }
 
 ///
@@ -218,8 +216,8 @@ MLSContext::add_epoch(EpochID epoch_id,
     purge_epoch(epoch->full_epoch);
   }
 
-  epoch
-    .reset(new EpochKeys(epoch_id, sframe_epoch_secret, epoch_bits, sender_bits));
+  epoch.reset(
+    new EpochKeys(epoch_id, sframe_epoch_secret, epoch_bits, sender_bits));
 }
 
 void
@@ -261,7 +259,7 @@ MLSContext::unprotect(output_bytes plaintext, input_bytes ciphertext)
   const auto inner_ciphertext = ciphertext.subspan(header.size());
 
   ensure_key(header.key_id);
-  return _unprotect(header, plaintext, inner_ciphertext);
+  return ContextBase::unprotect(header, plaintext, inner_ciphertext);
 }
 
 MLSContext::EpochKeys::EpochKeys(MLSContext::EpochID full_epoch_in,
@@ -299,37 +297,8 @@ MLSContext::EpochKeys::base_key(CipherSuite ciphersuite,
   auto enc_sender_id = bytes(8);
   encode_uint(sender_id, enc_sender_id);
 
-  auto base_key = hkdf_expand(
+  return hkdf_expand(
     ciphersuite, sframe_epoch_secret, enc_sender_id, hash_size);
-
-  std::cout << "===" << std::endl
-            << "ciphersuite " << uint16_t(ciphersuite) << std::endl
-            << "sframe_epoch_secret " << sframe_epoch_secret << std::endl
-            << "enc_sender_id " << enc_sender_id << std::endl
-            << "hash_size " << hash_size << std::endl
-            << std::endl;
-
-  return base_key;
-}
-
-SFrame::KeyAndSalt&
-MLSContext::EpochKeys::get(CipherSuite ciphersuite, SenderID sender_id)
-{
-  auto it = sender_keys.find(sender_id);
-  if (it != sender_keys.end()) {
-    return it->second;
-  }
-
-  auto hash_size = cipher_digest_size(ciphersuite);
-  auto enc_sender_id = bytes(8);
-  encode_uint(sender_id, enc_sender_id);
-
-  auto sender_base_key =
-    hkdf_expand(ciphersuite, sframe_epoch_secret, enc_sender_id, hash_size);
-  auto key_state = KeyAndSalt::from_base_key(ciphersuite, sender_base_key);
-  sender_keys.insert({ sender_id, std::move(key_state) });
-
-  return sender_keys.at(sender_id);
 }
 
 void
@@ -383,14 +352,6 @@ MLSContext::form_key_id(EpochID epoch_id,
     context_part = uint64_t(context_id) << (epoch_bits + epoch->sender_bits);
   }
 
-  printf("epoch   %016llx\n", epoch_id);
-  printf("sender  %016llx\n", sender_id);
-  printf("context %016llx\n", context_id);
-  printf("epoch   %016llx\n", epoch_index);
-  printf("sender  %016llx\n", sender_part);
-  printf("context %016llx\n", context_part);
-  printf("key_id  %016llx\n", context_part | sender_part | epoch_index);
-
   return KeyID(context_part | sender_part | epoch_index);
 }
 
@@ -401,10 +362,9 @@ MLSContext::ensure_key(KeyID key_id)
   const auto epoch_index = key_id & epoch_mask;
   auto& epoch = epoch_cache.at(epoch_index);
   if (!epoch) {
-    throw invalid_parameter_error(
-      "Unknown epoch: " + std::to_string(epoch_index));
+    throw invalid_parameter_error("Unknown epoch: " +
+                                  std::to_string(epoch_index));
   }
-
 
   if (keys.count(key_id) > 0) {
     return;
@@ -412,28 +372,8 @@ MLSContext::ensure_key(KeyID key_id)
 
   // Otherwise, derive a key and implant it
   const auto sender_id = key_id >> epoch_bits;
-  add_key(key_id, epoch->base_key(suite, sender_id));
-
-  std::cout << "key " << keys.at(key_id).key << std::endl
-          << "salt " << keys.at(key_id).salt << std::endl
-          << std::endl;
+  Context::add_key(key_id, epoch->base_key(suite, sender_id));
   return;
-}
-
-SFrame::KeyAndSalt&
-MLSContext::get_state(KeyID key_id)
-{
-  const auto epoch_index = EpochID(key_id & epoch_mask);
-  const auto sender_id = SenderID(key_id >> epoch_bits);
-
-  auto& epoch = epoch_cache.at(epoch_index);
-  if (!epoch) {
-    throw invalid_parameter_error(
-      "Unknown epoch. epoch_index: " + std::to_string(epoch_index) +
-      ", sender_id:" + std::to_string(sender_id));
-  }
-
-  return epoch->get(suite, sender_id);
 }
 
 } // namespace sframe
