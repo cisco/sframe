@@ -1,11 +1,6 @@
 #pragma once
 
-#include <iosfwd>
-#include <map>
-#include <memory>
-#include <vector>
 #include <cassert>
-
 #include <gsl/gsl-lite.hpp>
 
 namespace sframe {
@@ -47,36 +42,33 @@ enum class CipherSuite : uint16_t
 
 constexpr size_t max_overhead = 17 + 16;
 
-using input_bytes = gsl::span<const uint8_t>;
-using output_bytes = gsl::span<uint8_t>;
-
-template<size_t N>
-class owned_bytes {
+template<typename T, size_t N>
+class vector {
   private:
-  std::array<uint8_t, N> _data;
+  std::array<T, N> _data;
   size_t _size;
 
   public:
-  constexpr owned_bytes()
+  constexpr vector()
     : _size(N)
   {
-    std::fill(_data.begin(), _data.end(), 0);
+    std::fill(_data.begin(), _data.end(), T());
   }
 
-  constexpr owned_bytes(std::initializer_list<uint8_t> content)
+  constexpr vector(std::initializer_list<uint8_t> content)
   {
     resize(content.size());
     std::copy(content.begin(), content.end(), _data.begin());
   }
 
-  constexpr owned_bytes(input_bytes content)
+  constexpr vector(gsl::span<const T> content)
   {
     resize(content.size());
     std::copy(content.begin(), content.end(), _data.begin());
   }
 
   template<size_t M>
-  constexpr owned_bytes(const owned_bytes<M>& content)
+  constexpr vector(const vector<T, M>& content)
   {
     resize(content.size());
     std::copy(content.begin(), content.end(), _data.begin());
@@ -96,7 +88,12 @@ class owned_bytes {
     _size = size;
   }
 
-  void append(input_bytes content) {
+  void push(T&& item) {
+    resize(_size + 1);
+    _data.at(_size - 1) = item;
+  }
+
+  void append(gsl::span<const T> content) {
     const auto original_size = _size;
     resize(_size + content.size());
     std::copy(content.begin(), content.end(), _data.begin() + original_size);
@@ -105,9 +102,68 @@ class owned_bytes {
   auto& operator[](size_t i) { return _data.at(i); }
   const auto& operator[](size_t i) const { return _data.at(i); }
 
-  operator input_bytes() const { return input_bytes(_data).first(_size); }
-  operator output_bytes() { return output_bytes(_data).first(_size); }
+  operator gsl::span<const T>() const { return gsl::span(_data).first(_size); }
+  operator gsl::span<T>() { return gsl::span(_data).first(_size); }
 };
+
+template<typename K, typename V, size_t N>
+class map : private vector<std::optional<std::pair<K, V>>, N> {
+  public:
+  template<class... Args>
+  void emplace(Args&&... args) {
+    const auto pos = std::find_if(this->begin(), this->end(), [&](const auto& pair) { return !pair; });
+    if (pos == this->end()) {
+      throw std::out_of_range("map out of space");
+    }
+
+    pos->emplace(args...);
+  }
+
+  auto find(const K& key) const {
+    return std::find_if(this->begin(), this->end(), [&](const auto& pair) { return pair && pair.value().first == key; });
+  }
+
+  auto find(const K& key) {
+    return std::find_if(this->begin(), this->end(), [&](const auto& pair) { return pair && pair.value().first == key; });
+  }
+
+  bool contains(const K& key) const {
+    return find(key) != this->end();
+  }
+
+  const V& at(const K& key) const {
+    const auto pos = find(key);
+    if (pos == this->end()) {
+      throw std::out_of_range("map key not found");
+    }
+
+    return pos->value().second;
+  }
+
+  V& at(const K& key) {
+    auto pos = find(key);
+    if (pos == this->end()) {
+      throw std::out_of_range("map key not found");
+    }
+
+    return pos->value().second;
+  }
+
+  template<typename F>
+  void erase_if_key(F&& f) {
+    const auto to_erase = [&f](const auto& maybe_pair) {
+      return maybe_pair && f(maybe_pair.value().first);
+    };
+
+    std::replace_if(this->begin(), this->end(), to_erase, std::nullopt);
+  }
+};
+
+template<size_t N>
+using owned_bytes = vector<uint8_t, N>;
+
+using input_bytes = gsl::span<const uint8_t>;
+using output_bytes = gsl::span<uint8_t>;
 
 std::ostream&
 operator<<(std::ostream& str, const input_bytes data);
@@ -177,7 +233,9 @@ public:
 
 protected:
   CipherSuite suite;
-  std::map<KeyID, KeyAndSalt> keys;
+
+  static constexpr size_t max_keys = 200;
+  map<KeyID, KeyAndSalt, max_keys> keys;
 };
 
 // Context applies the full SFrame transform.  It tracks a counter for each key
@@ -197,7 +255,8 @@ public:
   output_bytes unprotect(output_bytes plaintext, input_bytes ciphertext);
 
 protected:
-  std::map<KeyID, Counter> counters;
+  static constexpr size_t max_counters = 200;
+  map<KeyID, Counter, max_counters> counters;
 };
 
 // MLSContext augments Context with logic for deriving keys from MLS.  Instead
@@ -235,8 +294,8 @@ private:
   {
     static constexpr size_t max_secret_size = 64;
 
-    const EpochID full_epoch;
-    const owned_bytes<max_secret_size> sframe_epoch_secret;
+    EpochID full_epoch;
+    owned_bytes<max_secret_size> sframe_epoch_secret;
     size_t sender_bits;
     size_t context_bits;
     uint64_t max_sender_id;
@@ -258,7 +317,10 @@ private:
 
   const size_t epoch_bits;
   const size_t epoch_mask;
-  std::vector<std::unique_ptr<EpochKeys>> epoch_cache;
+
+  // XXX(RLB) Make this an attribute of the class?
+  static constexpr size_t max_epochs = 10;
+  vector<std::optional<EpochKeys>, max_epochs> epoch_cache;
 };
 
 } // namespace sframe

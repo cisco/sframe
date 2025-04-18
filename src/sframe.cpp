@@ -3,24 +3,7 @@
 #include "crypto.h"
 #include "header.h"
 
-#include <algorithm>
-#include <array>
-#include <iomanip>
-#include <iostream>
-#include <stdexcept>
-#include <tuple>
-
 namespace sframe {
-
-std::ostream&
-operator<<(std::ostream& str, const input_bytes data)
-{
-  str.flags(std::ios::hex);
-  for (const auto& byte : data) {
-    str << std::setw(2) << std::setfill('0') << int(byte);
-  }
-  return str;
-}
 
 ///
 /// Errors
@@ -192,11 +175,8 @@ MLSContext::MLSContext(CipherSuite suite_in, size_t epoch_bits_in)
   : Context(suite_in)
   , epoch_bits(epoch_bits_in)
   , epoch_mask((size_t(1) << epoch_bits_in) - 1)
-  , epoch_cache(size_t(1) << epoch_bits_in)
 {
-  std::for_each(epoch_cache.begin(),
-                epoch_cache.end(),
-                [&](std::unique_ptr<EpochKeys>& ptr) { ptr.reset(nullptr); });
+  epoch_cache.resize(1 << epoch_bits_in);
 }
 
 void
@@ -211,14 +191,13 @@ MLSContext::add_epoch(EpochID epoch_id,
                       size_t sender_bits)
 {
   auto epoch_index = epoch_id & epoch_mask;
-  auto& epoch = epoch_cache.at(epoch_index);
+  auto& epoch = epoch_cache[epoch_index];
 
   if (epoch) {
     purge_epoch(epoch->full_epoch);
   }
 
-  epoch.reset(
-    new EpochKeys(epoch_id, sframe_epoch_secret, epoch_bits, sender_bits));
+  epoch.emplace(epoch_id, sframe_epoch_secret, epoch_bits, sender_bits);
 }
 
 void
@@ -227,7 +206,7 @@ MLSContext::purge_before(EpochID keeper)
   for (auto& ptr : epoch_cache) {
     if (ptr && ptr->full_epoch < keeper) {
       purge_epoch(ptr->full_epoch);
-      ptr.reset(nullptr);
+      ptr.reset();
     }
   }
 }
@@ -307,23 +286,9 @@ MLSContext::purge_epoch(EpochID epoch_id)
 {
   const auto drop_bits = epoch_id & epoch_bits;
 
-  // Remove keys for this epoch
-  for (auto i = keys.begin(); i != keys.end();) {
-    if ((i->first & epoch_bits) == drop_bits) {
-      i = keys.erase(i);
-    } else {
-      ++i;
-    }
-  }
-
-  // Remove counters for this epoch
-  for (auto i = counters.begin(); i != counters.end();) {
-    if ((i->first & epoch_bits) == drop_bits) {
-      i = counters.erase(i);
-    } else {
-      ++i;
-    }
-  }
+  keys.erase_if_key([&](const auto& epoch) {
+      return (epoch & epoch_bits) == drop_bits;
+  });
 }
 
 KeyID
@@ -332,7 +297,7 @@ MLSContext::form_key_id(EpochID epoch_id,
                         ContextID context_id) const
 {
   auto epoch_index = epoch_id & epoch_mask;
-  auto& epoch = epoch_cache.at(epoch_index);
+  auto& epoch = epoch_cache[epoch_index];
   if (!epoch) {
     throw invalid_parameter_error(
       "Unknown epoch. epoch_index: " + std::to_string(epoch_index) +
@@ -361,13 +326,13 @@ MLSContext::ensure_key(KeyID key_id)
 {
   // If the required key already exists, we are done
   const auto epoch_index = key_id & epoch_mask;
-  auto& epoch = epoch_cache.at(epoch_index);
+  auto& epoch = epoch_cache[epoch_index];
   if (!epoch) {
     throw invalid_parameter_error("Unknown epoch: " +
                                   std::to_string(epoch_index));
   }
 
-  if (keys.count(key_id) > 0) {
+  if (!keys.contains(key_id)) {
     return;
   }
 

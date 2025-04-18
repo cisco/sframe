@@ -3,9 +3,6 @@
 #include <openssl/hmac.h>
 #include <sframe/sframe.h>
 
-#include <array>
-#include <cassert>
-
 namespace sframe {
 
 ///
