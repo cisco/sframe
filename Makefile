@@ -29,10 +29,10 @@ test: ${TEST_BIN}
 	cd ${TEST_VECTOR_DIR} && ctest
 
 dtest: ${TEST_BIN}
-	${TEST_BIN}
+	cd test && ../${TEST_BIN}
 
 dbtest: ${TEST_BIN}
-	lldb ${TEST_BIN}
+	cd test && lldb ../${TEST_BIN}
 
 clean:
 	cmake --build ${BUILD_DIR} --target clean

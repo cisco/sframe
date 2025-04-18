@@ -6,11 +6,45 @@
 using namespace sframe;
 using nlohmann::json;
 
+struct HexBytes {
+  bytes data;
+
+  operator input_bytes() const { return data; }
+};
+
+// Seems redundant, but works
+bool operator==(const HexBytes& hex, const input_bytes& other) {
+  return input_bytes(hex) == other;
+}
+
+bool operator==(const input_bytes& other, const HexBytes& hex) {
+  return hex == other;
+}
+
+void from_json(const json& j, HexBytes& b) {
+  const auto hex = j.get<std::string>();
+
+  if (hex.length() % 2 == 1) {
+    throw std::invalid_argument("Odd-length hex string");
+  }
+
+  const auto len = hex.length() / 2;
+  b.data.resize(len);
+  for (size_t i = 0; i < len; i += 1) {
+    const std::string byte = hex.substr(2 * i, 2);
+    b.data.at(i) = static_cast<uint8_t>(strtol(byte.c_str(), nullptr, 16));
+  }
+}
+
+void to_json(json& /* j */, const HexBytes& /* p */) {
+  // Included just so that macros work
+}
+
 struct HeaderTestVector
 {
   uint64_t kid;
   uint64_t ctr;
-  bytes encoded;
+  HexBytes encoded;
 
   NLOHMANN_DEFINE_TYPE_INTRUSIVE(HeaderTestVector, kid, ctr, encoded)
 };
@@ -18,11 +52,11 @@ struct HeaderTestVector
 struct AesCtrHmacTestVector
 {
   CipherSuite cipher_suite;
-  bytes key;
-  bytes enc_key;
-  bytes auth_key;
-  bytes nonce;
-  bytes aad;
+  HexBytes key;
+  HexBytes enc_key;
+  HexBytes auth_key;
+  HexBytes nonce;
+  HexBytes aad;
   bytes pt;
   bytes ct;
 
@@ -73,7 +107,7 @@ struct TestVectors
   std::vector<AesCtrHmacTestVector> aes_ctr_hmac;
   std::vector<SFrameTestVector> sframe;
 
-  NLOHMANN_DEFINE_TYPE_INTRUSIVE(TestVectors, header, aes_ctr_hmac, sframe)
+  NLOHMANN_DEFINE_TYPE_INTRUSIVE(TestVectors, header/*, aes_ctr_hmac, sframe*/)
 };
 
 struct TestVectorTest

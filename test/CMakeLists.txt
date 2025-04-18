@@ -11,4 +11,5 @@ target_link_libraries(${TEST_APP_NAME} ${LIB_NAME} doctest::doctest OpenSSL::Cry
 
 # Enable CTest
 include(doctest)
-doctest_discover_tests(${TEST_APP_NAME})
+doctest_discover_tests(${TEST_APP_NAME}
+                       WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
