@@ -180,7 +180,7 @@ output_bytes
 Context::unprotect(output_bytes plaintext, input_bytes ciphertext)
 {
   const auto header = Header::parse(ciphertext);
-  const auto inner_ciphertext = ciphertext.subspan(header.size);
+  const auto inner_ciphertext = ciphertext.subspan(header.size());
   return ContextBase::unprotect(header, plaintext, inner_ciphertext);
 }
 
@@ -257,7 +257,7 @@ output_bytes
 MLSContext::unprotect(output_bytes plaintext, input_bytes ciphertext)
 {
   const auto header = Header::parse(ciphertext);
-  const auto inner_ciphertext = ciphertext.subspan(header.size);
+  const auto inner_ciphertext = ciphertext.subspan(header.size());
 
   ensure_key(header.key_id);
   return ContextBase::unprotect(header, plaintext, inner_ciphertext);

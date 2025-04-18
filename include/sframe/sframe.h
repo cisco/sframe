@@ -4,6 +4,7 @@
 #include <map>
 #include <memory>
 #include <vector>
+#include <cassert>
 
 #include <gsl/gsl-lite.hpp>
 
@@ -46,12 +47,52 @@ enum class CipherSuite : uint16_t
 
 constexpr size_t max_overhead = 17 + 16;
 
-template<size_t N>
-using byte_array = std::array<uint8_t, N>;
-
 using bytes = std::vector<uint8_t>;
 using input_bytes = gsl::span<const uint8_t>;
 using output_bytes = gsl::span<uint8_t>;
+
+template<size_t N>
+struct owned_bytes {
+  constexpr owned_bytes()
+    : _size(N)
+  {
+    std::fill(_data.begin(), _data.end(), 0);
+  }
+
+  constexpr owned_bytes(input_bytes content)
+  {
+    resize(content.size());
+    std::copy(content.begin(), content.end(), _data.begin());
+  }
+
+  constexpr owned_bytes(std::initializer_list<uint8_t> content)
+  {
+    resize(content.size());
+    std::copy(content.begin(), content.end(), _data.begin());
+  }
+
+  uint8_t* data() { return _data.data(); }
+  auto begin() { return _data.begin(); }
+
+  size_t size() const { return _size; }
+  void resize(size_t size) {
+    assert(size <= N);
+    _size = size;
+  }
+
+  uint8_t& operator[](size_t i) { return _data.at(i); }
+  const uint8_t& operator[](size_t i) const { return _data.at(i); }
+
+  // TODO(RLB) Delete this once allocations are not needed downstream
+  explicit operator bytes() const { return bytes(_data.begin(), _data.begin() + _size); }
+
+  operator input_bytes() const { return input_bytes(_data).first(_size); }
+  operator output_bytes() { return output_bytes(_data).first(_size); }
+
+  private:
+  std::array<uint8_t, N> _data;
+  size_t _size;
+};
 
 std::ostream&
 operator<<(std::ostream& str, const input_bytes data);
@@ -64,12 +105,12 @@ class Header
 public:
   const KeyID key_id;
   const Counter counter;
-  const size_t size;
 
   Header(KeyID key_id_in, Counter counter_in);
   static Header parse(input_bytes buffer);
 
-  input_bytes encoded() const;
+  input_bytes encoded() const { return _encoded; }
+  size_t size() const { return _encoded.size(); }
 
 private:
   // Just the configuration byte
@@ -78,11 +119,10 @@ private:
   // Configuration byte plus 8-byte KID and CTR
   static constexpr size_t max_size = 1 + 8 + 8;
 
-  byte_array<max_size> buffer;
+  owned_bytes<max_size> _encoded;
 
   Header(KeyID key_id_in,
          Counter counter_in,
-         size_t size_in,
          input_bytes encoded_in);
 };
 

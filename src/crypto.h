@@ -31,35 +31,6 @@ cipher_nonce_size(CipherSuite suite);
 /// HMAC and HKDF
 ///
 
-template<size_t N>
-struct owned_bytes {
-  owned_bytes()
-    : _size(N)
-  {
-    std::fill(_data.begin(), _data.end(), 0);
-  }
-
-  uint8_t* data() { return _data.data(); }
-  auto begin() { return _data.begin(); }
-
-  size_t size() const { return _size; }
-  void resize(size_t size) {
-    assert(size < N);
-    _size = size;
-  }
-
-  // TODO(RLB) Delete this once allocations are not needed downstream
-  explicit operator bytes() const { return bytes(_data.begin(), _data.end()); }
-
-  operator input_bytes() const { return input_bytes(_data).first(_size); }
-  operator output_bytes() { return output_bytes(_data).first(_size); }
-
-  private:
-  std::array<uint8_t, N> _data;
-  size_t _size;
-};
-
-
 struct HMAC
 {
   using Output = owned_bytes<EVP_MAX_MD_SIZE>;

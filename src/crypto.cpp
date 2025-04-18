@@ -119,7 +119,6 @@ HMAC::HMAC(CipherSuite suite, input_bytes key)
   : ctx(HMAC_CTX_new(), HMAC_CTX_free)
 {
   const auto type = openssl_digest_type(suite);
-  auto ctx = scoped_hmac_ctx(HMAC_CTX_new(), HMAC_CTX_free);
 
   // Some FIPS-enabled libraries are overly conservative in their interpretation
   // of NIST SP 800-131A, which requires HMAC keys to be at least 112 bits long.
@@ -189,7 +188,7 @@ hkdf_expand(CipherSuite suite,
     throw invalid_parameter_error("Size too big for hkdf_expand");
   }
 
-  static constexpr auto counter = std::array<uint8_t, 1>{ 0x01 };
+  static const auto counter = owned_bytes<1>{ 0x01 };
 
   auto h = HMAC(suite, prk);
   h.write(info);
@@ -221,7 +220,7 @@ ctr_crypt(CipherSuite suite,
   }
 
   static auto padded_nonce =
-    std::array<uint8_t, 16>{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    owned_bytes<16>{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
   std::copy(nonce.begin(), nonce.end(), padded_nonce.begin());
 
   auto cipher = openssl_cipher(suite);

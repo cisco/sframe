@@ -126,12 +126,13 @@ struct ConfigByte
 Header::Header(KeyID key_id_in, Counter counter_in)
   : key_id(key_id_in)
   , counter(counter_in)
-  , size(1 + uint_size(key_id) + uint_size(counter))
 {
   const auto cfg = ConfigByte{ key_id, counter };
-  buffer[0] = cfg.encode();
 
-  const auto encoded = output_bytes(buffer);
+  _encoded[0] = cfg.encode();
+  _encoded.resize(cfg.encoded_size());
+
+  const auto encoded = output_bytes(_encoded);
   const auto after_cfg = encoded.subspan(1);
   encode_uint(key_id, after_cfg.subspan(0, cfg.kid.value_size()));
 
@@ -149,30 +150,19 @@ Header::parse(input_bytes buffer)
   const auto cfg = ConfigByte{ buffer[0] };
   const auto after_cfg = buffer.subspan(1);
   const auto [key_id, after_kid] = cfg.kid.read(after_cfg);
-  const auto [counter, after_ctr] = cfg.ctr.read(after_kid);
+  const auto [counter, _] = cfg.ctr.read(after_kid);
+  const auto encoded = buffer.subspan(0, cfg.encoded_size());
 
-  const auto size = cfg.encoded_size();
-  const auto encoded = buffer.subspan(0, size);
-
-  return Header(key_id, counter, size, encoded);
-}
-
-input_bytes
-Header::encoded() const
-{
-  return input_bytes(buffer).subspan(0, size);
+  return Header(key_id, counter, encoded);
 }
 
 Header::Header(KeyID key_id_in,
                Counter counter_in,
-               size_t size_in,
                input_bytes encoded_in)
   : key_id(key_id_in)
   , counter(counter_in)
-  , size(size_in)
-{
-  std::copy(encoded_in.begin(), encoded_in.end(), buffer.begin());
-}
+  , _encoded(encoded_in)
+{}
 
 #if 0
 std::tuple<Header, input_bytes>
