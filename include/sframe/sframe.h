@@ -47,22 +47,20 @@ enum class CipherSuite : uint16_t
 
 constexpr size_t max_overhead = 17 + 16;
 
-using bytes = std::vector<uint8_t>;
 using input_bytes = gsl::span<const uint8_t>;
 using output_bytes = gsl::span<uint8_t>;
 
 template<size_t N>
-struct owned_bytes {
+class owned_bytes {
+  private:
+  std::array<uint8_t, N> _data;
+  size_t _size;
+
+  public:
   constexpr owned_bytes()
     : _size(N)
   {
     std::fill(_data.begin(), _data.end(), 0);
-  }
-
-  constexpr owned_bytes(input_bytes content)
-  {
-    resize(content.size());
-    std::copy(content.begin(), content.end(), _data.begin());
   }
 
   constexpr owned_bytes(std::initializer_list<uint8_t> content)
@@ -71,27 +69,44 @@ struct owned_bytes {
     std::copy(content.begin(), content.end(), _data.begin());
   }
 
+  constexpr owned_bytes(input_bytes content)
+  {
+    resize(content.size());
+    std::copy(content.begin(), content.end(), _data.begin());
+  }
+
+  template<size_t M>
+  constexpr owned_bytes(const owned_bytes<M>& content)
+  {
+    resize(content.size());
+    std::copy(content.begin(), content.end(), _data.begin());
+  }
+
   uint8_t* data() { return _data.data(); }
+
+  auto begin() const { return _data.begin(); }
   auto begin() { return _data.begin(); }
 
-  size_t size() const { return _size; }
+  auto end() const { return _data.begin() + _size; }
+  auto end() { return _data.end() + _size; }
+
+  auto size() const { return _size; }
   void resize(size_t size) {
     assert(size <= N);
     _size = size;
   }
 
-  uint8_t& operator[](size_t i) { return _data.at(i); }
-  const uint8_t& operator[](size_t i) const { return _data.at(i); }
+  void append(input_bytes content) {
+    const auto original_size = _size;
+    resize(_size + content.size());
+    std::copy(content.begin(), content.end(), _data.begin() + original_size);
+  }
 
-  // TODO(RLB) Delete this once allocations are not needed downstream
-  explicit operator bytes() const { return bytes(_data.begin(), _data.begin() + _size); }
+  auto& operator[](size_t i) { return _data.at(i); }
+  const auto& operator[](size_t i) const { return _data.at(i); }
 
   operator input_bytes() const { return input_bytes(_data).first(_size); }
   operator output_bytes() { return output_bytes(_data).first(_size); }
-
-  private:
-  std::array<uint8_t, N> _data;
-  size_t _size;
 };
 
 std::ostream&
@@ -126,6 +141,18 @@ private:
          input_bytes encoded_in);
 };
 
+struct KeyAndSalt
+{
+  static KeyAndSalt from_base_key(CipherSuite suite, input_bytes base_key);
+
+  static constexpr size_t max_key_size = 48;
+  static constexpr size_t max_salt_size = 12;
+
+  owned_bytes<max_key_size> key;
+  owned_bytes<max_salt_size> salt;
+  Counter counter;
+};
+
 // ContextBase represents the core SFrame encryption logic.  It remembers a set
 // of keys and salts identified by key IDs, and uses them to protect and
 // unprotect payloads.  The SFrame header is **not** written by the protect
@@ -139,7 +166,7 @@ public:
   ContextBase(CipherSuite suite_in);
   virtual ~ContextBase();
 
-  void add_key(KeyID kid, const bytes& key);
+  void add_key(KeyID kid, input_bytes key);
 
   output_bytes protect(const Header& header,
                        output_bytes ciphertext,
@@ -149,15 +176,6 @@ public:
                          input_bytes plaintext);
 
 protected:
-  struct KeyAndSalt
-  {
-    static KeyAndSalt from_base_key(CipherSuite suite, const bytes& base_key);
-
-    bytes key;
-    bytes salt;
-    Counter counter;
-  };
-
   CipherSuite suite;
   std::map<KeyID, KeyAndSalt> keys;
 };
@@ -171,7 +189,7 @@ public:
   Context(CipherSuite suite);
   virtual ~Context();
 
-  void add_key(KeyID kid, const bytes& key);
+  void add_key(KeyID kid, input_bytes key);
 
   output_bytes protect(KeyID key_id,
                        output_bytes ciphertext,
@@ -194,9 +212,9 @@ public:
 
   MLSContext(CipherSuite suite_in, size_t epoch_bits_in);
 
-  void add_epoch(EpochID epoch_id, const bytes& sframe_epoch_secret);
+  void add_epoch(EpochID epoch_id, input_bytes sframe_epoch_secret);
   void add_epoch(EpochID epoch_id,
-                 const bytes& sframe_epoch_secret,
+                 input_bytes sframe_epoch_secret,
                  size_t sender_bits);
   void purge_before(EpochID keeper);
 
@@ -215,18 +233,20 @@ public:
 private:
   struct EpochKeys
   {
+    static constexpr size_t max_secret_size = 64;
+
     const EpochID full_epoch;
-    const bytes sframe_epoch_secret;
+    const owned_bytes<max_secret_size> sframe_epoch_secret;
     size_t sender_bits;
     size_t context_bits;
     uint64_t max_sender_id;
     uint64_t max_context_id;
 
     EpochKeys(EpochID full_epoch_in,
-              bytes sframe_epoch_secret_in,
+              input_bytes sframe_epoch_secret_in,
               size_t epoch_bits,
               size_t sender_bits_in);
-    bytes base_key(CipherSuite suite, SenderID sender_id) const;
+    owned_bytes<max_secret_size> base_key(CipherSuite suite, SenderID sender_id) const;
   };
 
   void purge_epoch(EpochID epoch_id);

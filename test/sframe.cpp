@@ -3,6 +3,8 @@
 #include <openssl/err.h>
 #include <sframe/sframe.h>
 
+#include "common.h"
+
 #include <iostream>
 #include <map>       // for map
 #include <stdexcept> // for invalid_argument
@@ -17,30 +19,6 @@ ensure_fips_if_required()
   if (require && FIPS_mode() == 0) {
     REQUIRE(FIPS_mode_set(1) == 1);
   }
-}
-
-static bytes
-from_hex(const std::string& hex)
-{
-  if (hex.length() % 2 == 1) {
-    throw std::invalid_argument("Odd-length hex string");
-  }
-
-  auto len = int(hex.length() / 2);
-  auto out = bytes(len);
-  for (int i = 0; i < len; i += 1) {
-    auto byte = hex.substr(2 * i, 2);
-    out[i] = static_cast<uint8_t>(strtol(byte.c_str(), nullptr, 16));
-  }
-
-  return out;
-}
-
-template<typename T>
-bytes
-to_bytes(const T& range)
-{
-  return bytes(range.begin(), range.end());
 }
 
 #if 0 // XXX(RLB) Disabled for now; to be replaced by test vectors

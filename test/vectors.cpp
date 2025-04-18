@@ -5,6 +5,8 @@
 
 #include <crypto.h>
 
+#include "common.h"
+
 using namespace sframe;
 using nlohmann::json;
 
@@ -40,15 +42,6 @@ void from_json(const json& j, HexBytes& b) {
 
 void to_json(json& /* j */, const HexBytes& /* p */) {
   // Included just so that macros work
-}
-
-std::string to_hex(const input_bytes data) {
-  std::stringstream hex(std::ios_base::out);
-  hex.flags(std::ios::hex);
-  for (const auto& byte : data) {
-    hex << std::setw(2) << std::setfill('0') << int(byte);
-  }
-  return hex.str();
 }
 
 struct HeaderTestVector
