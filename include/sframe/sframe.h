@@ -72,7 +72,10 @@ public:
   input_bytes encoded() const;
 
 private:
+  // Just the configuration byte
   static constexpr size_t min_size = 1;
+
+  // Configuration byte plus 8-byte KID and CTR
   static constexpr size_t max_size = 1 + 8 + 8;
 
   byte_array<max_size> buffer;
