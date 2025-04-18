@@ -47,6 +47,19 @@ struct HeaderTestVector
   HexBytes encoded;
 
   NLOHMANN_DEFINE_TYPE_INTRUSIVE(HeaderTestVector, kid, ctr, encoded)
+
+  void verify() const {
+    // Decode
+    const auto decoded = Header::parse(encoded);
+    REQUIRE(decoded.key_id == kid);
+    REQUIRE(decoded.counter == ctr);
+    REQUIRE(decoded.size == encoded.data.size());
+    REQUIRE(decoded.encoded() == encoded);
+
+    // Encode
+    const auto to_encode = Header{ kid, ctr };
+    REQUIRE(to_encode.encoded() == encoded);
+  }
 };
 
 struct AesCtrHmacTestVector
@@ -57,8 +70,8 @@ struct AesCtrHmacTestVector
   HexBytes auth_key;
   HexBytes nonce;
   HexBytes aad;
-  bytes pt;
-  bytes ct;
+  HexBytes pt;
+  HexBytes ct;
 
   NLOHMANN_DEFINE_TYPE_INTRUSIVE(AesCtrHmacTestVector,
                                  cipher_suite,
@@ -69,6 +82,10 @@ struct AesCtrHmacTestVector
                                  aad,
                                  pt,
                                  ct)
+
+  void verify() const {
+    // TODO
+  }
 };
 
 struct SFrameTestVector
@@ -76,15 +93,15 @@ struct SFrameTestVector
   CipherSuite cipher_suite;
   uint64_t kid;
   uint64_t ctr;
-  bytes base_key;
-  bytes sframe_key_label;
-  bytes sframe_salt_label;
-  bytes sframe_secret;
-  bytes metadata;
-  bytes nonce;
-  bytes aad;
-  bytes pt;
-  bytes ct;
+  HexBytes base_key;
+  HexBytes sframe_key_label;
+  HexBytes sframe_salt_label;
+  HexBytes sframe_secret;
+  HexBytes metadata;
+  HexBytes nonce;
+  HexBytes aad;
+  HexBytes pt;
+  HexBytes ct;
 
   NLOHMANN_DEFINE_TYPE_INTRUSIVE(SFrameTestVector,
                                  cipher_suite,
@@ -99,6 +116,10 @@ struct SFrameTestVector
                                  aad,
                                  pt,
                                  ct)
+
+  void verify() const {
+    // TODO
+  }
 };
 
 struct TestVectors
@@ -107,7 +128,7 @@ struct TestVectors
   std::vector<AesCtrHmacTestVector> aes_ctr_hmac;
   std::vector<SFrameTestVector> sframe;
 
-  NLOHMANN_DEFINE_TYPE_INTRUSIVE(TestVectors, header/*, aes_ctr_hmac, sframe*/)
+  NLOHMANN_DEFINE_TYPE_INTRUSIVE(TestVectors, header, aes_ctr_hmac, sframe)
 };
 
 struct TestVectorTest
@@ -127,5 +148,21 @@ std::unique_ptr<TestVectors> TestVectorTest::vectors = nullptr;
 
 TEST_CASE_FIXTURE(TestVectorTest, "Header Test Vectors")
 {
-  // TODO
+  for (const auto& tv : vectors->header) {
+    tv.verify();
+  }
+}
+
+TEST_CASE_FIXTURE(TestVectorTest, "AES-CTR-HMAC Test Vectors")
+{
+  for (const auto& tv : vectors->aes_ctr_hmac) {
+    tv.verify();
+  }
+}
+
+TEST_CASE_FIXTURE(TestVectorTest, "SFrame Test Vectors")
+{
+  for (const auto& tv : vectors->sframe) {
+    tv.verify();
+  }
 }

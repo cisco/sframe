@@ -44,23 +44,21 @@ TEST_CASE("Header Known-Answer")
   };
 
   const auto cases = std::vector<KnownAnswerTest>{
-    //{ 0, 0, from_hex("00") },
-    //{ 0, 7, from_hex("07") },
-    //{ 7, 0, from_hex("70") },
-    //{ 7, 7, from_hex("77") },
+    { 0, 0, from_hex("00") },
+    { 0, 7, from_hex("07") },
+    { 7, 0, from_hex("70") },
+    { 7, 7, from_hex("77") },
     { 0, 8, from_hex("0808") },
-    //{ 8, 0, from_hex("8008") },
-    //{ 8, 8, from_hex("880808") },
-    //{ 0xffffffffffffffff, 0, from_hex("f0ffffffffffffffff") },
-    //{ 0, 0xffffffffffffffff, from_hex("0fffffffffffffffff") },
-    //{ 0xffffffffffffffff,
-    //  0xffffffffffffffff,
-    //  from_hex("ffffffffffffffffffffffffffffffffff") },
+    { 8, 0, from_hex("8008") },
+    { 8, 8, from_hex("880808") },
+    { 0xffffffffffffffff, 0, from_hex("f0ffffffffffffffff") },
+    { 0, 0xffffffffffffffff, from_hex("0fffffffffffffffff") },
+    { 0xffffffffffffffff,
+      0xffffffffffffffff,
+      from_hex("ffffffffffffffffffffffffffffffffff") },
   };
 
   for (const auto& tc : cases) {
-    auto buffer = bytes(tc.encoding.size());
-
     // Decode
     const auto decoded = Header::parse(tc.encoding);
     REQUIRE(decoded.key_id == tc.key_id);
@@ -68,8 +66,6 @@ TEST_CASE("Header Known-Answer")
     REQUIRE(decoded.size == tc.encoding.size());
 
     // Encode
-    // 0808
-    // 08
     const auto to_encode = Header{ tc.key_id, tc.counter };
     const auto encoded = to_bytes(to_encode.encoded());
     REQUIRE(encoded == tc.encoding);
