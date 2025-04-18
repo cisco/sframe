@@ -6,6 +6,7 @@ static size_t
 uint_size(uint64_t val)
 {
   if (val < 0x08) {
+    // Fits in the config byte
     return 0;
   }
 
@@ -30,7 +31,7 @@ encode_uint(uint64_t val, output_bytes buffer)
 static uint64_t
 decode_uint(input_bytes data)
 {
-  if (data.size() > 1 && data[0] == 0) {
+  if (!data.empty() && data[0] == 0) {
     throw invalid_parameter_error("Integer is not minimally encoded");
   }
 
