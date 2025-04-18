@@ -4,6 +4,7 @@
 #include <sframe/sframe.h>
 
 #include <array>
+#include <cassert>
 
 namespace sframe {
 
@@ -30,23 +31,54 @@ cipher_nonce_size(CipherSuite suite);
 /// HMAC and HKDF
 ///
 
-struct HMAC
-{
-  HMAC(CipherSuite suite, input_bytes key);
-  void write(input_bytes data);
-  input_bytes digest();
+template<size_t N>
+struct owned_bytes {
+  owned_bytes()
+    : _size(N)
+  {
+    std::fill(_data.begin(), _data.end(), 0);
+  }
 
-  scoped_hmac_ctx ctx;
-  std::array<uint8_t, EVP_MAX_MD_SIZE> md;
+  uint8_t* data() { return _data.data(); }
+  auto begin() { return _data.begin(); }
+
+  size_t size() const { return _size; }
+  void resize(size_t size) {
+    assert(size < N);
+    _size = size;
+  }
+
+  // TODO(RLB) Delete this once allocations are not needed downstream
+  explicit operator bytes() const { return bytes(_data.begin(), _data.end()); }
+
+  operator input_bytes() const { return input_bytes(_data).first(_size); }
+  operator output_bytes() { return output_bytes(_data).first(_size); }
+
+  private:
+  std::array<uint8_t, N> _data;
+  size_t _size;
 };
 
-bytes
-hkdf_extract(CipherSuite suite, const bytes& salt, const bytes& ikm);
 
-bytes
+struct HMAC
+{
+  using Output = owned_bytes<EVP_MAX_MD_SIZE>;
+
+  HMAC(CipherSuite suite, input_bytes key);
+  void write(input_bytes data);
+  Output digest();
+
+  private:
+  scoped_hmac_ctx ctx;
+};
+
+HMAC::Output
+hkdf_extract(CipherSuite suite, input_bytes salt, input_bytes ikm);
+
+HMAC::Output
 hkdf_expand(CipherSuite suite,
-            const bytes& secret,
-            const bytes& info,
+            input_bytes prk,
+            input_bytes info,
             size_t size);
 
 ///

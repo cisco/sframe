@@ -46,6 +46,9 @@ enum class CipherSuite : uint16_t
 
 constexpr size_t max_overhead = 17 + 16;
 
+template<size_t N>
+using byte_array = std::array<uint8_t, N>;
+
 using bytes = std::vector<uint8_t>;
 using input_bytes = gsl::span<const uint8_t>;
 using output_bytes = gsl::span<uint8_t>;
@@ -72,7 +75,7 @@ private:
   static constexpr size_t min_size = 1;
   static constexpr size_t max_size = 1 + 8 + 8;
 
-  std::array<uint8_t, max_size> buffer;
+  byte_array<max_size> buffer;
 
   Header(KeyID key_id_in,
          Counter counter_in,

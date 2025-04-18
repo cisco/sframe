@@ -120,8 +120,8 @@ ContextBase::KeyAndSalt::from_base_key(CipherSuite suite, const bytes& base_key)
   auto hash_size = cipher_digest_size(suite);
 
   auto secret = hkdf_extract(suite, sframe_label, base_key);
-  auto key = hkdf_expand(suite, secret, sframe_key_label, key_size);
-  auto salt = hkdf_expand(suite, secret, sframe_salt_label, nonce_size);
+  auto key = bytes(hkdf_expand(suite, secret, sframe_key_label, key_size));
+  auto salt = bytes(hkdf_expand(suite, secret, sframe_salt_label, nonce_size));
 
   // If using CTR+HMAC, set key = enc_key || auth_key
   if (suite == CipherSuite::AES_CM_128_HMAC_SHA256_4 ||
@@ -129,8 +129,8 @@ ContextBase::KeyAndSalt::from_base_key(CipherSuite suite, const bytes& base_key)
     secret = hkdf_extract(suite, sframe_ctr_label, key);
 
     auto main_key = key;
-    auto enc_key = hkdf_expand(suite, secret, sframe_enc_label, key_size);
-    auto auth_key = hkdf_expand(suite, secret, sframe_auth_label, hash_size);
+    auto enc_key = bytes(hkdf_expand(suite, secret, sframe_enc_label, key_size));
+    auto auth_key = bytes(hkdf_expand(suite, secret, sframe_auth_label, hash_size));
 
     key = enc_key;
     key.insert(key.end(), auth_key.begin(), auth_key.end());
@@ -298,8 +298,8 @@ MLSContext::EpochKeys::base_key(CipherSuite ciphersuite,
   auto enc_sender_id = bytes(8);
   encode_uint(sender_id, enc_sender_id);
 
-  return hkdf_expand(
-    ciphersuite, sframe_epoch_secret, enc_sender_id, hash_size);
+  return bytes(hkdf_expand(
+    ciphersuite, sframe_epoch_secret, enc_sender_id, hash_size));
 }
 
 void
