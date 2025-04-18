@@ -61,26 +61,26 @@ class Header
 public:
   const KeyID key_id;
   const Counter counter;
+  const size_t size;
 
   Header(KeyID key_id_in, Counter counter_in);
   static Header parse(input_bytes buffer);
 
   input_bytes encoded() const;
-  size_t size() const;
 
 private:
+  // Just the configuration byte
   static constexpr size_t min_size = 1;
-  static constexpr size_t max_size = 1 + 7 + 7;
 
-  const size_t key_id_size;
-  const size_t counter_size;
+  // Configuration byte plus 8-byte KID and CTR
+  static constexpr size_t max_size = 1 + 8 + 8;
+
   std::array<uint8_t, max_size> buffer;
 
   Header(KeyID key_id_in,
          Counter counter_in,
-         size_t key_id_size_in,
-         size_t counter_size_in,
-         input_bytes encoded);
+         size_t size_in,
+         input_bytes encoded_in);
 };
 
 // ContextBase represents the core SFrame encryption logic.  It remembers a set

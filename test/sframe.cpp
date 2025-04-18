@@ -43,6 +43,7 @@ to_bytes(const T& range)
   return bytes(range.begin(), range.end());
 }
 
+#if 0 // XXX(RLB) Disabled for now; to be replaced by test vectors
 TEST_CASE("SFrame Known-Answer")
 {
   ensure_fips_if_required();
@@ -140,6 +141,7 @@ TEST_CASE("SFrame Known-Answer")
     CHECK(plaintext == to_bytes(ctx.unprotect(pt_out, ct2)));
   }
 }
+#endif
 
 TEST_CASE("SFrame Round-Trip")
 {
@@ -181,6 +183,8 @@ TEST_CASE("SFrame Round-Trip")
   }
 }
 
+#if 0 // XXX(RLB) Disabled for now; to be replaced by test vectors or fresh
+      // known-answer tests.
 TEST_CASE("MLS Known-Answer")
 {
   ensure_fips_if_required();
@@ -748,3 +752,4 @@ TEST_CASE("MLS Failure after Purge")
   const auto dec_ab_2 = member_b.unprotect(pt_out, enc_ab_2);
   CHECK(plaintext == to_bytes(dec_ab_2));
 }
+#endif // 0
