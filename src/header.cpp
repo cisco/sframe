@@ -58,7 +58,7 @@ struct ValueOrLength
   static ValueOrLength decode(uint8_t encoded)
   {
     const auto is_length = (encoded & 0x08) != 0;
-    const auto value_or_length = (encoded & 0x07) + (is_length ? 1 : 0);
+    const auto value_or_length = (encoded & 0x07);
     return { is_length, static_cast<uint8_t>(value_or_length) };
   }
 
@@ -67,7 +67,7 @@ struct ValueOrLength
     return (((is_length) ? 1 : 0) << 3) | (value_or_length & 0x07);
   }
 
-  size_t size() const
+  size_t value_size() const
   {
     if (!is_length) {
       return 0;
@@ -83,8 +83,9 @@ struct ValueOrLength
       return { value_or_length, data };
     }
 
-    const auto value = decode_uint(data.subspan(0, value_or_length));
-    const auto remaining = data.subspan(value_or_length);
+    const auto size = value_size();
+    const auto value = decode_uint(data.subspan(0, size));
+    const auto remaining = data.subspan(size);
     return { value, remaining };
   }
 
@@ -113,17 +114,68 @@ struct ConfigByte
   {
   }
 
+  size_t encoded_size() const
+  {
+    return 1 + kid.value_size() + ctr.value_size();
+  }
+
   uint8_t encode() const { return (kid.encode() << 4) | ctr.encode(); }
 };
 
-size_t
-Header::size() const
+Header::Header(KeyID key_id_in, Counter counter_in)
+  : key_id(key_id_in)
+  , counter(counter_in)
+  , size(1 + uint_size(key_id) + uint_size(counter))
 {
-  return 1 + uint_size(key_id) + uint_size(counter);
+  const auto cfg = ConfigByte{ key_id, counter };
+  buffer[0] = cfg.encode();
+
+  const auto encoded = output_bytes(buffer);
+  const auto after_cfg = encoded.subspan(1);
+  encode_uint(key_id, after_cfg.subspan(0, cfg.kid.value_size()));
+
+  const auto after_kid = after_cfg.subspan(cfg.kid.value_size());
+  encode_uint(counter, after_kid.subspan(0, cfg.ctr.value_size()));
 }
 
+Header
+Header::parse(input_bytes buffer)
+{
+  if (buffer.size() < Header::min_size) {
+    throw buffer_too_small_error("Ciphertext too small to decode header");
+  }
+
+  const auto cfg = ConfigByte{ buffer[0] };
+  const auto after_cfg = buffer.subspan(1);
+  const auto [key_id, after_kid] = cfg.kid.read(after_cfg);
+  const auto [counter, after_ctr] = cfg.ctr.read(after_kid);
+
+  const auto size = cfg.encoded_size();
+  const auto encoded = buffer.subspan(0, size);
+
+  return Header(key_id, counter, size, encoded);
+}
+
+input_bytes
+Header::encoded() const
+{
+  return input_bytes(buffer).subspan(0, size);
+}
+
+Header::Header(KeyID key_id_in,
+               Counter counter_in,
+               size_t size_in,
+               input_bytes encoded_in)
+  : key_id(key_id_in)
+  , counter(counter_in)
+  , size(size_in)
+{
+  std::copy(encoded_in.begin(), encoded_in.end(), buffer.begin());
+}
+
+#if 0
 std::tuple<Header, input_bytes>
-Header::decode(input_bytes buffer)
+decode(input_bytes buffer)
 {
   if (buffer.size() < Header::min_size) {
     throw buffer_too_small_error("Ciphertext too small to decode header");
@@ -156,5 +208,6 @@ Header::encode(output_bytes buffer) const
 
   return size();
 }
+#endif
 
 } // namespace sframe

@@ -1,7 +1,7 @@
 #include <doctest/doctest.h>
+#include <fstream>
 #include <nlohmann/json.hpp>
 #include <sframe/sframe.h>
-#include <fstream>
 
 using namespace sframe;
 using nlohmann::json;
