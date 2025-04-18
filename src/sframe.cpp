@@ -28,11 +28,13 @@ operator<<(std::ostream& str, const input_bytes data)
 
 unsupported_ciphersuite_error::unsupported_ciphersuite_error()
   : std::runtime_error("Unsupported ciphersuite")
-{}
+{
+}
 
 authentication_error::authentication_error()
   : std::runtime_error("AEAD authentication failure")
-{}
+{
+}
 
 ///
 /// Context
@@ -40,7 +42,8 @@ authentication_error::authentication_error()
 
 Context::Context(CipherSuite suite_in)
   : SFrame(suite_in)
-{}
+{
+}
 
 static const bytes sframe_label{
   0x53, 0x46, 0x72, 0x61, 0x6d, 0x65, 0x31, 0x30 // "SFrame10"
@@ -103,7 +106,8 @@ form_nonce(Counter ctr, const bytes& salt)
 
 SFrame::SFrame(CipherSuite suite_in)
   : suite(suite_in)
-{}
+{
+}
 
 SFrame::~SFrame() = default;
 
@@ -256,7 +260,8 @@ MLSContext::EpochKeys::EpochKeys(MLSContext::EpochID full_epoch_in,
   : full_epoch(full_epoch_in)
   , sframe_epoch_secret(std::move(sframe_epoch_secret_in))
   , sender_bits(sender_bits_in)
-{}
+{
+}
 
 SFrame::KeyState&
 MLSContext::EpochKeys::get(CipherSuite ciphersuite, SenderID sender_id)

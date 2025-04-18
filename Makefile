@@ -8,22 +8,28 @@ BUILD_DIR=build
 CLANG_FORMAT=clang-format -i
 
 TEST_VECTOR_DIR=./build/test
-TEST_GEN=./build/cmd/test_gen/test_gen
+TEST_BIN=./build/test/sframe_test
 
 .PHONY: all tidy test clean cclean format
 
-all: ${BUILD_DIR}
+all: ${BUILD_DIR} src/* include/sframe/*
 	cmake --build ${BUILD_DIR} --target sframe
 
 ${BUILD_DIR}: CMakeLists.txt test/CMakeLists.txt
 	cmake -B${BUILD_DIR} .
 
 dev: CMakeLists.txt test/CMakeLists.txt
-	cmake -B${BUILD_DIR} -DCLANG_TIDY=ON -DTESTING=ON -DSANITIZERS=ON .
+	cmake -B${BUILD_DIR} -DCMAKE_BUILD_TYPE=Debug -DCLANG_TIDY=ON -DTESTING=ON -DSANITIZERS=ON .
 
 test: ${BUILD_DIR} test/*
 	cmake --build ${BUILD_DIR} --target sframe_test
 	cd ${TEST_VECTOR_DIR} && ctest
+
+dtest: ${TEST_BIN}
+	${TEST_BIN}
+
+dbtest: ${TEST_BIN}
+	lldb ${TEST_BIN}
 
 clean:
 	cmake --build ${BUILD_DIR} --target clean

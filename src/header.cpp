@@ -5,6 +5,10 @@ namespace sframe {
 static size_t
 uint_size(uint64_t val)
 {
+  if (val < 0x08) {
+    return 0;
+  }
+
   for (unsigned int i = 0; i < 8; i += 1) {
     if ((val >> (8 * i)) == 0) {
       return i;
@@ -26,6 +30,10 @@ encode_uint(uint64_t val, output_bytes buffer)
 static uint64_t
 decode_uint(input_bytes data)
 {
+  if (data.size() > 1 && data[0] == 0) {
+    throw invalid_parameter_error("Integer is not minimally encoded");
+  }
+
   uint64_t val = 0;
   for (size_t i = 0; i < data.size(); i++) {
     val = (val << 8) + static_cast<uint64_t>(data[i]);
@@ -33,20 +41,85 @@ decode_uint(input_bytes data)
   return val;
 }
 
+struct ValueOrLength
+{
+  bool is_length = false;
+  uint8_t value_or_length = 0;
+
+  static ValueOrLength for_u64(uint64_t value)
+  {
+    if (value >= 0x08) {
+      return { true, static_cast<uint8_t>(uint_size(value) - 1) };
+    } else {
+      return { false, static_cast<uint8_t>(value) };
+    }
+  }
+
+  static ValueOrLength decode(uint8_t encoded)
+  {
+    const auto is_length = (encoded & 0x08) != 0;
+    const auto value_or_length = (encoded & 0x07) + (is_length ? 1 : 0);
+    return { is_length, static_cast<uint8_t>(value_or_length) };
+  }
+
+  uint8_t encode() const
+  {
+    return (((is_length) ? 1 : 0) << 3) | (value_or_length & 0x07);
+  }
+
+  size_t size() const
+  {
+    if (!is_length) {
+      return 0;
+    }
+
+    return value_or_length + 1;
+  }
+
+  std::tuple<uint64_t, input_bytes> read(input_bytes data) const
+  {
+    if (!is_length) {
+      // Nothing to read; value is already in config byte
+      return { value_or_length, data };
+    }
+
+    const auto value = decode_uint(data.subspan(0, value_or_length));
+    const auto remaining = data.subspan(value_or_length);
+    return { value, remaining };
+  }
+
+private:
+  ValueOrLength(bool is_length_in, uint8_t value_or_length_in)
+    : is_length(is_length_in)
+    , value_or_length(value_or_length_in)
+  {
+  }
+};
+
+struct ConfigByte
+{
+  ValueOrLength kid;
+  ValueOrLength ctr;
+
+  ConfigByte(uint64_t kid_in, uint64_t ctr_in)
+    : kid(ValueOrLength::for_u64(kid_in))
+    , ctr(ValueOrLength::for_u64(ctr_in))
+  {
+  }
+
+  explicit ConfigByte(uint8_t encoded)
+    : kid(ValueOrLength::decode(encoded >> 4))
+    , ctr(ValueOrLength::decode(encoded & 0x0f))
+  {
+  }
+
+  uint8_t encode() const { return (kid.encode() << 4) | ctr.encode(); }
+};
+
 size_t
 Header::size() const
 {
-  auto kid_size = size_t(0);
-  if (key_id > 0x07) {
-    kid_size = uint_size(key_id);
-  }
-
-  const auto ctr_size = uint_size(counter);
-  if ((kid_size > 0x07) || (ctr_size > 0x07)) {
-    throw buffer_too_small_error("Header overflow");
-  }
-
-  return 1 + kid_size + ctr_size;
+  return 1 + uint_size(key_id) + uint_size(counter);
 }
 
 std::tuple<Header, input_bytes>
@@ -56,29 +129,13 @@ Header::decode(input_bytes buffer)
     throw buffer_too_small_error("Ciphertext too small to decode header");
   }
 
-  auto cfg = buffer[0];
-  auto ctr_size = size_t((cfg >> 4) & 0x07) + 1;
-  auto kid_long = (cfg & 0x08) > 0;
-  auto kid_size = size_t(cfg & 0x07);
+  const auto cfg = ConfigByte{ buffer[0] };
+  const auto after_cfg = buffer.subspan(1);
+  const auto [kid, after_kid] = cfg.kid.read(after_cfg);
+  const auto [ctr, after_ctr] = cfg.ctr.read(after_kid);
+  const auto header = Header{ KeyID(kid), Counter(ctr) };
 
-  auto key_id = KeyID(kid_size);
-  if (kid_long) {
-    if (buffer.size() < 1 + kid_size) {
-      throw buffer_too_small_error("Ciphertext too small to decode KID");
-    }
-
-    key_id = KeyID(decode_uint(buffer.subspan(1, kid_size)));
-  } else {
-    kid_size = 0;
-  }
-
-  if (buffer.size() < 1 + kid_size + ctr_size) {
-    throw buffer_too_small_error("Ciphertext too small to decode CTR");
-  }
-  auto counter = Counter(decode_uint(buffer.subspan(1 + kid_size, ctr_size)));
-
-  return std::make_tuple(Header{ key_id, counter },
-                         buffer.subspan(0, 1 + kid_size + ctr_size));
+  return { header, after_ctr };
 }
 
 size_t
@@ -88,25 +145,16 @@ Header::encode(output_bytes buffer) const
     throw buffer_too_small_error("Buffer too small to encode header");
   }
 
-  auto kid_size = uint_size(key_id);
-  if (key_id <= 0x07) {
-    kid_size = 0;
-    buffer[0] = static_cast<uint8_t>(key_id);
-  } else {
-    encode_uint(key_id, buffer.subspan(1, kid_size));
-    buffer[0] = static_cast<uint8_t>(0x08 | kid_size);
-  }
+  const auto cfg = ConfigByte{ key_id, counter };
+  buffer[0] = cfg.encode();
 
-  auto ctr_size = uint_size(counter);
-  if (ctr_size == 0) {
-    // Counter always takes at least one byte
-    ctr_size = 1;
-  }
+  const auto after_cfg = buffer.subspan(1);
+  encode_uint(key_id, after_cfg.subspan(0, cfg.kid.size()));
 
-  encode_uint(counter, buffer.subspan(1 + kid_size, ctr_size));
-  buffer[0] |= uint8_t((ctr_size - 1) << 4);
+  const auto after_kid = after_cfg.subspan(cfg.kid.size());
+  encode_uint(counter, after_kid.subspan(0, cfg.ctr.size()));
 
-  return 1 + kid_size + ctr_size;
+  return size();
 }
 
 } // namespace sframe

@@ -11,7 +11,8 @@ namespace sframe {
 
 openssl_error::openssl_error()
   : std::runtime_error(ERR_error_string(ERR_get_error(), nullptr))
-{}
+{
+}
 
 static const EVP_MD*
 openssl_digest_type(CipherSuite suite)
@@ -168,7 +169,7 @@ hmac_for_hkdf(CipherSuite suite, input_bytes key, input_bytes data)
     key_data = &non_null_zero_length_key;
   }
 
-  if (1 != HMAC_Init_ex(ctx.get(), key.data(), key_size, type, nullptr)) {
+  if (1 != HMAC_Init_ex(ctx.get(), key_data, key_size, type, nullptr)) {
     throw openssl_error();
   }
 

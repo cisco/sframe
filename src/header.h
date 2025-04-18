@@ -18,7 +18,7 @@ struct Header
   size_t encode(output_bytes buffer) const;
 
   static constexpr size_t min_size = 1;
-  static constexpr size_t max_size = 1 + 7 + 7;
+  static constexpr size_t max_size = 1 + 8 + 8;
 };
 
 } // namespace sframe
