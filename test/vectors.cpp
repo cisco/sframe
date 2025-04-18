@@ -3,6 +3,8 @@
 #include <nlohmann/json.hpp>
 #include <sframe/sframe.h>
 
+#include <crypto.h>
+
 using namespace sframe;
 using nlohmann::json;
 
@@ -38,6 +40,15 @@ void from_json(const json& j, HexBytes& b) {
 
 void to_json(json& /* j */, const HexBytes& /* p */) {
   // Included just so that macros work
+}
+
+std::string to_hex(const input_bytes data) {
+  std::stringstream hex(std::ios_base::out);
+  hex.flags(std::ios::hex);
+  for (const auto& byte : data) {
+    hex << std::setw(2) << std::setfill('0') << int(byte);
+  }
+  return hex.str();
 }
 
 struct HeaderTestVector
@@ -84,7 +95,17 @@ struct AesCtrHmacTestVector
                                  ct)
 
   void verify() const {
-    // TODO
+#if 0 // TODO(RLB) Re-enable after updating crypto routines to match the spec
+    // Seal
+    auto ciphertext = bytes(ct.data.size());
+    const auto ct_out = seal(cipher_suite, key, nonce, ciphertext, aad, pt);
+    REQUIRE(ct_out == ct);
+
+    // Open
+    auto plaintext = bytes(pt.data.size());
+    const auto pt_out = open(cipher_suite, key, nonce, plaintext, aad, ct);
+    REQUIRE(pt_out == pt);
+#endif
   }
 };
 
@@ -118,7 +139,7 @@ struct SFrameTestVector
                                  ct)
 
   void verify() const {
-    // TODO
+    // TODO(RLB)
   }
 };
 

@@ -258,8 +258,8 @@ ctr_crypt(CipherSuite suite,
 
 static output_bytes
 seal_ctr(CipherSuite suite,
-         const bytes& key,
-         const bytes& nonce,
+         input_bytes key,
+         input_bytes nonce,
          output_bytes ct,
          input_bytes aad,
          input_bytes pt)
@@ -292,8 +292,8 @@ seal_ctr(CipherSuite suite,
 
 static output_bytes
 seal_aead(CipherSuite suite,
-          const bytes& key,
-          const bytes& nonce,
+          input_bytes key,
+          input_bytes nonce,
           output_bytes ct,
           input_bytes aad,
           input_bytes pt)
@@ -363,8 +363,8 @@ overhead(CipherSuite suite)
 
 output_bytes
 seal(CipherSuite suite,
-     const bytes& key,
-     const bytes& nonce,
+     input_bytes key,
+     input_bytes nonce,
      output_bytes ct,
      input_bytes aad,
      input_bytes pt)
@@ -386,8 +386,8 @@ seal(CipherSuite suite,
 
 static output_bytes
 open_ctr(CipherSuite suite,
-         const bytes& key,
-         const bytes& nonce,
+         input_bytes key,
+         input_bytes nonce,
          output_bytes pt,
          input_bytes aad,
          input_bytes ct)
@@ -424,8 +424,8 @@ open_ctr(CipherSuite suite,
 
 static output_bytes
 open_aead(CipherSuite suite,
-          const bytes& key,
-          const bytes& nonce,
+          input_bytes key,
+          input_bytes nonce,
           output_bytes pt,
           input_bytes aad,
           input_bytes ct)
@@ -484,8 +484,8 @@ open_aead(CipherSuite suite,
 
 output_bytes
 open(CipherSuite suite,
-     const bytes& key,
-     const bytes& nonce,
+     input_bytes key,
+     input_bytes nonce,
      output_bytes pt,
      input_bytes aad,
      input_bytes ct)
