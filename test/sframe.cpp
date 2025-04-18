@@ -303,7 +303,6 @@ TEST_CASE("MLS Known-Answer")
       for (size_t j = 0; j < tc.epochs[i].size(); j++) {
         auto encrypted =
           ctx.protect(epoch_ids[i], sender_ids[j], ct_out, plaintext);
-        std::cout << tc.epochs[i][j] << " " << to_bytes(encrypted) << std::endl;
         CHECK(tc.epochs[i][j] == to_bytes(encrypted));
 
         auto decrypted = ctx.unprotect(pt_out, tc.epochs[i][j]);
@@ -348,8 +347,6 @@ TEST_CASE("MLS Round-Trip")
           member_a.protect(epoch_id, sender_id_a, ct_out, plaintext);
         auto decrypted_ab = member_b.unprotect(pt_out, encrypted_ab);
         CHECK(plaintext == to_bytes(decrypted_ab));
-
-        std::cout << encrypted_ab << std::endl;
 
         auto encrypted_ba =
           member_b.protect(epoch_id, sender_id_b, ct_out, plaintext);
@@ -694,7 +691,6 @@ TEST_CASE("MLS Round-Trip with context")
           to_bytes(member_b.unprotect(pt_out, encrypted_ab_1));
         CHECK(plaintext == decrypted_ab_1);
 
-        std::cout << encrypted_ab_0 << " " << encrypted_ab_1 << std::endl;
         CHECK(to_bytes(encrypted_ab_0) != to_bytes(encrypted_ab_1));
 
         auto encrypted_ba =
