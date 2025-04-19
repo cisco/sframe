@@ -33,7 +33,7 @@ ContextBase::~ContextBase() = default;
 void
 ContextBase::add_key(KeyID key_id, input_bytes base_key)
 {
-  keys.emplace(key_id, KeyAndSalt::from_base_key(suite, base_key));
+  keys.emplace(key_id, KeyAndSalt::from_base_key(suite, key_id, base_key));
 }
 
 static owned_bytes<KeyAndSalt::max_salt_size>
@@ -84,11 +84,6 @@ ContextBase::unprotect(const Header& header,
 static const owned_bytes<8> sframe_label{
   0x53, 0x46, 0x72, 0x61, 0x6d, 0x65, 0x31, 0x30 // "ContextBase10"
 };
-static const owned_bytes<3> sframe_key_label{ 0x6b, 0x65, 0x79 }; // "key"
-static const owned_bytes<4> sframe_salt_label{ 0x73,
-                                               0x61,
-                                               0x6c,
-                                               0x74 }; // "salt"
 
 static const owned_bytes<20> sframe_ctr_label{
   // "ContextBase10 AES CM AEAD"
@@ -101,30 +96,66 @@ static const owned_bytes<4> sframe_auth_label{ 0x61,
                                                0x74,
                                                0x68 }; // "auth"
 
+owned_bytes<32>
+sframe_key_label(CipherSuite suite, KeyID key_id)
+{
+  auto label = owned_bytes<32>{
+    // "SFrame 1.0 Secret key "
+    0x53, 0x46, 0x72, 0x61, 0x6d, 0x65, 0x20, 0x31,
+    0x2e, 0x30, 0x20, 0x53, 0x65, 0x63, 0x72, 0x65,
+    0x74, 0x20, 0x6b, 0x65, 0x79, 0x20,
+
+    // Encoded KID
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+
+    // Encoded CipherSuite
+    0x00, 0x00,
+  };
+
+  auto label_data = output_bytes(label);
+  encode_uint(key_id, label_data.subspan(22).first(8));
+  encode_uint(static_cast<uint64_t>(suite), label_data.subspan(30));
+
+  return label;
+}
+
+owned_bytes<33>
+sframe_salt_label(CipherSuite suite, KeyID key_id)
+{
+  // TODO
+  auto label = owned_bytes<33>{
+    // "SFrame 1.0 Secret salt "
+    0x53, 0x46, 0x72, 0x61, 0x6d, 0x65, 0x20, 0x31,
+    0x2e, 0x30, 0x20, 0x53, 0x65, 0x63, 0x72, 0x65,
+    0x74, 0x20, 0x73, 0x61, 0x6c, 0x74, 0x20,
+
+    // Encoded KID
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+
+    // Encoded CipherSuite
+    0x00, 0x00,
+  };
+
+  auto label_data = output_bytes(label);
+  encode_uint(key_id, label_data.subspan(23).first(8));
+  encode_uint(static_cast<uint64_t>(suite), label_data.subspan(31));
+
+  return label;
+}
+
 KeyAndSalt
-KeyAndSalt::from_base_key(CipherSuite suite, input_bytes base_key)
+KeyAndSalt::from_base_key(CipherSuite suite, KeyID key_id, input_bytes base_key)
 {
   auto key_size = cipher_key_size(suite);
   auto nonce_size = cipher_nonce_size(suite);
 
-  auto secret = hkdf_extract(suite, sframe_label, base_key);
-  auto key = hkdf_expand(suite, secret, sframe_key_label, key_size);
-  auto salt = hkdf_expand(suite, secret, sframe_salt_label, nonce_size);
+  const auto empty_byte_string = owned_bytes<0>();
+  const auto key_label = sframe_key_label(suite, key_id);
+  const auto salt_label = sframe_salt_label(suite, key_id);
 
-  // If using CTR+HMAC, set key = enc_key || auth_key
-  if (suite == CipherSuite::AES_128_CTR_HMAC_SHA256_80 ||
-      suite == CipherSuite::AES_128_CTR_HMAC_SHA256_64 ||
-      suite == CipherSuite::AES_128_CTR_HMAC_SHA256_32) {
-    secret = hkdf_extract(suite, sframe_ctr_label, key);
-
-    auto enc_key = hkdf_expand(suite, secret, sframe_enc_label, key_size);
-
-    auto hash_size = cipher_digest_size(suite);
-    auto auth_key = hkdf_expand(suite, secret, sframe_auth_label, hash_size);
-
-    key = enc_key;
-    key.append(auth_key);
-  }
+  auto secret = hkdf_extract(suite, empty_byte_string, base_key);
+  auto key = hkdf_expand(suite, secret, key_label, key_size);
+  auto salt = hkdf_expand(suite, secret, salt_label, nonce_size);
 
   return KeyAndSalt{ key, salt, 0 };
 }

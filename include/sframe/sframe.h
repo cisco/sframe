@@ -97,13 +97,6 @@ public:
     _data.at(_size - 1) = item;
   }
 
-  void append(gsl::span<const T> content)
-  {
-    const auto original_size = _size;
-    resize(_size + content.size());
-    std::copy(content.begin(), content.end(), _data.begin() + original_size);
-  }
-
   auto& operator[](size_t i) { return _data.at(i); }
   const auto& operator[](size_t i) const { return _data.at(i); }
 
@@ -212,7 +205,7 @@ private:
 
 struct KeyAndSalt
 {
-  static KeyAndSalt from_base_key(CipherSuite suite, input_bytes base_key);
+  static KeyAndSalt from_base_key(CipherSuite suite, KeyID key_id, input_bytes base_key);
 
   static constexpr size_t max_key_size = 48;
   static constexpr size_t max_salt_size = 12;

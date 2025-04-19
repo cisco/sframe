@@ -93,10 +93,24 @@ cipher_key_size(CipherSuite suite)
     case CipherSuite::AES_128_CTR_HMAC_SHA256_64:
     case CipherSuite::AES_128_CTR_HMAC_SHA256_32:
     case CipherSuite::AES_GCM_128_SHA256:
-      return 16;
+      return 48;
 
     case CipherSuite::AES_GCM_256_SHA512:
       return 32;
+
+    default:
+      throw unsupported_ciphersuite_error();
+  }
+}
+
+size_t
+cipher_enc_key_size(CipherSuite suite)
+{
+  switch (suite) {
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_80:
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_64:
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_32:
+      return 16;
 
     default:
       throw unsupported_ciphersuite_error();
@@ -285,7 +299,7 @@ seal_ctr(CipherSuite suite,
   }
 
   // Split the key into enc and auth subkeys
-  auto enc_key_size = cipher_key_size(suite);
+  auto enc_key_size = cipher_enc_key_size(suite);
   auto enc_key = key.first(enc_key_size);
   auto auth_key = key.subspan(enc_key_size);
 
@@ -398,7 +412,7 @@ open_ctr(CipherSuite suite,
   auto tag = ct.subspan(inner_ct_size, tag_size);
 
   // Split the key into enc and auth subkeys
-  auto enc_key_size = cipher_key_size(suite);
+  auto enc_key_size = cipher_enc_key_size(suite);
   auto enc_key = key.first(enc_key_size);
   auto auth_key = key.subspan(enc_key_size);
 

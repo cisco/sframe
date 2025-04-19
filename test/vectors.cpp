@@ -102,11 +102,6 @@ struct AesCtrHmacTestVector
     // Seal
     auto ciphertext = bytes(ct.data.size());
     const auto ct_out = seal(cipher_suite, key, nonce, ciphertext, aad, pt);
-
-    const auto act_ct_hex = to_hex(ct_out);
-    const auto exp_ct_hex = to_hex(ct);
-    REQUIRE(act_ct_hex == exp_ct_hex);
-
     REQUIRE(ct_out == ct);
 
     // Open
@@ -147,7 +142,32 @@ struct SFrameTestVector
 
   void verify() const
   {
-    // TODO(RLB)
+    // Protect
+    auto send_ctx = Context(cipher_suite);
+    send_ctx.add_key(kid, base_key);
+
+    auto ct_data = owned_bytes<128>();
+    auto next_ctr = uint64_t(0);
+    while (next_ctr < ctr) {
+      send_ctx.protect(kid, ct_data, pt);
+      next_ctr += 1;
+    }
+
+    const auto ct_out = send_ctx.protect(kid, ct_data, pt);
+
+    const auto act_ct_hex = to_hex(ct_out);
+    const auto exp_ct_hex = to_hex(ct);
+    REQUIRE(act_ct_hex == exp_ct_hex);
+
+    REQUIRE(ct_out == ct);
+
+    // Unprotect
+    auto recv_ctx = Context(cipher_suite);
+    recv_ctx.add_key(kid, base_key);
+
+    auto pt_data = owned_bytes<128>();
+    auto pt_out = recv_ctx.unprotect(pt_data, ct);
+    REQUIRE(pt_out == pt);
   }
 };
 
