@@ -36,7 +36,7 @@ struct HMAC
   void write(input_bytes data);
   Output digest();
 
-  private:
+private:
   scoped_hmac_ctx ctx;
 };
 
@@ -44,10 +44,7 @@ HMAC::Output
 hkdf_extract(CipherSuite suite, input_bytes salt, input_bytes ikm);
 
 HMAC::Output
-hkdf_expand(CipherSuite suite,
-            input_bytes prk,
-            input_bytes info,
-            size_t size);
+hkdf_expand(CipherSuite suite, input_bytes prk, input_bytes info, size_t size);
 
 ///
 /// AEAD Algorithms

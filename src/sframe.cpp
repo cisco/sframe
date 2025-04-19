@@ -84,16 +84,22 @@ ContextBase::unprotect(const Header& header,
 static const owned_bytes<8> sframe_label{
   0x53, 0x46, 0x72, 0x61, 0x6d, 0x65, 0x31, 0x30 // "ContextBase10"
 };
-static const owned_bytes<3> sframe_key_label{ 0x6b, 0x65, 0x79 };        // "key"
-static const owned_bytes<4> sframe_salt_label{ 0x73, 0x61, 0x6c, 0x74 }; // "salt"
+static const owned_bytes<3> sframe_key_label{ 0x6b, 0x65, 0x79 }; // "key"
+static const owned_bytes<4> sframe_salt_label{ 0x73,
+                                               0x61,
+                                               0x6c,
+                                               0x74 }; // "salt"
 
 static const owned_bytes<20> sframe_ctr_label{
   // "ContextBase10 AES CM AEAD"
   0x53, 0x46, 0x72, 0x61, 0x6d, 0x65, 0x31, 0x30, 0x20, 0x41,
   0x45, 0x53, 0x20, 0x43, 0x4d, 0x20, 0x41, 0x45, 0x41, 0x44,
 };
-static const owned_bytes<3> sframe_enc_label{ 0x65, 0x6e, 0x63 };        // "enc"
-static const owned_bytes<4> sframe_auth_label{ 0x61, 0x75, 0x74, 0x68 }; // "auth"
+static const owned_bytes<3> sframe_enc_label{ 0x65, 0x6e, 0x63 }; // "enc"
+static const owned_bytes<4> sframe_auth_label{ 0x61,
+                                               0x75,
+                                               0x74,
+                                               0x68 }; // "auth"
 
 KeyAndSalt
 KeyAndSalt::from_base_key(CipherSuite suite, input_bytes base_key)
@@ -286,9 +292,8 @@ MLSContext::purge_epoch(EpochID epoch_id)
 {
   const auto drop_bits = epoch_id & epoch_bits;
 
-  keys.erase_if_key([&](const auto& epoch) {
-      return (epoch & epoch_bits) == drop_bits;
-  });
+  keys.erase_if_key(
+    [&](const auto& epoch) { return (epoch & epoch_bits) == drop_bits; });
 }
 
 KeyID

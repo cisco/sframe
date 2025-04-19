@@ -178,10 +178,7 @@ hkdf_extract(CipherSuite suite, input_bytes salt, input_bytes ikm)
 //
 //   HMAC(Secret, Label || 0x01)
 HMAC::Output
-hkdf_expand(CipherSuite suite,
-            input_bytes prk,
-            input_bytes info,
-            size_t size)
+hkdf_expand(CipherSuite suite, input_bytes prk, input_bytes info, size_t size)
 {
   // Ensure that we need only one hash invocation
   if (size > cipher_digest_size(suite)) {

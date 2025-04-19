@@ -43,12 +43,13 @@ enum class CipherSuite : uint16_t
 constexpr size_t max_overhead = 17 + 16;
 
 template<typename T, size_t N>
-class vector {
-  private:
+class vector
+{
+private:
   std::array<T, N> _data;
   size_t _size;
 
-  public:
+public:
   constexpr vector()
     : _size(N)
   {
@@ -83,17 +84,20 @@ class vector {
   auto end() { return _data.end() + _size; }
 
   auto size() const { return _size; }
-  void resize(size_t size) {
+  void resize(size_t size)
+  {
     assert(size <= N);
     _size = size;
   }
 
-  void push(T&& item) {
+  void push(T&& item)
+  {
     resize(_size + 1);
     _data.at(_size - 1) = item;
   }
 
-  void append(gsl::span<const T> content) {
+  void append(gsl::span<const T> content)
+  {
     const auto original_size = _size;
     resize(_size + content.size());
     std::copy(content.begin(), content.end(), _data.begin() + original_size);
@@ -107,11 +111,14 @@ class vector {
 };
 
 template<typename K, typename V, size_t N>
-class map : private vector<std::optional<std::pair<K, V>>, N> {
-  public:
+class map : private vector<std::optional<std::pair<K, V>>, N>
+{
+public:
   template<class... Args>
-  void emplace(Args&&... args) {
-    const auto pos = std::find_if(this->begin(), this->end(), [&](const auto& pair) { return !pair; });
+  void emplace(Args&&... args)
+  {
+    const auto pos = std::find_if(
+      this->begin(), this->end(), [&](const auto& pair) { return !pair; });
     if (pos == this->end()) {
       throw std::out_of_range("map out of space");
     }
@@ -119,19 +126,24 @@ class map : private vector<std::optional<std::pair<K, V>>, N> {
     pos->emplace(args...);
   }
 
-  auto find(const K& key) const {
-    return std::find_if(this->begin(), this->end(), [&](const auto& pair) { return pair && pair.value().first == key; });
+  auto find(const K& key) const
+  {
+    return std::find_if(this->begin(), this->end(), [&](const auto& pair) {
+      return pair && pair.value().first == key;
+    });
   }
 
-  auto find(const K& key) {
-    return std::find_if(this->begin(), this->end(), [&](const auto& pair) { return pair && pair.value().first == key; });
+  auto find(const K& key)
+  {
+    return std::find_if(this->begin(), this->end(), [&](const auto& pair) {
+      return pair && pair.value().first == key;
+    });
   }
 
-  bool contains(const K& key) const {
-    return find(key) != this->end();
-  }
+  bool contains(const K& key) const { return find(key) != this->end(); }
 
-  const V& at(const K& key) const {
+  const V& at(const K& key) const
+  {
     const auto pos = find(key);
     if (pos == this->end()) {
       throw std::out_of_range("map key not found");
@@ -140,7 +152,8 @@ class map : private vector<std::optional<std::pair<K, V>>, N> {
     return pos->value().second;
   }
 
-  V& at(const K& key) {
+  V& at(const K& key)
+  {
     auto pos = find(key);
     if (pos == this->end()) {
       throw std::out_of_range("map key not found");
@@ -150,7 +163,8 @@ class map : private vector<std::optional<std::pair<K, V>>, N> {
   }
 
   template<typename F>
-  void erase_if_key(F&& f) {
+  void erase_if_key(F&& f)
+  {
     const auto to_erase = [&f](const auto& maybe_pair) {
       return maybe_pair && f(maybe_pair.value().first);
     };
@@ -192,9 +206,7 @@ private:
 
   owned_bytes<max_size> _encoded;
 
-  Header(KeyID key_id_in,
-         Counter counter_in,
-         input_bytes encoded_in);
+  Header(KeyID key_id_in, Counter counter_in, input_bytes encoded_in);
 };
 
 struct KeyAndSalt
@@ -305,7 +317,8 @@ private:
               input_bytes sframe_epoch_secret_in,
               size_t epoch_bits,
               size_t sender_bits_in);
-    owned_bytes<max_secret_size> base_key(CipherSuite suite, SenderID sender_id) const;
+    owned_bytes<max_secret_size> base_key(CipherSuite suite,
+                                          SenderID sender_id) const;
   };
 
   void purge_epoch(EpochID epoch_id);

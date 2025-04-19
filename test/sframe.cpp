@@ -161,8 +161,8 @@ TEST_CASE("SFrame Round-Trip")
   }
 }
 
-#if 0 // XXX(RLB) Disabled for now; to be replaced by test vectors or fresh
-      // known-answer tests.
+#if 0  // XXX(RLB) Disabled for now; to be replaced by test vectors or fresh
+       // known-answer tests.
 TEST_CASE("MLS Known-Answer")
 {
   ensure_fips_if_required();

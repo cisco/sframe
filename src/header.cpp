@@ -156,13 +156,12 @@ Header::parse(input_bytes buffer)
   return Header(key_id, counter, encoded);
 }
 
-Header::Header(KeyID key_id_in,
-               Counter counter_in,
-               input_bytes encoded_in)
+Header::Header(KeyID key_id_in, Counter counter_in, input_bytes encoded_in)
   : key_id(key_id_in)
   , counter(counter_in)
   , _encoded(encoded_in)
-{}
+{
+}
 
 #if 0
 std::tuple<Header, input_bytes>
