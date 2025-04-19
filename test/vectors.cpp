@@ -5,25 +5,34 @@
 
 #include <crypto.h>
 
+#include "common.h"
+
 using namespace sframe;
 using nlohmann::json;
 
-struct HexBytes {
+struct HexBytes
+{
   bytes data;
 
   operator input_bytes() const { return data; }
 };
 
 // Seems redundant, but works
-bool operator==(const HexBytes& hex, const input_bytes& other) {
+bool
+operator==(const HexBytes& hex, const input_bytes& other)
+{
   return input_bytes(hex) == other;
 }
 
-bool operator==(const input_bytes& other, const HexBytes& hex) {
+bool
+operator==(const input_bytes& other, const HexBytes& hex)
+{
   return hex == other;
 }
 
-void from_json(const json& j, HexBytes& b) {
+void
+from_json(const json& j, HexBytes& b)
+{
   const auto hex = j.get<std::string>();
 
   if (hex.length() % 2 == 1) {
@@ -38,17 +47,10 @@ void from_json(const json& j, HexBytes& b) {
   }
 }
 
-void to_json(json& /* j */, const HexBytes& /* p */) {
+void
+to_json(json& /* j */, const HexBytes& /* p */)
+{
   // Included just so that macros work
-}
-
-std::string to_hex(const input_bytes data) {
-  std::stringstream hex(std::ios_base::out);
-  hex.flags(std::ios::hex);
-  for (const auto& byte : data) {
-    hex << std::setw(2) << std::setfill('0') << int(byte);
-  }
-  return hex.str();
 }
 
 struct HeaderTestVector
@@ -59,12 +61,13 @@ struct HeaderTestVector
 
   NLOHMANN_DEFINE_TYPE_INTRUSIVE(HeaderTestVector, kid, ctr, encoded)
 
-  void verify() const {
+  void verify() const
+  {
     // Decode
     const auto decoded = Header::parse(encoded);
     REQUIRE(decoded.key_id == kid);
     REQUIRE(decoded.counter == ctr);
-    REQUIRE(decoded.size == encoded.data.size());
+    REQUIRE(decoded.size() == encoded.data.size());
     REQUIRE(decoded.encoded() == encoded);
 
     // Encode
@@ -94,7 +97,8 @@ struct AesCtrHmacTestVector
                                  pt,
                                  ct)
 
-  void verify() const {
+  void verify() const
+  {
 #if 0 // TODO(RLB) Re-enable after updating crypto routines to match the spec
     // Seal
     auto ciphertext = bytes(ct.data.size());
@@ -138,7 +142,8 @@ struct SFrameTestVector
                                  pt,
                                  ct)
 
-  void verify() const {
+  void verify() const
+  {
     // TODO(RLB)
   }
 };

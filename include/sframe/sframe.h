@@ -1,10 +1,6 @@
 #pragma once
 
-#include <iosfwd>
-#include <map>
-#include <memory>
-#include <vector>
-
+#include <cassert>
 #include <gsl/gsl-lite.hpp>
 
 namespace sframe {
@@ -46,7 +42,140 @@ enum class CipherSuite : uint16_t
 
 constexpr size_t max_overhead = 17 + 16;
 
-using bytes = std::vector<uint8_t>;
+template<typename T, size_t N>
+class vector
+{
+private:
+  std::array<T, N> _data;
+  size_t _size;
+
+public:
+  constexpr vector()
+    : _size(N)
+  {
+    std::fill(_data.begin(), _data.end(), T());
+  }
+
+  constexpr vector(std::initializer_list<uint8_t> content)
+  {
+    resize(content.size());
+    std::copy(content.begin(), content.end(), _data.begin());
+  }
+
+  constexpr vector(gsl::span<const T> content)
+  {
+    resize(content.size());
+    std::copy(content.begin(), content.end(), _data.begin());
+  }
+
+  template<size_t M>
+  constexpr vector(const vector<T, M>& content)
+  {
+    resize(content.size());
+    std::copy(content.begin(), content.end(), _data.begin());
+  }
+
+  uint8_t* data() { return _data.data(); }
+
+  auto begin() const { return _data.begin(); }
+  auto begin() { return _data.begin(); }
+
+  auto end() const { return _data.begin() + _size; }
+  auto end() { return _data.end() + _size; }
+
+  auto size() const { return _size; }
+  void resize(size_t size)
+  {
+    assert(size <= N);
+    _size = size;
+  }
+
+  void push(T&& item)
+  {
+    resize(_size + 1);
+    _data.at(_size - 1) = item;
+  }
+
+  void append(gsl::span<const T> content)
+  {
+    const auto original_size = _size;
+    resize(_size + content.size());
+    std::copy(content.begin(), content.end(), _data.begin() + original_size);
+  }
+
+  auto& operator[](size_t i) { return _data.at(i); }
+  const auto& operator[](size_t i) const { return _data.at(i); }
+
+  operator gsl::span<const T>() const { return gsl::span(_data).first(_size); }
+  operator gsl::span<T>() { return gsl::span(_data).first(_size); }
+};
+
+template<typename K, typename V, size_t N>
+class map : private vector<std::optional<std::pair<K, V>>, N>
+{
+public:
+  template<class... Args>
+  void emplace(Args&&... args)
+  {
+    const auto pos = std::find_if(
+      this->begin(), this->end(), [&](const auto& pair) { return !pair; });
+    if (pos == this->end()) {
+      throw std::out_of_range("map out of space");
+    }
+
+    pos->emplace(args...);
+  }
+
+  auto find(const K& key) const
+  {
+    return std::find_if(this->begin(), this->end(), [&](const auto& pair) {
+      return pair && pair.value().first == key;
+    });
+  }
+
+  auto find(const K& key)
+  {
+    return std::find_if(this->begin(), this->end(), [&](const auto& pair) {
+      return pair && pair.value().first == key;
+    });
+  }
+
+  bool contains(const K& key) const { return find(key) != this->end(); }
+
+  const V& at(const K& key) const
+  {
+    const auto pos = find(key);
+    if (pos == this->end()) {
+      throw std::out_of_range("map key not found");
+    }
+
+    return pos->value().second;
+  }
+
+  V& at(const K& key)
+  {
+    auto pos = find(key);
+    if (pos == this->end()) {
+      throw std::out_of_range("map key not found");
+    }
+
+    return pos->value().second;
+  }
+
+  template<typename F>
+  void erase_if_key(F&& f)
+  {
+    const auto to_erase = [&f](const auto& maybe_pair) {
+      return maybe_pair && f(maybe_pair.value().first);
+    };
+
+    std::replace_if(this->begin(), this->end(), to_erase, std::nullopt);
+  }
+};
+
+template<size_t N>
+using owned_bytes = vector<uint8_t, N>;
+
 using input_bytes = gsl::span<const uint8_t>;
 using output_bytes = gsl::span<uint8_t>;
 
@@ -61,12 +190,12 @@ class Header
 public:
   const KeyID key_id;
   const Counter counter;
-  const size_t size;
 
   Header(KeyID key_id_in, Counter counter_in);
   static Header parse(input_bytes buffer);
 
-  input_bytes encoded() const;
+  input_bytes encoded() const { return _encoded; }
+  size_t size() const { return _encoded.size(); }
 
 private:
   // Just the configuration byte
@@ -75,12 +204,21 @@ private:
   // Configuration byte plus 8-byte KID and CTR
   static constexpr size_t max_size = 1 + 8 + 8;
 
-  std::array<uint8_t, max_size> buffer;
+  owned_bytes<max_size> _encoded;
 
-  Header(KeyID key_id_in,
-         Counter counter_in,
-         size_t size_in,
-         input_bytes encoded_in);
+  Header(KeyID key_id_in, Counter counter_in, input_bytes encoded_in);
+};
+
+struct KeyAndSalt
+{
+  static KeyAndSalt from_base_key(CipherSuite suite, input_bytes base_key);
+
+  static constexpr size_t max_key_size = 48;
+  static constexpr size_t max_salt_size = 12;
+
+  owned_bytes<max_key_size> key;
+  owned_bytes<max_salt_size> salt;
+  Counter counter;
 };
 
 // ContextBase represents the core SFrame encryption logic.  It remembers a set
@@ -96,7 +234,7 @@ public:
   ContextBase(CipherSuite suite_in);
   virtual ~ContextBase();
 
-  void add_key(KeyID kid, const bytes& key);
+  void add_key(KeyID kid, input_bytes key);
 
   output_bytes protect(const Header& header,
                        output_bytes ciphertext,
@@ -106,17 +244,10 @@ public:
                          input_bytes plaintext);
 
 protected:
-  struct KeyAndSalt
-  {
-    static KeyAndSalt from_base_key(CipherSuite suite, const bytes& base_key);
-
-    bytes key;
-    bytes salt;
-    Counter counter;
-  };
-
   CipherSuite suite;
-  std::map<KeyID, KeyAndSalt> keys;
+
+  static constexpr size_t max_keys = 200;
+  map<KeyID, KeyAndSalt, max_keys> keys;
 };
 
 // Context applies the full SFrame transform.  It tracks a counter for each key
@@ -128,7 +259,7 @@ public:
   Context(CipherSuite suite);
   virtual ~Context();
 
-  void add_key(KeyID kid, const bytes& key);
+  void add_key(KeyID kid, input_bytes key);
 
   output_bytes protect(KeyID key_id,
                        output_bytes ciphertext,
@@ -136,7 +267,8 @@ public:
   output_bytes unprotect(output_bytes plaintext, input_bytes ciphertext);
 
 protected:
-  std::map<KeyID, Counter> counters;
+  static constexpr size_t max_counters = 200;
+  map<KeyID, Counter, max_counters> counters;
 };
 
 // MLSContext augments Context with logic for deriving keys from MLS.  Instead
@@ -151,9 +283,9 @@ public:
 
   MLSContext(CipherSuite suite_in, size_t epoch_bits_in);
 
-  void add_epoch(EpochID epoch_id, const bytes& sframe_epoch_secret);
+  void add_epoch(EpochID epoch_id, input_bytes sframe_epoch_secret);
   void add_epoch(EpochID epoch_id,
-                 const bytes& sframe_epoch_secret,
+                 input_bytes sframe_epoch_secret,
                  size_t sender_bits);
   void purge_before(EpochID keeper);
 
@@ -172,18 +304,21 @@ public:
 private:
   struct EpochKeys
   {
-    const EpochID full_epoch;
-    const bytes sframe_epoch_secret;
+    static constexpr size_t max_secret_size = 64;
+
+    EpochID full_epoch;
+    owned_bytes<max_secret_size> sframe_epoch_secret;
     size_t sender_bits;
     size_t context_bits;
     uint64_t max_sender_id;
     uint64_t max_context_id;
 
     EpochKeys(EpochID full_epoch_in,
-              bytes sframe_epoch_secret_in,
+              input_bytes sframe_epoch_secret_in,
               size_t epoch_bits,
               size_t sender_bits_in);
-    bytes base_key(CipherSuite suite, SenderID sender_id) const;
+    owned_bytes<max_secret_size> base_key(CipherSuite suite,
+                                          SenderID sender_id) const;
   };
 
   void purge_epoch(EpochID epoch_id);
@@ -195,7 +330,10 @@ private:
 
   const size_t epoch_bits;
   const size_t epoch_mask;
-  std::vector<std::unique_ptr<EpochKeys>> epoch_cache;
+
+  // XXX(RLB) Make this an attribute of the class?
+  static constexpr size_t max_epochs = 10;
+  vector<std::optional<EpochKeys>, max_epochs> epoch_cache;
 };
 
 } // namespace sframe

@@ -3,36 +3,12 @@
 #include <openssl/err.h>
 #include <sframe/sframe.h>
 
-#include <iostream>
+#include "common.h"
+
 #include <map>       // for map
 #include <stdexcept> // for invalid_argument
-#include <string>    // for basic_string, operator==
 
 using namespace sframe;
-
-static bytes
-from_hex(const std::string& hex)
-{
-  if (hex.length() % 2 == 1) {
-    throw std::invalid_argument("Odd-length hex string");
-  }
-
-  auto len = int(hex.length() / 2);
-  auto out = bytes(len);
-  for (int i = 0; i < len; i += 1) {
-    auto byte = hex.substr(2 * i, 2);
-    out[i] = static_cast<uint8_t>(strtol(byte.c_str(), nullptr, 16));
-  }
-
-  return out;
-}
-
-template<typename T>
-bytes
-to_bytes(const T& range)
-{
-  return bytes(range.begin(), range.end());
-}
 
 TEST_CASE("Header Known-Answer")
 {
@@ -63,7 +39,7 @@ TEST_CASE("Header Known-Answer")
     const auto decoded = Header::parse(tc.encoding);
     REQUIRE(decoded.key_id == tc.key_id);
     REQUIRE(decoded.counter == tc.counter);
-    REQUIRE(decoded.size == tc.encoding.size());
+    REQUIRE(decoded.size() == tc.encoding.size());
 
     // Encode
     const auto to_encode = Header{ tc.key_id, tc.counter };

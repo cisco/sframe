@@ -118,37 +118,7 @@ cipher_nonce_size(CipherSuite suite)
 HMAC::HMAC(CipherSuite suite, input_bytes key)
   : ctx(HMAC_CTX_new(), HMAC_CTX_free)
 {
-  auto type = openssl_digest_type(suite);
-  auto key_size = static_cast<int>(key.size());
-  if (1 != HMAC_Init_ex(ctx.get(), key.data(), key_size, type, nullptr)) {
-    throw openssl_error();
-  }
-}
-
-void
-HMAC::write(input_bytes data)
-{
-  if (1 != HMAC_Update(ctx.get(), data.data(), data.size())) {
-    throw openssl_error();
-  }
-}
-
-input_bytes
-HMAC::digest()
-{
-  unsigned int size = 0;
-  if (1 != HMAC_Final(ctx.get(), md.data(), &size)) {
-    throw openssl_error();
-  }
-
-  return input_bytes(md.data(), size);
-}
-
-static bytes
-hmac_for_hkdf(CipherSuite suite, input_bytes key, input_bytes data)
-{
   const auto type = openssl_digest_type(suite);
-  auto ctx = scoped_hmac_ctx(HMAC_CTX_new(), HMAC_CTX_free);
 
   // Some FIPS-enabled libraries are overly conservative in their interpretation
   // of NIST SP 800-131A, which requires HMAC keys to be at least 112 bits long.
@@ -172,44 +142,56 @@ hmac_for_hkdf(CipherSuite suite, input_bytes key, input_bytes data)
   if (1 != HMAC_Init_ex(ctx.get(), key_data, key_size, type, nullptr)) {
     throw openssl_error();
   }
+}
 
+void
+HMAC::write(input_bytes data)
+{
   if (1 != HMAC_Update(ctx.get(), data.data(), data.size())) {
     throw openssl_error();
   }
+}
 
-  auto md = bytes(cipher_digest_size(suite));
-  unsigned int size = 0;
+HMAC::Output
+HMAC::digest()
+{
+  unsigned int size = int(0);
+  auto md = Output{};
   if (1 != HMAC_Final(ctx.get(), md.data(), &size)) {
     throw openssl_error();
   }
 
+  md.resize(static_cast<size_t>(size));
   return md;
 }
 
-bytes
-hkdf_extract(CipherSuite suite, const bytes& salt, const bytes& ikm)
+HMAC::Output
+hkdf_extract(CipherSuite suite, input_bytes salt, input_bytes ikm)
 {
-  return hmac_for_hkdf(suite, salt, ikm);
+  auto h = HMAC(suite, salt);
+  h.write(ikm);
+  return h.digest();
 }
 
 // For simplicity, we enforce that size <= Hash.length, so that
 // HKDF-Expand(Secret, Label) reduces to:
 //
 //   HMAC(Secret, Label || 0x01)
-bytes
-hkdf_expand(CipherSuite suite,
-            const bytes& secret,
-            const bytes& info,
-            size_t size)
+HMAC::Output
+hkdf_expand(CipherSuite suite, input_bytes prk, input_bytes info, size_t size)
 {
   // Ensure that we need only one hash invocation
   if (size > cipher_digest_size(suite)) {
     throw invalid_parameter_error("Size too big for hkdf_expand");
   }
 
-  auto label = info;
-  label.push_back(0x01);
-  auto mac = hmac_for_hkdf(suite, secret, label);
+  static const auto counter = owned_bytes<1>{ 0x01 };
+
+  auto h = HMAC(suite, prk);
+  h.write(info);
+  h.write(counter);
+
+  auto mac = h.digest();
   mac.resize(size);
   return mac;
 }
@@ -235,7 +217,7 @@ ctr_crypt(CipherSuite suite,
   }
 
   static auto padded_nonce =
-    std::array<uint8_t, 16>{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    owned_bytes<16>{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
   std::copy(nonce.begin(), nonce.end(), padded_nonce.begin());
 
   auto cipher = openssl_cipher(suite);
