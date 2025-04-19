@@ -129,9 +129,11 @@ TEST_CASE("SFrame Round-Trip")
   const auto kid = KeyID(0x42);
   const auto plaintext = from_hex("00010203");
   const std::map<CipherSuite, bytes> keys{
-    { CipherSuite::AES_CM_128_HMAC_SHA256_4,
+    { CipherSuite::AES_128_CTR_HMAC_SHA256_80,
+      from_hex("000102030405060708090a0b0c0d0e0f") },
+    { CipherSuite::AES_128_CTR_HMAC_SHA256_80,
       from_hex("101112131415161718191a1b1c1d1e1f") },
-    { CipherSuite::AES_CM_128_HMAC_SHA256_8,
+    { CipherSuite::AES_128_CTR_HMAC_SHA256_80,
       from_hex("202122232425262728292a2b2c2d2e2f") },
     { CipherSuite::AES_GCM_128_SHA256,
       from_hex("303132333435363738393a3b3c3d3e3f") },

@@ -99,17 +99,20 @@ struct AesCtrHmacTestVector
 
   void verify() const
   {
-#if 0 // TODO(RLB) Re-enable after updating crypto routines to match the spec
     // Seal
     auto ciphertext = bytes(ct.data.size());
     const auto ct_out = seal(cipher_suite, key, nonce, ciphertext, aad, pt);
+
+    const auto act_ct_hex = to_hex(ct_out);
+    const auto exp_ct_hex = to_hex(ct);
+    REQUIRE(act_ct_hex == exp_ct_hex);
+
     REQUIRE(ct_out == ct);
 
     // Open
     auto plaintext = bytes(pt.data.size());
     const auto pt_out = open(cipher_suite, key, nonce, plaintext, aad, ct);
     REQUIRE(pt_out == pt);
-#endif
   }
 };
 

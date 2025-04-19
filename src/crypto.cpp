@@ -1,4 +1,5 @@
 #include "crypto.h"
+#include "header.h"
 
 #include <openssl/err.h>
 #include <openssl/evp.h>
@@ -18,8 +19,9 @@ static const EVP_MD*
 openssl_digest_type(CipherSuite suite)
 {
   switch (suite) {
-    case CipherSuite::AES_CM_128_HMAC_SHA256_4:
-    case CipherSuite::AES_CM_128_HMAC_SHA256_8:
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_80:
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_64:
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_32:
     case CipherSuite::AES_GCM_128_SHA256:
       return EVP_sha256();
 
@@ -35,8 +37,9 @@ static const EVP_CIPHER*
 openssl_cipher(CipherSuite suite)
 {
   switch (suite) {
-    case CipherSuite::AES_CM_128_HMAC_SHA256_4:
-    case CipherSuite::AES_CM_128_HMAC_SHA256_8:
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_80:
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_64:
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_32:
       return EVP_aes_128_ctr();
 
     case CipherSuite::AES_GCM_128_SHA256:
@@ -50,15 +53,18 @@ openssl_cipher(CipherSuite suite)
   }
 }
 
-static size_t
-openssl_tag_size(CipherSuite suite)
+size_t
+overhead(CipherSuite suite)
 {
   switch (suite) {
-    case CipherSuite::AES_CM_128_HMAC_SHA256_4:
-      return 4;
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_80:
+      return 10;
 
-    case CipherSuite::AES_CM_128_HMAC_SHA256_8:
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_64:
       return 8;
+
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_32:
+      return 4;
 
     case CipherSuite::AES_GCM_128_SHA256:
     case CipherSuite::AES_GCM_256_SHA512:
@@ -83,8 +89,9 @@ size_t
 cipher_key_size(CipherSuite suite)
 {
   switch (suite) {
-    case CipherSuite::AES_CM_128_HMAC_SHA256_4:
-    case CipherSuite::AES_CM_128_HMAC_SHA256_8:
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_80:
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_64:
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_32:
     case CipherSuite::AES_GCM_128_SHA256:
       return 16;
 
@@ -100,8 +107,9 @@ size_t
 cipher_nonce_size(CipherSuite suite)
 {
   switch (suite) {
-    case CipherSuite::AES_CM_128_HMAC_SHA256_4:
-    case CipherSuite::AES_CM_128_HMAC_SHA256_8:
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_80:
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_64:
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_32:
     case CipherSuite::AES_GCM_128_SHA256:
     case CipherSuite::AES_GCM_256_SHA512:
       return 12;
@@ -200,6 +208,31 @@ hkdf_expand(CipherSuite suite, input_bytes prk, input_bytes info, size_t size)
 /// AEAD Algorithms
 ///
 
+static HMAC::Output
+compute_tag(CipherSuite suite,
+            input_bytes auth_key,
+            input_bytes nonce,
+            input_bytes aad,
+            input_bytes ct,
+            size_t tag_size)
+{
+  auto len_block = owned_bytes<24>();
+  auto len_view = output_bytes(len_block);
+  encode_uint(aad.size(), len_view.first(8));
+  encode_uint(ct.size(), len_view.subspan(8).first(8));
+  encode_uint(tag_size, len_view.subspan(16));
+
+  auto h = HMAC(suite, auth_key);
+  h.write(len_block);
+  h.write(nonce);
+  h.write(aad);
+  h.write(ct);
+
+  auto tag = h.digest();
+  tag.resize(tag_size);
+  return tag;
+}
+
 static void
 ctr_crypt(CipherSuite suite,
           input_bytes key,
@@ -246,26 +279,22 @@ seal_ctr(CipherSuite suite,
          input_bytes aad,
          input_bytes pt)
 {
-  auto tag_size = openssl_tag_size(suite);
+  auto tag_size = overhead(suite);
   if (ct.size() < pt.size() + tag_size) {
     throw buffer_too_small_error("Ciphertext buffer too small");
   }
 
   // Split the key into enc and auth subkeys
-  auto key_span = input_bytes(key);
   auto enc_key_size = cipher_key_size(suite);
-  auto enc_key = key_span.subspan(0, enc_key_size);
-  auto auth_key = key_span.subspan(enc_key_size);
+  auto enc_key = key.first(enc_key_size);
+  auto auth_key = key.subspan(enc_key_size);
 
   // Encrypt with AES-CM
   auto inner_ct = ct.subspan(0, pt.size());
   ctr_crypt(suite, enc_key, nonce, inner_ct, pt);
 
   // Authenticate with truncated HMAC
-  auto hmac = HMAC(suite, auth_key);
-  hmac.write(aad);
-  hmac.write(inner_ct);
-  auto mac = hmac.digest();
+  auto mac = compute_tag(suite, auth_key, nonce, aad, inner_ct, tag_size);
   auto tag = ct.subspan(pt.size(), tag_size);
   std::copy(mac.begin(), mac.begin() + tag_size, tag.begin());
 
@@ -280,7 +309,7 @@ seal_aead(CipherSuite suite,
           input_bytes aad,
           input_bytes pt)
 {
-  auto tag_size = openssl_tag_size(suite);
+  auto tag_size = overhead(suite);
   if (ct.size() < pt.size() + tag_size) {
     throw buffer_too_small_error("Ciphertext buffer too small");
   }
@@ -327,22 +356,6 @@ seal_aead(CipherSuite suite,
   return ct.subspan(0, pt.size() + tag_size);
 }
 
-size_t
-overhead(CipherSuite suite)
-{
-  switch (suite) {
-    case CipherSuite::AES_CM_128_HMAC_SHA256_4:
-      return 4;
-
-    case CipherSuite::AES_CM_128_HMAC_SHA256_8:
-      return 8;
-
-    case CipherSuite::AES_GCM_128_SHA256:
-    case CipherSuite::AES_GCM_256_SHA512:
-      return 16;
-  }
-}
-
 output_bytes
 seal(CipherSuite suite,
      input_bytes key,
@@ -352,8 +365,9 @@ seal(CipherSuite suite,
      input_bytes pt)
 {
   switch (suite) {
-    case CipherSuite::AES_CM_128_HMAC_SHA256_4:
-    case CipherSuite::AES_CM_128_HMAC_SHA256_8: {
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_80:
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_64:
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_32: {
       return seal_ctr(suite, key, nonce, ct, aad, pt);
     }
 
@@ -374,7 +388,7 @@ open_ctr(CipherSuite suite,
          input_bytes aad,
          input_bytes ct)
 {
-  auto tag_size = openssl_tag_size(suite);
+  auto tag_size = overhead(suite);
   if (ct.size() < tag_size) {
     throw buffer_too_small_error("Ciphertext buffer too small");
   }
@@ -384,21 +398,17 @@ open_ctr(CipherSuite suite,
   auto tag = ct.subspan(inner_ct_size, tag_size);
 
   // Split the key into enc and auth subkeys
-  auto key_span = input_bytes(key);
   auto enc_key_size = cipher_key_size(suite);
-  auto enc_key = key_span.subspan(0, enc_key_size);
-  auto auth_key = key_span.subspan(enc_key_size);
+  auto enc_key = key.first(enc_key_size);
+  auto auth_key = key.subspan(enc_key_size);
 
   // Authenticate with truncated HMAC
-  auto hmac = HMAC(suite, auth_key);
-  hmac.write(aad);
-  hmac.write(inner_ct);
-  auto mac = hmac.digest();
+  auto mac = compute_tag(suite, auth_key, nonce, aad, inner_ct, tag_size);
   if (CRYPTO_memcmp(mac.data(), tag.data(), tag.size()) != 0) {
     throw authentication_error();
   }
 
-  // Decrypt with AES-CM
+  // Decrypt with AES-CTR
   ctr_crypt(suite, enc_key, nonce, pt, ct.subspan(0, inner_ct_size));
 
   return pt.subspan(0, inner_ct_size);
@@ -412,7 +422,7 @@ open_aead(CipherSuite suite,
           input_bytes aad,
           input_bytes ct)
 {
-  auto tag_size = openssl_tag_size(suite);
+  auto tag_size = overhead(suite);
   if (ct.size() < tag_size) {
     throw buffer_too_small_error("Ciphertext buffer too small");
   }
@@ -473,8 +483,9 @@ open(CipherSuite suite,
      input_bytes ct)
 {
   switch (suite) {
-    case CipherSuite::AES_CM_128_HMAC_SHA256_4:
-    case CipherSuite::AES_CM_128_HMAC_SHA256_8: {
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_80:
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_64:
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_32: {
       return open_ctr(suite, key, nonce, pt, aad, ct);
     }
 

@@ -112,8 +112,9 @@ KeyAndSalt::from_base_key(CipherSuite suite, input_bytes base_key)
   auto salt = hkdf_expand(suite, secret, sframe_salt_label, nonce_size);
 
   // If using CTR+HMAC, set key = enc_key || auth_key
-  if (suite == CipherSuite::AES_CM_128_HMAC_SHA256_4 ||
-      suite == CipherSuite::AES_CM_128_HMAC_SHA256_8) {
+  if (suite == CipherSuite::AES_128_CTR_HMAC_SHA256_80 ||
+      suite == CipherSuite::AES_128_CTR_HMAC_SHA256_64 ||
+      suite == CipherSuite::AES_128_CTR_HMAC_SHA256_32) {
     secret = hkdf_extract(suite, sframe_ctr_label, key);
 
     auto enc_key = hkdf_expand(suite, secret, sframe_enc_label, key_size);
