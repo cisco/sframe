@@ -156,8 +156,8 @@ TEST_CASE("SFrame Round-Trip")
     recv.add_key(kid, key);
 
     for (int i = 0; i < rounds; i++) {
-      auto encrypted = to_bytes(send.protect(kid, ct_out, plaintext));
-      auto decrypted = to_bytes(recv.unprotect(pt_out, encrypted));
+      auto encrypted = to_bytes(send.protect(kid, ct_out, plaintext, {}));
+      auto decrypted = to_bytes(recv.unprotect(pt_out, encrypted, {}));
       CHECK(decrypted == plaintext);
     }
   }

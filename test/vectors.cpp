@@ -149,11 +149,11 @@ struct SFrameTestVector
     auto ct_data = owned_bytes<128>();
     auto next_ctr = uint64_t(0);
     while (next_ctr < ctr) {
-      send_ctx.protect(kid, ct_data, pt);
+      send_ctx.protect(kid, ct_data, pt, metadata);
       next_ctr += 1;
     }
 
-    const auto ct_out = send_ctx.protect(kid, ct_data, pt);
+    const auto ct_out = send_ctx.protect(kid, ct_data, pt, metadata);
 
     const auto act_ct_hex = to_hex(ct_out);
     const auto exp_ct_hex = to_hex(ct);
@@ -166,7 +166,7 @@ struct SFrameTestVector
     recv_ctx.add_key(kid, base_key);
 
     auto pt_data = owned_bytes<128>();
-    auto pt_out = recv_ctx.unprotect(pt_data, ct);
+    auto pt_out = recv_ctx.unprotect(pt_data, ct, metadata);
     CHECK(pt_out == pt);
   }
 };

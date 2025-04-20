@@ -203,26 +203,22 @@ hkdf_expand(CipherSuite suite, input_bytes prk, input_bytes info, size_t size)
     throw invalid_parameter_error("Size too big for hkdf_expand");
   }
 
-  auto out = owned_bytes<max_hkdf_extract_size>();
-  out.resize(size);
-  auto out_view = output_bytes(out);
+  auto out = owned_bytes<max_hkdf_extract_size>(0);
 
-  auto block = HMAC::Output();
-  block.resize(0);
-
+  auto block = HMAC::Output(0);
   const auto block_size = cipher_digest_size(suite);
   auto counter = uint8_t(0x01);
-  for (auto start = size_t(0); start < out.size(); start += block_size) {
+  while (out.size() < size) {
+  // for (auto start = size_t(0); start < out.size(); start += block_size) {
     auto h = HMAC(suite, prk);
     h.write(block);
     h.write(info);
     h.write(owned_bytes<1>{ counter });
     block = h.digest();
 
-    const auto remaining = out.size() - start;
-    const auto to_write = (remaining < block_size)?  remaining : block_size;
-    const auto out_block = out_view.subspan(start).first(to_write);
-    std::copy(block.begin(), block.begin() + to_write, out_block.begin());
+    const auto remaining = size - out.size();
+    const auto to_write = (remaining < block_size) ? remaining : block_size;
+    out.append(input_bytes(block).first(to_write));
 
     counter += 1;
   }
@@ -275,9 +271,9 @@ ctr_crypt(CipherSuite suite,
     throw openssl_error();
   }
 
-  static auto padded_nonce =
-    owned_bytes<16>{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-  std::copy(nonce.begin(), nonce.end(), padded_nonce.begin());
+  auto padded_nonce = owned_bytes<16>(0);
+  padded_nonce.append(nonce);
+  padded_nonce.resize(16);
 
   auto cipher = openssl_cipher(suite);
   if (1 !=
@@ -435,9 +431,10 @@ open_ctr(CipherSuite suite,
   }
 
   // Decrypt with AES-CTR
-  ctr_crypt(suite, enc_key, nonce, pt, ct.subspan(0, inner_ct_size));
+  const auto pt_out = pt.first(inner_ct_size);
+  ctr_crypt(suite, enc_key, nonce, pt_out, ct.first(inner_ct_size));
 
-  return pt.subspan(0, inner_ct_size);
+  return pt_out;
 }
 
 static output_bytes

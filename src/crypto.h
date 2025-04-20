@@ -40,7 +40,6 @@ private:
   scoped_hmac_ctx ctx;
 };
 
-
 HMAC::Output
 hkdf_extract(CipherSuite suite, input_bytes salt, input_bytes ikm);
 
