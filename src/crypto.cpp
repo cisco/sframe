@@ -195,27 +195,39 @@ hkdf_extract(CipherSuite suite, input_bytes salt, input_bytes ikm)
   return h.digest();
 }
 
-// For simplicity, we enforce that size <= Hash.length, so that
-// HKDF-Expand(Secret, Label) reduces to:
-//
-//   HMAC(Secret, Label || 0x01)
-HMAC::Output
+owned_bytes<max_hkdf_extract_size>
 hkdf_expand(CipherSuite suite, input_bytes prk, input_bytes info, size_t size)
 {
   // Ensure that we need only one hash invocation
-  if (size > cipher_digest_size(suite)) {
+  if (size > max_hkdf_extract_size) {
     throw invalid_parameter_error("Size too big for hkdf_expand");
   }
 
-  static const auto counter = owned_bytes<1>{ 0x01 };
+  auto out = owned_bytes<max_hkdf_extract_size>();
+  out.resize(size);
+  auto out_view = output_bytes(out);
 
-  auto h = HMAC(suite, prk);
-  h.write(info);
-  h.write(counter);
+  auto block = HMAC::Output();
+  block.resize(0);
 
-  auto mac = h.digest();
-  mac.resize(size);
-  return mac;
+  const auto block_size = cipher_digest_size(suite);
+  auto counter = uint8_t(0x01);
+  for (auto start = size_t(0); start < out.size(); start += block_size) {
+    auto h = HMAC(suite, prk);
+    h.write(block);
+    h.write(info);
+    h.write(owned_bytes<1>{ counter });
+    block = h.digest();
+
+    const auto remaining = out.size() - start;
+    const auto to_write = (remaining < block_size)?  remaining : block_size;
+    const auto out_block = out_view.subspan(start).first(to_write);
+    std::copy(block.begin(), block.begin() + to_write, out_block.begin());
+
+    counter += 1;
+  }
+
+  return out;
 }
 
 ///

@@ -157,9 +157,9 @@ struct SFrameTestVector
 
     const auto act_ct_hex = to_hex(ct_out);
     const auto exp_ct_hex = to_hex(ct);
-    REQUIRE(act_ct_hex == exp_ct_hex);
+    CHECK(act_ct_hex == exp_ct_hex);
 
-    REQUIRE(ct_out == ct);
+    CHECK(ct_out == ct);
 
     // Unprotect
     auto recv_ctx = Context(cipher_suite);
@@ -167,7 +167,7 @@ struct SFrameTestVector
 
     auto pt_data = owned_bytes<128>();
     auto pt_out = recv_ctx.unprotect(pt_data, ct);
-    REQUIRE(pt_out == pt);
+    CHECK(pt_out == pt);
   }
 };
 

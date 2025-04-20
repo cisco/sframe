@@ -40,10 +40,13 @@ private:
   scoped_hmac_ctx ctx;
 };
 
+
 HMAC::Output
 hkdf_extract(CipherSuite suite, input_bytes salt, input_bytes ikm);
 
-HMAC::Output
+static constexpr size_t max_hkdf_extract_size = 48;
+
+owned_bytes<max_hkdf_extract_size>
 hkdf_expand(CipherSuite suite, input_bytes prk, input_bytes info, size_t size);
 
 ///
