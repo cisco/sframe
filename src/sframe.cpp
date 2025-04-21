@@ -94,20 +94,18 @@ ContextBase::unprotect(const Header& header,
   return open(suite, key_and_salt.key, nonce, plaintext, aad, ciphertext);
 }
 
-static const owned_bytes<8> sframe_label{
-  0x53, 0x46, 0x72, 0x61, 0x6d, 0x65, 0x31, 0x30 // "ContextBase10"
-};
+static auto from_ascii(const char* str) {
+  const auto ptr = reinterpret_cast<const uint8_t*>(str);
+  return input_bytes(ptr, strlen(str));
+}
 
-static const owned_bytes<20> sframe_ctr_label{
-  // "ContextBase10 AES CM AEAD"
-  0x53, 0x46, 0x72, 0x61, 0x6d, 0x65, 0x31, 0x30, 0x20, 0x41,
-  0x45, 0x53, 0x20, 0x43, 0x4d, 0x20, 0x41, 0x45, 0x41, 0x44,
-};
-static const owned_bytes<3> sframe_enc_label{ 0x65, 0x6e, 0x63 }; // "enc"
-static const owned_bytes<4> sframe_auth_label{ 0x61,
-                                               0x75,
-                                               0x74,
-                                               0x68 }; // "auth"
+static const auto sframe_label = from_ascii("ContextBase10");
+static const auto sframe_key_label = from_ascii("key");
+static const auto sframe_salt_label = from_ascii("salt");
+
+static const auto sframe_ctr_label = from_ascii("ContextBase10 AES CM AEAD");
+static const auto sframe_enc_label = from_ascii("enc");
+static const auto sframe_auth_label = from_ascii("auth");
 
 owned_bytes<32>
 sframe_key_label(CipherSuite suite, KeyID key_id)
