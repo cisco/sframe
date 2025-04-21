@@ -3,8 +3,6 @@
 #include <openssl/hmac.h>
 #include <sframe/sframe.h>
 
-#include <array>
-
 namespace sframe {
 
 ///
@@ -32,22 +30,21 @@ cipher_nonce_size(CipherSuite suite);
 
 struct HMAC
 {
+  using Output = owned_bytes<EVP_MAX_MD_SIZE>;
+
   HMAC(CipherSuite suite, input_bytes key);
   void write(input_bytes data);
-  input_bytes digest();
+  Output digest();
 
+private:
   scoped_hmac_ctx ctx;
-  std::array<uint8_t, EVP_MAX_MD_SIZE> md;
 };
 
-bytes
-hkdf_extract(CipherSuite suite, const bytes& salt, const bytes& ikm);
+HMAC::Output
+hkdf_extract(CipherSuite suite, input_bytes salt, input_bytes ikm);
 
-bytes
-hkdf_expand(CipherSuite suite,
-            const bytes& secret,
-            const bytes& info,
-            size_t size);
+HMAC::Output
+hkdf_expand(CipherSuite suite, input_bytes prk, input_bytes info, size_t size);
 
 ///
 /// AEAD Algorithms
