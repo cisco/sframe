@@ -366,7 +366,7 @@ MLSContext::ensure_key(KeyID key_id)
                                   std::to_string(epoch_index));
   }
 
-  if (!keys.contains(key_id)) {
+  if (keys.contains(key_id)) {
     return;
   }
 
