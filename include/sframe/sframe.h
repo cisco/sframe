@@ -113,7 +113,8 @@ public:
     _data.at(_size - 1) = item;
   }
 
-  void append(input_bytes content) {
+  void append(input_bytes content)
+  {
     const auto start = _size;
     resize(_size + content.size());
     std::copy(content.begin(), content.end(), begin() + start);

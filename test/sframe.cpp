@@ -166,8 +166,8 @@ TEST_CASE("MLS Round-Trip with context")
 
         CHECK(to_bytes(encrypted_ab_0) != to_bytes(encrypted_ab_1));
 
-        auto encrypted_ba =
-          member_b.protect(epoch_id, sender_id_b, ct_out_0, plaintext, metadata);
+        auto encrypted_ba = member_b.protect(
+          epoch_id, sender_id_b, ct_out_0, plaintext, metadata);
         auto decrypted_ba_0 =
           to_bytes(member_a_0.unprotect(pt_out, encrypted_ba, metadata));
         auto decrypted_ba_1 =
@@ -215,8 +215,9 @@ TEST_CASE("MLS Failure after Purge")
   member_a.purge_before(epoch_id_2);
   member_b.purge_before(epoch_id_2);
 
-  CHECK_THROWS_AS(member_a.protect(epoch_id_1, sender_id_a, ct_out, plaintext, metadata),
-                  invalid_parameter_error);
+  CHECK_THROWS_AS(
+    member_a.protect(epoch_id_1, sender_id_a, ct_out, plaintext, metadata),
+    invalid_parameter_error);
   CHECK_THROWS_AS(member_b.unprotect(pt_out, enc_ab_1_data, metadata),
                   invalid_parameter_error);
 
