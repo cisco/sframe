@@ -45,9 +45,6 @@ constexpr size_t max_overhead = 17 + 16;
 using input_bytes = gsl::span<const uint8_t>;
 using output_bytes = gsl::span<uint8_t>;
 
-std::ostream&
-operator<<(std::ostream& str, const input_bytes data);
-
 using KeyID = uint64_t;
 using Counter = uint64_t;
 

@@ -241,8 +241,8 @@ compute_tag(CipherSuite suite,
   auto len_block = owned_bytes<24>();
   auto len_view = output_bytes(len_block);
   encode_uint(aad.size(), len_view.first(8));
-  encode_uint(ct.size(), len_view.subspan(8).first(8));
-  encode_uint(tag_size, len_view.subspan(16));
+  encode_uint(ct.size(), len_view.first(16).last(8));
+  encode_uint(tag_size, len_view.last(8));
 
   auto h = HMAC(suite, auth_key);
   h.write(len_block);
