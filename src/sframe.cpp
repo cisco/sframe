@@ -99,56 +99,16 @@ static auto from_ascii(const char* str) {
   return input_bytes(ptr, strlen(str));
 }
 
-static const auto sframe_label = from_ascii("ContextBase10");
-static const auto sframe_key_label = from_ascii("key");
-static const auto sframe_salt_label = from_ascii("salt");
-
-static const auto sframe_ctr_label = from_ascii("ContextBase10 AES CM AEAD");
-static const auto sframe_enc_label = from_ascii("enc");
-static const auto sframe_auth_label = from_ascii("auth");
+static const auto base_label = from_ascii("SFrame 1.0 Secret ");
+static const auto key_label = from_ascii("key ");
+static const auto salt_label = from_ascii("salt ");
 
 owned_bytes<32>
 sframe_key_label(CipherSuite suite, KeyID key_id)
 {
-  auto label = owned_bytes<32>{
-    // "SFrame 1.0 Secret key "
-    0x53,
-    0x46,
-    0x72,
-    0x61,
-    0x6d,
-    0x65,
-    0x20,
-    0x31,
-    0x2e,
-    0x30,
-    0x20,
-    0x53,
-    0x65,
-    0x63,
-    0x72,
-    0x65,
-    0x74,
-    0x20,
-    0x6b,
-    0x65,
-    0x79,
-    0x20,
-
-    // Encoded KID
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-
-    // Encoded CipherSuite
-    0x00,
-    0x00,
-  };
+  auto label = owned_bytes<32>(base_label);
+  label.append(key_label);
+  label.resize(32);
 
   auto label_data = output_bytes(label);
   encode_uint(key_id, label_data.subspan(22).first(8));
@@ -160,51 +120,13 @@ sframe_key_label(CipherSuite suite, KeyID key_id)
 owned_bytes<33>
 sframe_salt_label(CipherSuite suite, KeyID key_id)
 {
-  // TODO
-  auto label = owned_bytes<33>{
-    // "SFrame 1.0 Secret salt "
-    0x53,
-    0x46,
-    0x72,
-    0x61,
-    0x6d,
-    0x65,
-    0x20,
-    0x31,
-    0x2e,
-    0x30,
-    0x20,
-    0x53,
-    0x65,
-    0x63,
-    0x72,
-    0x65,
-    0x74,
-    0x20,
-    0x73,
-    0x61,
-    0x6c,
-    0x74,
-    0x20,
-
-    // Encoded KID
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-
-    // Encoded CipherSuite
-    0x00,
-    0x00,
-  };
+  auto label = owned_bytes<33>(base_label);
+  label.append(salt_label);
+  label.resize(33);
 
   auto label_data = output_bytes(label);
-  encode_uint(key_id, label_data.subspan(23).first(8));
-  encode_uint(static_cast<uint64_t>(suite), label_data.subspan(31));
+  encode_uint(key_id, label_data.last(10).first(8));
+  encode_uint(static_cast<uint64_t>(suite), label_data.last(2));
 
   return label;
 }
