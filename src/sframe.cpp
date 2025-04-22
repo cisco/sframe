@@ -95,15 +95,15 @@ ContextBase::unprotect(const Header& header,
 }
 
 static auto
-from_ascii(const char* str)
+from_ascii(const char* str, size_t len)
 {
   const auto ptr = reinterpret_cast<const uint8_t*>(str);
-  return input_bytes(ptr, strlen(str));
+  return input_bytes(ptr, len);
 }
 
-static const auto base_label = from_ascii("SFrame 1.0 Secret ");
-static const auto key_label = from_ascii("key ");
-static const auto salt_label = from_ascii("salt ");
+static const auto base_label = from_ascii("SFrame 1.0 Secret ", 18);
+static const auto key_label = from_ascii("key ", 4);
+static const auto salt_label = from_ascii("salt ", 5);
 
 owned_bytes<32>
 sframe_key_label(CipherSuite suite, KeyID key_id)
