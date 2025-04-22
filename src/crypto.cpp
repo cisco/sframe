@@ -209,7 +209,7 @@ hkdf_expand(CipherSuite suite, input_bytes prk, input_bytes info, size_t size)
   const auto block_size = cipher_digest_size(suite);
   auto counter = uint8_t(0x01);
   while (out.size() < size) {
-  // for (auto start = size_t(0); start < out.size(); start += block_size) {
+    // for (auto start = size_t(0); start < out.size(); start += block_size) {
     auto h = HMAC(suite, prk);
     h.write(block);
     h.write(info);

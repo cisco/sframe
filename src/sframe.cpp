@@ -94,7 +94,9 @@ ContextBase::unprotect(const Header& header,
   return open(suite, key_and_salt.key, nonce, plaintext, aad, ciphertext);
 }
 
-static auto from_ascii(const char* str) {
+static auto
+from_ascii(const char* str)
+{
   const auto ptr = reinterpret_cast<const uint8_t*>(str);
   return input_bytes(ptr, strlen(str));
 }
@@ -366,7 +368,7 @@ MLSContext::ensure_key(KeyID key_id)
                                   std::to_string(epoch_index));
   }
 
-  if (!keys.contains(key_id)) {
+  if (keys.contains(key_id)) {
     return;
   }
 

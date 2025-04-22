@@ -95,7 +95,7 @@ public:
   auto begin() { return _data.begin(); }
 
   auto end() const { return _data.begin() + _size; }
-  auto end() { return _data.end() + _size; }
+  auto end() { return _data.begin() + _size; }
 
   auto size() const { return _size; }
   void resize(size_t size)
@@ -113,7 +113,8 @@ public:
     _data.at(_size - 1) = item;
   }
 
-  void append(input_bytes content) {
+  void append(input_bytes content)
+  {
     const auto start = _size;
     resize(_size + content.size());
     std::copy(content.begin(), content.end(), begin() + start);
@@ -142,14 +143,14 @@ public:
     pos->emplace(args...);
   }
 
-  auto find(const K& key) const
+  auto find(const K& key)
   {
     return std::find_if(this->begin(), this->end(), [&](const auto& pair) {
       return pair && pair.value().first == key;
     });
   }
 
-  auto find(const K& key)
+  auto find(const K& key) const
   {
     return std::find_if(this->begin(), this->end(), [&](const auto& pair) {
       return pair && pair.value().first == key;
@@ -352,7 +353,7 @@ private:
   const size_t epoch_mask;
 
   // XXX(RLB) Make this an attribute of the class?
-  static constexpr size_t max_epochs = 10;
+  static constexpr size_t max_epochs = 16;
   vector<std::optional<EpochKeys>, max_epochs> epoch_cache;
 };
 
