@@ -22,6 +22,9 @@ ${BUILD_DIR}: CMakeLists.txt test/CMakeLists.txt
 dev: CMakeLists.txt test/CMakeLists.txt
 	cmake -B${BUILD_DIR} -DCMAKE_BUILD_TYPE=Debug -DCLANG_TIDY=ON -DTESTING=ON -DSANITIZERS=ON .
 
+dev3: CMakeLists.txt test/CMakeLists.txt
+	cmake -B${BUILD_DIR} -DCMAKE_BUILD_TYPE=Debug -DCLANG_TIDY=ON -DTESTING=ON -DSANITIZERS=ON -DCRYPTO=OPENSSL_3 .
+
 ${TEST_BIN}: ${LIB} test/*
 	cmake --build ${BUILD_DIR} --target sframe_test
 

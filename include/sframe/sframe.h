@@ -63,9 +63,9 @@ public:
   }
 
   constexpr vector(size_t size)
-    : _size(size)
   {
     std::fill(_data.begin(), _data.end(), T());
+    resize(size);
   }
 
   constexpr vector(std::initializer_list<uint8_t> content)
