@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cassert>
 #include <gsl/gsl-lite.hpp>
 
 namespace sframe {
@@ -34,13 +33,20 @@ struct invalid_parameter_error : std::runtime_error
 
 enum class CipherSuite : uint16_t
 {
-  AES_CM_128_HMAC_SHA256_4 = 1,
-  AES_CM_128_HMAC_SHA256_8 = 2,
-  AES_GCM_128_SHA256 = 3,
-  AES_GCM_256_SHA512 = 4,
+  AES_128_CTR_HMAC_SHA256_80 = 1,
+  AES_128_CTR_HMAC_SHA256_64 = 2,
+  AES_128_CTR_HMAC_SHA256_32 = 3,
+  AES_GCM_128_SHA256 = 4,
+  AES_GCM_256_SHA512 = 5,
 };
 
 constexpr size_t max_overhead = 17 + 16;
+
+using input_bytes = gsl::span<const uint8_t>;
+using output_bytes = gsl::span<uint8_t>;
+
+using KeyID = uint64_t;
+using Counter = uint64_t;
 
 template<typename T, size_t N>
 class vector
@@ -52,6 +58,12 @@ private:
 public:
   constexpr vector()
     : _size(N)
+  {
+    std::fill(_data.begin(), _data.end(), T());
+  }
+
+  constexpr vector(size_t size)
+    : _size(size)
   {
     std::fill(_data.begin(), _data.end(), T());
   }
@@ -68,6 +80,8 @@ public:
     std::copy(content.begin(), content.end(), _data.begin());
   }
 
+  // XXX(RLB) This constructor seems redundant with the prior one, but for some
+  // reason the compiler won't auto-convert from vector to span.
   template<size_t M>
   constexpr vector(const vector<T, M>& content)
   {
@@ -86,7 +100,10 @@ public:
   auto size() const { return _size; }
   void resize(size_t size)
   {
-    assert(size <= N);
+    if (size > N) {
+      throw std::out_of_range("vector out of space");
+    }
+
     _size = size;
   }
 
@@ -96,11 +113,10 @@ public:
     _data.at(_size - 1) = item;
   }
 
-  void append(gsl::span<const T> content)
-  {
-    const auto original_size = _size;
+  void append(input_bytes content) {
+    const auto start = _size;
     resize(_size + content.size());
-    std::copy(content.begin(), content.end(), _data.begin() + original_size);
+    std::copy(content.begin(), content.end(), begin() + start);
   }
 
   auto& operator[](size_t i) { return _data.at(i); }
@@ -176,15 +192,6 @@ public:
 template<size_t N>
 using owned_bytes = vector<uint8_t, N>;
 
-using input_bytes = gsl::span<const uint8_t>;
-using output_bytes = gsl::span<uint8_t>;
-
-std::ostream&
-operator<<(std::ostream& str, const input_bytes data);
-
-using KeyID = uint64_t;
-using Counter = uint64_t;
-
 class Header
 {
 public:
@@ -197,12 +204,12 @@ public:
   input_bytes encoded() const { return _encoded; }
   size_t size() const { return _encoded.size(); }
 
+  // Configuration byte plus 8-byte KID and CTR
+  static constexpr size_t max_size = 1 + 8 + 8;
+
 private:
   // Just the configuration byte
   static constexpr size_t min_size = 1;
-
-  // Configuration byte plus 8-byte KID and CTR
-  static constexpr size_t max_size = 1 + 8 + 8;
 
   owned_bytes<max_size> _encoded;
 
@@ -211,7 +218,9 @@ private:
 
 struct KeyAndSalt
 {
-  static KeyAndSalt from_base_key(CipherSuite suite, input_bytes base_key);
+  static KeyAndSalt from_base_key(CipherSuite suite,
+                                  KeyID key_id,
+                                  input_bytes base_key);
 
   static constexpr size_t max_key_size = 48;
   static constexpr size_t max_salt_size = 12;
@@ -238,10 +247,14 @@ public:
 
   output_bytes protect(const Header& header,
                        output_bytes ciphertext,
-                       input_bytes plaintext);
+                       input_bytes plaintext,
+                       input_bytes metadata);
   output_bytes unprotect(const Header& header,
                          output_bytes ciphertext,
-                         input_bytes plaintext);
+                         input_bytes plaintext,
+                         input_bytes metadata);
+
+  static constexpr size_t max_aad_size = Header::max_size + 512;
 
 protected:
   CipherSuite suite;
@@ -263,8 +276,11 @@ public:
 
   output_bytes protect(KeyID key_id,
                        output_bytes ciphertext,
-                       input_bytes plaintext);
-  output_bytes unprotect(output_bytes plaintext, input_bytes ciphertext);
+                       input_bytes plaintext,
+                       input_bytes metadata);
+  output_bytes unprotect(output_bytes plaintext,
+                         input_bytes ciphertext,
+                         input_bytes metadata);
 
 protected:
   static constexpr size_t max_counters = 200;
@@ -292,14 +308,18 @@ public:
   output_bytes protect(EpochID epoch_id,
                        SenderID sender_id,
                        output_bytes ciphertext,
-                       input_bytes plaintext);
+                       input_bytes plaintext,
+                       input_bytes metadata);
   output_bytes protect(EpochID epoch_id,
                        SenderID sender_id,
                        ContextID context_id,
                        output_bytes ciphertext,
-                       input_bytes plaintext);
+                       input_bytes plaintext,
+                       input_bytes metadata);
 
-  output_bytes unprotect(output_bytes plaintext, input_bytes ciphertext);
+  output_bytes unprotect(output_bytes plaintext,
+                         input_bytes ciphertext,
+                         input_bytes metadata);
 
 private:
   struct EpochKeys
