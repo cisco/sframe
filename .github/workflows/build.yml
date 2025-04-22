@@ -32,6 +32,7 @@ jobs:
     env:
       CMAKE_BUILD_DIR: ${{ github.workspace }}/build
       CMAKE_TEST_DIR: ${{ github.workspace }}/build/test
+      CMAKE_MAKE_PROGRAM: "Ninja"
 
     steps:
     - uses: actions/checkout@v4
