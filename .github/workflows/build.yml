@@ -34,7 +34,7 @@ jobs:
       CMAKE_TEST_DIR: ${{ github.workspace }}/build/test
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
 
     - name: dependencies (macos)
       if: ${{ matrix.os == 'macos-latest' }}
@@ -44,7 +44,7 @@ jobs:
         ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
 
     - name: Restore cache
-      uses: actions/cache@v2
+      uses: actions/cache@v4
       with:
         path: |
             ${{ env.CMAKE_BUILD_DIR }}/vcpkg_installed
