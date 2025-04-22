@@ -3,16 +3,16 @@ name: Check Formatting
 on:
   push:
     branches:
-      - master
+      - main
   pull_request:
     branches:
-      - master
+      - main
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
     - name: check clang-format
       uses: jidicula/clang-format-action@v2.0.0
 
