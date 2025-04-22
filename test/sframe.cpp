@@ -15,10 +15,12 @@ using namespace sframe;
 static void
 ensure_fips_if_required()
 {
+#if defined(OPENSSL_1_1)
   const auto* require = std::getenv("REQUIRE_FIPS");
   if (require && FIPS_mode() == 0) {
     REQUIRE(FIPS_mode_set(1) == 1);
   }
+#endif
 }
 
 TEST_CASE("SFrame Round-Trip")

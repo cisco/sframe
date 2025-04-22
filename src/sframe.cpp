@@ -62,7 +62,7 @@ ContextBase::protect(const Header& header,
                      input_bytes plaintext,
                      input_bytes metadata)
 {
-  if (ciphertext.size() < plaintext.size() + overhead(suite)) {
+  if (ciphertext.size() < plaintext.size() + cipher_overhead(suite)) {
     throw buffer_too_small_error("Ciphertext too small for cipher overhead");
   }
 
@@ -79,11 +79,11 @@ ContextBase::unprotect(const Header& header,
                        input_bytes ciphertext,
                        input_bytes metadata)
 {
-  if (ciphertext.size() < overhead(suite)) {
+  if (ciphertext.size() < cipher_overhead(suite)) {
     throw buffer_too_small_error("Ciphertext too small for cipher overhead");
   }
 
-  if (plaintext.size() < ciphertext.size() - overhead(suite)) {
+  if (plaintext.size() < ciphertext.size() - cipher_overhead(suite)) {
     throw buffer_too_small_error("Plaintext too small for decrypted value");
   }
 

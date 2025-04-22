@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.10)
 
 project(sframe
   VERSION 0.1
@@ -8,6 +8,11 @@ project(sframe
 option(TESTING    "Build tests" OFF)
 option(CLANG_TIDY "Perform linting with clang-tidy" OFF)
 option(SANITIZERS "Enable sanitizers" OFF)
+
+# Use -DCRYPTO=(OPENSSL_1_1 | OPENSSL_3) to configure crypto
+if(NOT DEFINED CRYPTO)
+  set(CRYPTO "OPENSSL_1_1")
+endif()
 
 ###
 ### Global Config
@@ -49,7 +54,20 @@ endif()
 ###
 
 # External libraries
-find_package(OpenSSL 1.1 REQUIRED)
+if(${CRYPTO} STREQUAL "OPENSSL_1_1")
+  message(STATUS "Configuring with OpenSSL 1.1")
+  find_package(OpenSSL 1.1 EXACT REQUIRED)
+  add_compile_definitions(OPENSSL_1_1)
+  set(CRYPTO_LIB OpenSSL::Crypto)
+elseif(${CRYPTO} STREQUAL "OPENSSL_3")
+  message(STATUS "Configuring with OpenSSL 3")
+  find_package(OpenSSL 3 EXACT REQUIRED)
+  add_compile_definitions(OPENSSL_3)
+  set(CRYPTO_LIB OpenSSL::Crypto)
+else()
+  message(FATAL_ERROR "Please select a crypto back-end (OPENSSL_1_1 or OPENSSL_3) [${CRYPTO}]")
+endif()
+
 
 ###
 ### Library Config
@@ -61,7 +79,7 @@ file(GLOB_RECURSE LIB_HEADERS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/inc
 file(GLOB_RECURSE LIB_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 
 add_library(${LIB_NAME} ${LIB_HEADERS} ${LIB_SOURCES})
-target_link_libraries(${LIB_NAME} PRIVATE OpenSSL::Crypto)
+target_link_libraries(${LIB_NAME} PRIVATE ${CRYPTO_LIB})
 target_include_directories(${LIB_NAME}
   PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>

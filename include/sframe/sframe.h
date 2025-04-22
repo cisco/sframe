@@ -4,9 +4,9 @@
 
 namespace sframe {
 
-struct openssl_error : std::runtime_error
+struct crypto_error : std::runtime_error
 {
-  openssl_error();
+  crypto_error();
 };
 
 struct unsupported_ciphersuite_error : std::runtime_error
@@ -98,6 +98,7 @@ public:
   auto end() { return _data.begin() + _size; }
 
   auto size() const { return _size; }
+  auto capacity() const { return N; }
   void resize(size_t size)
   {
     if (size > N) {
