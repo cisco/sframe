@@ -16,5 +16,5 @@ jobs:
     - name: check clang-format
       uses: jidicula/clang-format-action@v4.15.0
       with:
-        - exclude-regex: "gsl-lite.hpp"
+        exclude-regex: "gsl-lite.hpp"
 
