@@ -11,7 +11,7 @@ option(SANITIZERS "Enable sanitizers" OFF)
 
 # Use -DCRYPTO=(OPENSSL_1_1 | OPENSSL_3) to configure crypto
 if(NOT DEFINED CRYPTO)
-  set(CRYPTO "OPENSSL_1_1")
+  set(CRYPTO "OPENSSL_3")
 endif()
 
 ###
