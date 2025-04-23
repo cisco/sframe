@@ -20,79 +20,8 @@ authentication_error::authentication_error()
 }
 
 ///
-/// ContextBase
+/// KeyAndSalt
 ///
-
-ContextBase::ContextBase(CipherSuite suite_in)
-  : suite(suite_in)
-{
-}
-
-ContextBase::~ContextBase() = default;
-
-void
-ContextBase::add_key(KeyID key_id, input_bytes base_key)
-{
-  keys.emplace(key_id, KeyAndSalt::from_base_key(suite, key_id, base_key));
-}
-
-static owned_bytes<KeyAndSalt::max_salt_size>
-form_nonce(Counter ctr, input_bytes salt)
-{
-  auto nonce = owned_bytes<KeyAndSalt::max_salt_size>(salt);
-  for (size_t i = 0; i < sizeof(ctr); i++) {
-    nonce[nonce.size() - i - 1] ^= uint8_t(ctr >> (8 * i));
-  }
-
-  return nonce;
-}
-
-static owned_bytes<ContextBase::max_aad_size>
-form_aad(const Header& header, input_bytes metadata)
-{
-  auto aad = owned_bytes<ContextBase::max_aad_size>(0);
-  aad.append(header.encoded());
-  aad.append(metadata);
-  return aad;
-}
-
-output_bytes
-ContextBase::protect(const Header& header,
-                     output_bytes ciphertext,
-                     input_bytes plaintext,
-                     input_bytes metadata)
-{
-  if (ciphertext.size() < plaintext.size() + cipher_overhead(suite)) {
-    throw buffer_too_small_error("Ciphertext too small for cipher overhead");
-  }
-
-  const auto& key_and_salt = keys.at(header.key_id);
-
-  const auto aad = form_aad(header, metadata);
-  const auto nonce = form_nonce(header.counter, key_and_salt.salt);
-  return seal(suite, key_and_salt.key, nonce, ciphertext, aad, plaintext);
-}
-
-output_bytes
-ContextBase::unprotect(const Header& header,
-                       output_bytes plaintext,
-                       input_bytes ciphertext,
-                       input_bytes metadata)
-{
-  if (ciphertext.size() < cipher_overhead(suite)) {
-    throw buffer_too_small_error("Ciphertext too small for cipher overhead");
-  }
-
-  if (plaintext.size() < ciphertext.size() - cipher_overhead(suite)) {
-    throw buffer_too_small_error("Plaintext too small for decrypted value");
-  }
-
-  const auto& key_and_salt = keys.at(header.key_id);
-
-  const auto aad = form_aad(header, metadata);
-  const auto nonce = form_nonce(header.counter, key_and_salt.salt);
-  return open(suite, key_and_salt.key, nonce, plaintext, aad, ciphertext);
-}
 
 static auto
 from_ascii(const char* str, size_t len)
@@ -155,7 +84,7 @@ KeyAndSalt::from_base_key(CipherSuite suite, KeyID key_id, input_bytes base_key)
 ///
 
 Context::Context(CipherSuite suite_in)
-  : ContextBase(suite_in)
+  : suite(suite_in)
 {
 }
 
@@ -164,8 +93,28 @@ Context::~Context() = default;
 void
 Context::add_key(KeyID key_id, input_bytes base_key)
 {
-  ContextBase::add_key(key_id, base_key);
+  keys.emplace(key_id, KeyAndSalt::from_base_key(suite, key_id, base_key));
   counters.emplace(key_id, 0);
+}
+
+static owned_bytes<KeyAndSalt::max_salt_size>
+form_nonce(Counter ctr, input_bytes salt)
+{
+  auto nonce = owned_bytes<KeyAndSalt::max_salt_size>(salt);
+  for (size_t i = 0; i < sizeof(ctr); i++) {
+    nonce[nonce.size() - i - 1] ^= uint8_t(ctr >> (8 * i));
+  }
+
+  return nonce;
+}
+
+static owned_bytes<Context::max_aad_size>
+form_aad(const Header& header, input_bytes metadata)
+{
+  auto aad = owned_bytes<Context::max_aad_size>(0);
+  aad.append(header.encoded());
+  aad.append(metadata);
+  return aad;
 }
 
 output_bytes
@@ -186,7 +135,7 @@ Context::protect(KeyID key_id,
   std::copy(header_data.begin(), header_data.end(), ciphertext.begin());
   auto inner_ciphertext = ciphertext.subspan(header_data.size());
   auto final_ciphertext =
-    ContextBase::protect(header, inner_ciphertext, plaintext, metadata);
+    Context::protect_inner(header, inner_ciphertext, plaintext, metadata);
   return ciphertext.first(header_data.size() + final_ciphertext.size());
 }
 
@@ -197,7 +146,45 @@ Context::unprotect(output_bytes plaintext,
 {
   const auto header = Header::parse(ciphertext);
   const auto inner_ciphertext = ciphertext.subspan(header.size());
-  return ContextBase::unprotect(header, plaintext, inner_ciphertext, metadata);
+  return Context::unprotect_inner(header, plaintext, inner_ciphertext, metadata);
+}
+
+output_bytes
+Context::protect_inner(const Header& header,
+                       output_bytes ciphertext,
+                       input_bytes plaintext,
+                       input_bytes metadata)
+{
+  if (ciphertext.size() < plaintext.size() + cipher_overhead(suite)) {
+    throw buffer_too_small_error("Ciphertext too small for cipher overhead");
+  }
+
+  const auto& key_and_salt = keys.at(header.key_id);
+
+  const auto aad = form_aad(header, metadata);
+  const auto nonce = form_nonce(header.counter, key_and_salt.salt);
+  return seal(suite, key_and_salt.key, nonce, ciphertext, aad, plaintext);
+}
+
+output_bytes
+Context::unprotect_inner(const Header& header,
+                         output_bytes plaintext,
+                         input_bytes ciphertext,
+                         input_bytes metadata)
+{
+  if (ciphertext.size() < cipher_overhead(suite)) {
+    throw buffer_too_small_error("Ciphertext too small for cipher overhead");
+  }
+
+  if (plaintext.size() < ciphertext.size() - cipher_overhead(suite)) {
+    throw buffer_too_small_error("Plaintext too small for decrypted value");
+  }
+
+  const auto& key_and_salt = keys.at(header.key_id);
+
+  const auto aad = form_aad(header, metadata);
+  const auto nonce = form_nonce(header.counter, key_and_salt.salt);
+  return open(suite, key_and_salt.key, nonce, plaintext, aad, ciphertext);
 }
 
 ///
@@ -276,7 +263,7 @@ MLSContext::unprotect(output_bytes plaintext,
   const auto inner_ciphertext = ciphertext.subspan(header.size());
 
   ensure_key(header.key_id);
-  return ContextBase::unprotect(header, plaintext, inner_ciphertext, metadata);
+  return Context::unprotect_inner(header, plaintext, inner_ciphertext, metadata);
 }
 
 MLSContext::EpochKeys::EpochKeys(MLSContext::EpochID full_epoch_in,

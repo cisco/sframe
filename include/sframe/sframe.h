@@ -233,43 +233,10 @@ struct KeyAndSalt
   Counter counter;
 };
 
-// ContextBase represents the core SFrame encryption logic.  It remembers a set
-// of keys and salts identified by key IDs, and uses them to protect and
-// unprotect payloads.  The SFrame header is **not** written by the protect
-// method or read by the unprotect method.  It is assumed that the application
-// carries the header values in some other way.
-//
-// In general, you should prefer Context to ContextBase.
-class ContextBase
-{
-public:
-  ContextBase(CipherSuite suite_in);
-  virtual ~ContextBase();
-
-  void add_key(KeyID kid, input_bytes key);
-
-  output_bytes protect(const Header& header,
-                       output_bytes ciphertext,
-                       input_bytes plaintext,
-                       input_bytes metadata);
-  output_bytes unprotect(const Header& header,
-                         output_bytes ciphertext,
-                         input_bytes plaintext,
-                         input_bytes metadata);
-
-  static constexpr size_t max_aad_size = Header::max_size + 512;
-
-protected:
-  CipherSuite suite;
-
-  static constexpr size_t max_keys = 200;
-  map<KeyID, KeyAndSalt, max_keys> keys;
-};
-
 // Context applies the full SFrame transform.  It tracks a counter for each key
 // to ensure nonce uniqueness, adds the SFrame header on protect, and
 // reads/strips the SFrame header on unprotect.
-class Context : protected ContextBase
+class Context
 {
 public:
   Context(CipherSuite suite);
@@ -285,9 +252,24 @@ public:
                          input_bytes ciphertext,
                          input_bytes metadata);
 
+  static constexpr size_t max_aad_size = Header::max_size + 512;
+
 protected:
-  static constexpr size_t max_counters = 200;
-  map<KeyID, Counter, max_counters> counters;
+  static constexpr size_t max_keys = 200;
+
+  CipherSuite suite;
+  map<KeyID, KeyAndSalt, max_keys> keys;
+  map<KeyID, Counter, max_keys> counters;
+
+  output_bytes protect_inner(const Header& header,
+                       output_bytes ciphertext,
+                       input_bytes plaintext,
+                       input_bytes metadata);
+  output_bytes unprotect_inner(const Header& header,
+                         output_bytes ciphertext,
+                         input_bytes plaintext,
+                         input_bytes metadata);
+
 };
 
 // MLSContext augments Context with logic for deriving keys from MLS.  Instead
