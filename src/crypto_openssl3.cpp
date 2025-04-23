@@ -3,11 +3,11 @@
 #include "crypto.h"
 #include "header.h"
 
+#include <openssl/core_names.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/kdf.h>
 #include <openssl/params.h>
-#include <openssl/core_names.h>
 
 namespace sframe {
 
@@ -63,26 +63,32 @@ openssl_digest_name(CipherSuite suite)
 ///
 
 using scoped_evp_kdf = std::unique_ptr<EVP_KDF, decltype(&EVP_KDF_free)>;
-using scoped_evp_kdf_ctx = std::unique_ptr<EVP_KDF_CTX, decltype(&EVP_KDF_CTX_free)>;
+using scoped_evp_kdf_ctx =
+  std::unique_ptr<EVP_KDF_CTX, decltype(&EVP_KDF_CTX_free)>;
 
 owned_bytes<max_hkdf_expand_size>
 hkdf_extract(CipherSuite suite, input_bytes salt, input_bytes ikm)
 {
   auto mode = EVP_KDF_HKDF_MODE_EXTRACT_ONLY;
   auto digest_name = openssl_digest_name(suite);
-  auto* salt_ptr = const_cast<void*>(reinterpret_cast<const void*>(salt.data()));
+  auto* salt_ptr =
+    const_cast<void*>(reinterpret_cast<const void*>(salt.data()));
   auto* ikm_ptr = const_cast<void*>(reinterpret_cast<const void*>(ikm.data()));
 
   const auto params = std::array<OSSL_PARAM, 5>{
     OSSL_PARAM_construct_int(OSSL_KDF_PARAM_MODE, &mode),
-    OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_DIGEST, digest_name.data(), digest_name.size()),
+    OSSL_PARAM_construct_utf8_string(
+      OSSL_KDF_PARAM_DIGEST, digest_name.data(), digest_name.size()),
     OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_KEY, ikm_ptr, ikm.size()),
-    OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_SALT, salt_ptr, salt.size()),
+    OSSL_PARAM_construct_octet_string(
+      OSSL_KDF_PARAM_SALT, salt_ptr, salt.size()),
     OSSL_PARAM_construct_end(),
   };
 
-  const auto kdf = scoped_evp_kdf(EVP_KDF_fetch(NULL, "HKDF", NULL), EVP_KDF_free);
-  const auto ctx = scoped_evp_kdf_ctx(EVP_KDF_CTX_new(kdf.get()), EVP_KDF_CTX_free);
+  const auto kdf =
+    scoped_evp_kdf(EVP_KDF_fetch(NULL, "HKDF", NULL), EVP_KDF_free);
+  const auto ctx =
+    scoped_evp_kdf_ctx(EVP_KDF_CTX_new(kdf.get()), EVP_KDF_CTX_free);
   if (1 != EVP_KDF_CTX_set_params(ctx.get(), params.data())) {
     throw crypto_error();
   }
@@ -90,7 +96,7 @@ hkdf_extract(CipherSuite suite, input_bytes salt, input_bytes ikm)
   const auto digest_size = EVP_KDF_CTX_get_kdf_size(ctx.get());
   auto out = owned_bytes<max_hkdf_expand_size>(digest_size);
   if (1 != EVP_KDF_derive(ctx.get(), out.data(), out.size(), nullptr)) {
-      throw crypto_error();
+    throw crypto_error();
   }
 
   return out;
@@ -102,22 +108,27 @@ hkdf_expand(CipherSuite suite, input_bytes prk, input_bytes info, size_t size)
   auto mode = EVP_KDF_HKDF_MODE_EXPAND_ONLY;
   auto digest_name = openssl_digest_name(suite);
   auto* prk_ptr = const_cast<void*>(reinterpret_cast<const void*>(prk.data()));
-  auto* info_ptr = const_cast<void*>(reinterpret_cast<const void*>(info.data()));
+  auto* info_ptr =
+    const_cast<void*>(reinterpret_cast<const void*>(info.data()));
 
   const auto params = std::array<OSSL_PARAM, 5>{
     OSSL_PARAM_construct_int(OSSL_KDF_PARAM_MODE, &mode),
-    OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_DIGEST, digest_name.data(), digest_name.size()),
+    OSSL_PARAM_construct_utf8_string(
+      OSSL_KDF_PARAM_DIGEST, digest_name.data(), digest_name.size()),
     OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_KEY, prk_ptr, prk.size()),
-    OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_INFO, info_ptr, info.size()),
+    OSSL_PARAM_construct_octet_string(
+      OSSL_KDF_PARAM_INFO, info_ptr, info.size()),
     OSSL_PARAM_construct_end(),
   };
 
-  const auto kdf = scoped_evp_kdf(EVP_KDF_fetch(NULL, "HKDF", NULL), EVP_KDF_free);
-  const auto ctx = scoped_evp_kdf_ctx(EVP_KDF_CTX_new(kdf.get()), EVP_KDF_CTX_free);
+  const auto kdf =
+    scoped_evp_kdf(EVP_KDF_fetch(NULL, "HKDF", NULL), EVP_KDF_free);
+  const auto ctx =
+    scoped_evp_kdf_ctx(EVP_KDF_CTX_new(kdf.get()), EVP_KDF_CTX_free);
 
   auto out = owned_bytes<max_hkdf_expand_size>(size);
   if (1 != EVP_KDF_derive(ctx.get(), out.data(), out.size(), params.data())) {
-      throw crypto_error();
+    throw crypto_error();
   }
 
   return out;
@@ -136,7 +147,8 @@ compute_tag(CipherSuite suite,
             size_t tag_size)
 {
   using scoped_evp_mac = std::unique_ptr<EVP_MAC, decltype(&EVP_MAC_free)>;
-  using scoped_evp_mac_ctx = std::unique_ptr<EVP_MAC_CTX, decltype(&EVP_MAC_CTX_free)>;
+  using scoped_evp_mac_ctx =
+    std::unique_ptr<EVP_MAC_CTX, decltype(&EVP_MAC_CTX_free)>;
 
   auto len_block = owned_bytes<24>();
   auto len_view = output_bytes(len_block);
@@ -151,10 +163,13 @@ compute_tag(CipherSuite suite,
     OSSL_PARAM_construct_end()
   };
 
-  const auto mac = scoped_evp_mac(EVP_MAC_fetch(nullptr, OSSL_MAC_NAME_HMAC, nullptr), EVP_MAC_free);
-  const auto ctx = scoped_evp_mac_ctx(EVP_MAC_CTX_new(mac.get()), EVP_MAC_CTX_free);
+  const auto mac = scoped_evp_mac(
+    EVP_MAC_fetch(nullptr, OSSL_MAC_NAME_HMAC, nullptr), EVP_MAC_free);
+  const auto ctx =
+    scoped_evp_mac_ctx(EVP_MAC_CTX_new(mac.get()), EVP_MAC_CTX_free);
 
-  if (1 != EVP_MAC_init(ctx.get(), auth_key.data(), auth_key.size(), params.data())) {
+  if (1 != EVP_MAC_init(
+             ctx.get(), auth_key.data(), auth_key.size(), params.data())) {
     throw crypto_error();
   }
 
@@ -184,7 +199,8 @@ compute_tag(CipherSuite suite,
   return tag;
 }
 
-using scoped_evp_cipher_ctx = std::unique_ptr<EVP_CIPHER_CTX, decltype(&EVP_CIPHER_CTX_free)>;
+using scoped_evp_cipher_ctx =
+  std::unique_ptr<EVP_CIPHER_CTX, decltype(&EVP_CIPHER_CTX_free)>;
 
 static void
 ctr_crypt(CipherSuite suite,

@@ -25,7 +25,6 @@ static constexpr size_t max_hkdf_expand_size = 64;
 owned_bytes<max_hkdf_extract_size>
 hkdf_extract(CipherSuite suite, input_bytes salt, input_bytes ikm);
 
-
 owned_bytes<max_hkdf_expand_size>
 hkdf_expand(CipherSuite suite, input_bytes prk, input_bytes info, size_t size);
 

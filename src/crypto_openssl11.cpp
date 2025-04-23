@@ -71,7 +71,6 @@ openssl_cipher(CipherSuite suite)
 struct HMAC
 {
 private:
-
   scoped_hmac_ctx ctx;
 
 public:
@@ -80,10 +79,10 @@ public:
   {
     const auto type = openssl_digest_type(suite);
 
-    // Some FIPS-enabled libraries are overly conservative in their interpretation
-    // of NIST SP 800-131A, which requires HMAC keys to be at least 112 bits long.
-    // That document does not impose that requirement on HKDF, so we disable FIPS
-    // enforcement for purposes of HKDF.
+    // Some FIPS-enabled libraries are overly conservative in their
+    // interpretation of NIST SP 800-131A, which requires HMAC keys to be at
+    // least 112 bits long. That document does not impose that requirement on
+    // HKDF, so we disable FIPS enforcement for purposes of HKDF.
     //
     // https://doi.org/10.6028/NIST.SP.800-131Ar2
     static const auto fips_min_hmac_key_len = 14;
@@ -110,7 +109,6 @@ public:
       throw crypto_error();
     }
   }
-
 
   output_bytes digest(output_bytes md)
   {
