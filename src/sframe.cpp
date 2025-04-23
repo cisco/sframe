@@ -20,7 +20,7 @@ authentication_error::authentication_error()
 }
 
 ///
-/// KeyAndSalt
+/// KeyRecord
 ///
 
 static auto
@@ -62,8 +62,8 @@ sframe_salt_label(CipherSuite suite, KeyID key_id)
   return label;
 }
 
-KeyAndSalt
-KeyAndSalt::from_base_key(CipherSuite suite, KeyID key_id, input_bytes base_key)
+KeyRecord
+KeyRecord::from_base_key(CipherSuite suite, KeyID key_id, input_bytes base_key)
 {
   auto key_size = cipher_key_size(suite);
   auto nonce_size = cipher_nonce_size(suite);
@@ -76,7 +76,7 @@ KeyAndSalt::from_base_key(CipherSuite suite, KeyID key_id, input_bytes base_key)
   auto key = hkdf_expand(suite, secret, key_label, key_size);
   auto salt = hkdf_expand(suite, secret, salt_label, nonce_size);
 
-  return KeyAndSalt{ key, salt, 0 };
+  return KeyRecord{ key, salt, 0 };
 }
 
 ///
@@ -93,14 +93,13 @@ Context::~Context() = default;
 void
 Context::add_key(KeyID key_id, input_bytes base_key)
 {
-  keys.emplace(key_id, KeyAndSalt::from_base_key(suite, key_id, base_key));
-  counters.emplace(key_id, 0);
+  keys.emplace(key_id, KeyRecord::from_base_key(suite, key_id, base_key));
 }
 
-static owned_bytes<KeyAndSalt::max_salt_size>
+static owned_bytes<KeyRecord::max_salt_size>
 form_nonce(Counter ctr, input_bytes salt)
 {
-  auto nonce = owned_bytes<KeyAndSalt::max_salt_size>(salt);
+  auto nonce = owned_bytes<KeyRecord::max_salt_size>(salt);
   for (size_t i = 0; i < sizeof(ctr); i++) {
     nonce[nonce.size() - i - 1] ^= uint8_t(ctr >> (8 * i));
   }
@@ -129,8 +128,9 @@ Context::protect(KeyID key_id,
                  input_bytes plaintext,
                  input_bytes metadata)
 {
-  const auto counter = counters.at(key_id);
-  counters.at(key_id) += 1;
+  auto& key_record = keys.at(key_id);
+  const auto counter = key_record.counter;
+  key_record.counter += 1;
 
   const auto header = Header{ key_id, counter };
   const auto header_data = header.encoded();

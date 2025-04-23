@@ -45,7 +45,7 @@ TEST_CASE("SFrame Round-Trip")
   };
 
   auto pt_out = bytes(plaintext.size());
-  auto ct_out = bytes(plaintext.size() + max_overhead);
+  auto ct_out = bytes(plaintext.size() + Context::max_overhead);
 
   for (auto& pair : keys) {
     auto& suite = pair.first;
@@ -87,7 +87,7 @@ TEST_CASE("MLS Round-Trip")
   };
 
   auto pt_out = bytes(plaintext.size());
-  auto ct_out = bytes(plaintext.size() + max_overhead);
+  auto ct_out = bytes(plaintext.size() + Context::max_overhead);
 
   for (auto& suite : suites) {
     auto member_a = MLSContext(suite, epoch_bits);
@@ -138,8 +138,8 @@ TEST_CASE("MLS Round-Trip with context")
   };
 
   auto pt_out = bytes(plaintext.size());
-  auto ct_out_1 = bytes(plaintext.size() + max_overhead);
-  auto ct_out_0 = bytes(plaintext.size() + max_overhead);
+  auto ct_out_1 = bytes(plaintext.size() + Context::max_overhead);
+  auto ct_out_0 = bytes(plaintext.size() + Context::max_overhead);
 
   for (auto& suite : suites) {
     auto member_a_0 = MLSContext(suite, epoch_bits);
@@ -194,7 +194,7 @@ TEST_CASE("MLS Failure after Purge")
   const auto sframe_epoch_secret_2 = bytes(32, 2);
 
   auto pt_out = bytes(plaintext.size());
-  auto ct_out = bytes(plaintext.size() + max_overhead);
+  auto ct_out = bytes(plaintext.size() + Context::max_overhead);
 
   auto member_a = MLSContext(suite, epoch_bits);
   auto member_b = MLSContext(suite, epoch_bits);
