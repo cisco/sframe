@@ -3,10 +3,10 @@ name: Build and Test
 on:
   push:
     branches:
-      - master
+      - main
   pull_request:
     branches:
-      - master
+      - main
 
 env:
   CTEST_OUTPUT_ON_FAILURE: 1
@@ -28,29 +28,30 @@ jobs:
             - os: macos-latest
               vcpkg-cmake-file: "$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
               ctest-target: test
-     
+
     env:
       CMAKE_BUILD_DIR: ${{ github.workspace }}/build
       CMAKE_TEST_DIR: ${{ github.workspace }}/build/test
+      CMAKE_GENERATOR: "Ninja"
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
 
     - name: dependencies (macos)
       if: ${{ matrix.os == 'macos-latest' }}
       run: |
-        brew install llvm
+        brew install llvm ninja
         ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
         ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
 
     - name: Restore cache
-      uses: actions/cache@v2
+      uses: actions/cache@v4
       with:
         path: |
             ${{ env.CMAKE_BUILD_DIR }}/vcpkg_installed
         key: ${{ runner.os }}-${{ hashFiles( '**/vcpkg.json' ) }}
 
-    - name: configure to use clang-tidy and sanitizers      
+    - name: configure to use clang-tidy and sanitizers
       run: |
         cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DCLANG_TIDY=ON -DTESTING=ON -DSANITIZERS=ON -DCMAKE_TOOLCHAIN_FILE="${{ matrix.vcpkg-cmake-file}}" .
 
@@ -60,5 +61,5 @@ jobs:
 
     - name: Unit tests
       run: |
-         cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target "${{ matrix.ctest-target }}" --config Release
+        ctest --test-dir "${{ env.CMAKE_BUILD_DIR }}"
 
