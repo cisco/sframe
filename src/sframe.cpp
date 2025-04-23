@@ -108,10 +108,16 @@ form_nonce(Counter ctr, input_bytes salt)
   return nonce;
 }
 
-static owned_bytes<Context::max_aad_size>
+static constexpr auto max_aad_size = Header::max_size + Context::max_metadata_size;
+
+static owned_bytes<max_aad_size>
 form_aad(const Header& header, input_bytes metadata)
 {
-  auto aad = owned_bytes<Context::max_aad_size>(0);
+  if (metadata.size() > Context::max_metadata_size) {
+    throw buffer_too_small_error("Metadata too large");
+  }
+
+  auto aad = owned_bytes<max_aad_size>(0);
   aad.append(header.encoded());
   aad.append(metadata);
   return aad;

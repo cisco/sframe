@@ -252,7 +252,7 @@ public:
                          input_bytes ciphertext,
                          input_bytes metadata);
 
-  static constexpr size_t max_aad_size = Header::max_size + 512;
+  static constexpr size_t max_metadata_size = 512;
 
 protected:
   static constexpr size_t max_keys = 200;
