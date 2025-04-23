@@ -3,8 +3,8 @@
 #include <gsl/gsl-lite.hpp>
 #include <optional>
 
-#include <sframe/vector.h>
 #include <sframe/map.h>
+#include <sframe/vector.h>
 
 namespace sframe {
 
@@ -58,8 +58,8 @@ class Header;
 struct KeyRecord
 {
   static KeyRecord from_base_key(CipherSuite suite,
-                                  KeyID key_id,
-                                  input_bytes base_key);
+                                 KeyID key_id,
+                                 input_bytes base_key);
 
   static constexpr size_t max_key_size = 48;
   static constexpr size_t max_salt_size = 12;
@@ -98,14 +98,13 @@ protected:
   map<KeyID, KeyRecord, max_keys> keys;
 
   output_bytes protect_inner(const Header& header,
-                       output_bytes ciphertext,
-                       input_bytes plaintext,
-                       input_bytes metadata);
+                             output_bytes ciphertext,
+                             input_bytes plaintext,
+                             input_bytes metadata);
   output_bytes unprotect_inner(const Header& header,
-                         output_bytes ciphertext,
-                         input_bytes plaintext,
-                         input_bytes metadata);
-
+                               output_bytes ciphertext,
+                               input_bytes plaintext,
+                               input_bytes metadata);
 };
 
 // MLSContext augments Context with logic for deriving keys from MLS.  Instead

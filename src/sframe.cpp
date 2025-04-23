@@ -107,7 +107,8 @@ form_nonce(Counter ctr, input_bytes salt)
   return nonce;
 }
 
-static constexpr auto max_aad_size = Header::max_size + Context::max_metadata_size;
+static constexpr auto max_aad_size =
+  Header::max_size + Context::max_metadata_size;
 
 static owned_bytes<max_aad_size>
 form_aad(const Header& header, input_bytes metadata)
@@ -152,7 +153,8 @@ Context::unprotect(output_bytes plaintext,
 {
   const auto header = Header::parse(ciphertext);
   const auto inner_ciphertext = ciphertext.subspan(header.size());
-  return Context::unprotect_inner(header, plaintext, inner_ciphertext, metadata);
+  return Context::unprotect_inner(
+    header, plaintext, inner_ciphertext, metadata);
 }
 
 output_bytes
@@ -269,7 +271,8 @@ MLSContext::unprotect(output_bytes plaintext,
   const auto inner_ciphertext = ciphertext.subspan(header.size());
 
   ensure_key(header.key_id);
-  return Context::unprotect_inner(header, plaintext, inner_ciphertext, metadata);
+  return Context::unprotect_inner(
+    header, plaintext, inner_ciphertext, metadata);
 }
 
 MLSContext::EpochKeys::EpochKeys(MLSContext::EpochID full_epoch_in,
