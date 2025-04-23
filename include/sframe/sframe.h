@@ -225,7 +225,8 @@ private:
   Header(KeyID key_id_in, Counter counter_in, input_bytes encoded_in);
 };
 
-enum struct KeyUsage {
+enum struct KeyUsage
+{
   protect,
   unprotect,
 };

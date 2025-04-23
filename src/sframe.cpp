@@ -33,7 +33,8 @@ ContextBase::~ContextBase() = default;
 void
 ContextBase::add_key(KeyID key_id, KeyUsage usage, input_bytes base_key)
 {
-  keys.emplace(key_id, KeyAndSalt::from_base_key(suite, key_id, usage, base_key));
+  keys.emplace(key_id,
+               KeyAndSalt::from_base_key(suite, key_id, usage, base_key));
 }
 
 static owned_bytes<KeyAndSalt::max_salt_size>
@@ -95,7 +96,6 @@ ContextBase::unprotect(const Header& header,
     throw invalid_key_usage_error("Encrypt-only key used for decryption");
   }
 
-
   const auto aad = form_aad(header, metadata);
   const auto nonce = form_nonce(header.counter, key_and_salt.salt);
   return open(suite, key_and_salt.key, nonce, plaintext, aad, ciphertext);
@@ -141,7 +141,10 @@ sframe_salt_label(CipherSuite suite, KeyID key_id)
 }
 
 KeyAndSalt
-KeyAndSalt::from_base_key(CipherSuite suite, KeyID key_id, KeyUsage usage, input_bytes base_key)
+KeyAndSalt::from_base_key(CipherSuite suite,
+                          KeyID key_id,
+                          KeyUsage usage,
+                          input_bytes base_key)
 {
   auto key_size = cipher_key_size(suite);
   auto nonce_size = cipher_nonce_size(suite);
