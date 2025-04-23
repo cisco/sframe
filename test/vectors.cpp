@@ -18,19 +18,19 @@ struct HexBytes
 };
 
 // Seems redundant, but works
-bool
+static bool
 operator==(const HexBytes& hex, const input_bytes& other)
 {
   return input_bytes(hex) == other;
 }
 
-bool
+static bool
 operator==(const input_bytes& other, const HexBytes& hex)
 {
   return hex == other;
 }
 
-void
+static void
 from_json(const json& j, HexBytes& b)
 {
   const auto hex = j.get<std::string>();
@@ -47,7 +47,7 @@ from_json(const json& j, HexBytes& b)
   }
 }
 
-void
+static void
 to_json(json& /* j */, const HexBytes& /* p */)
 {
   // Included just so that macros work

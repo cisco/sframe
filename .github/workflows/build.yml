@@ -32,6 +32,7 @@ jobs:
     env:
       CMAKE_BUILD_DIR: ${{ github.workspace }}/build
       CMAKE_TEST_DIR: ${{ github.workspace }}/build/test
+      CMAKE_GENERATOR: "Ninja"
 
     steps:
     - uses: actions/checkout@v4
@@ -39,7 +40,7 @@ jobs:
     - name: dependencies (macos)
       if: ${{ matrix.os == 'macos-latest' }}
       run: |
-        brew install llvm
+        brew install llvm ninja
         ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
         ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
 
@@ -60,5 +61,5 @@ jobs:
 
     - name: Unit tests
       run: |
-         cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target "${{ matrix.ctest-target }}" --config Release
+        ctest --test-dir "${{ env.CMAKE_BUILD_DIR }}"
 

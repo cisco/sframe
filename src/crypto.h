@@ -22,6 +22,8 @@ cipher_digest_size(CipherSuite suite);
 size_t
 cipher_key_size(CipherSuite suite);
 size_t
+cipher_enc_key_size(CipherSuite suite);
+size_t
 cipher_nonce_size(CipherSuite suite);
 
 ///

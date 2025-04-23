@@ -1,6 +1,7 @@
 #pragma once
 
 #include <gsl/gsl-lite.hpp>
+#include <optional>
 
 namespace sframe {
 
