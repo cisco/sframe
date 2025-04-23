@@ -144,7 +144,7 @@ struct SFrameTestVector
   {
     // Protect
     auto send_ctx = Context(cipher_suite);
-    send_ctx.add_key(kid, base_key);
+    send_ctx.add_key(kid, KeyUsage::protect, base_key);
 
     auto ct_data = owned_bytes<128>();
     auto next_ctr = uint64_t(0);
@@ -163,7 +163,7 @@ struct SFrameTestVector
 
     // Unprotect
     auto recv_ctx = Context(cipher_suite);
-    recv_ctx.add_key(kid, base_key);
+    recv_ctx.add_key(kid, KeyUsage::unprotect, base_key);
 
     auto pt_data = owned_bytes<128>();
     auto pt_out = recv_ctx.unprotect(pt_data, ct, metadata);

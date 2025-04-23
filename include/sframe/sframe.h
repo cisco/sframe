@@ -32,6 +32,12 @@ struct invalid_parameter_error : std::runtime_error
   using parent::parent;
 };
 
+struct invalid_key_usage_error : std::runtime_error
+{
+  using parent = std::runtime_error;
+  using parent::parent;
+};
+
 enum class CipherSuite : uint16_t
 {
   AES_128_CTR_HMAC_SHA256_80 = 1,
@@ -219,10 +225,16 @@ private:
   Header(KeyID key_id_in, Counter counter_in, input_bytes encoded_in);
 };
 
+enum struct KeyUsage {
+  protect,
+  unprotect,
+};
+
 struct KeyAndSalt
 {
   static KeyAndSalt from_base_key(CipherSuite suite,
                                   KeyID key_id,
+                                  KeyUsage usage,
                                   input_bytes base_key);
 
   static constexpr size_t max_key_size = 48;
@@ -230,6 +242,7 @@ struct KeyAndSalt
 
   owned_bytes<max_key_size> key;
   owned_bytes<max_salt_size> salt;
+  KeyUsage usage;
   Counter counter;
 };
 
@@ -246,7 +259,7 @@ public:
   ContextBase(CipherSuite suite_in);
   virtual ~ContextBase();
 
-  void add_key(KeyID kid, input_bytes key);
+  void add_key(KeyID kid, KeyUsage usage, input_bytes key);
 
   output_bytes protect(const Header& header,
                        output_bytes ciphertext,
@@ -275,7 +288,7 @@ public:
   Context(CipherSuite suite);
   virtual ~Context();
 
-  void add_key(KeyID kid, input_bytes key);
+  void add_key(KeyID kid, KeyUsage usage, input_bytes key);
 
   output_bytes protect(KeyID key_id,
                        output_bytes ciphertext,
@@ -349,7 +362,7 @@ private:
   KeyID form_key_id(EpochID epoch_id,
                     SenderID sender_id,
                     ContextID context_id) const;
-  void ensure_key(KeyID key_id);
+  void ensure_key(KeyID key_id, KeyUsage usage);
 
   const size_t epoch_bits;
   const size_t epoch_mask;
