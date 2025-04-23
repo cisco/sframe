@@ -105,7 +105,7 @@ static const auto base_label = from_ascii("SFrame 1.0 Secret ", 18);
 static const auto key_label = from_ascii("key ", 4);
 static const auto salt_label = from_ascii("salt ", 5);
 
-owned_bytes<32>
+static owned_bytes<32>
 sframe_key_label(CipherSuite suite, KeyID key_id)
 {
   auto label = owned_bytes<32>(base_label);
@@ -119,7 +119,7 @@ sframe_key_label(CipherSuite suite, KeyID key_id)
   return label;
 }
 
-owned_bytes<33>
+static owned_bytes<33>
 sframe_salt_label(CipherSuite suite, KeyID key_id)
 {
   auto label = owned_bytes<33>(base_label);
