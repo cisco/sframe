@@ -31,9 +31,10 @@ ContextBase::ContextBase(CipherSuite suite_in)
 ContextBase::~ContextBase() = default;
 
 void
-ContextBase::add_key(KeyID key_id, input_bytes base_key)
+ContextBase::add_key(KeyID key_id, KeyUsage usage, input_bytes base_key)
 {
-  keys.emplace(key_id, KeyAndSalt::from_base_key(suite, key_id, base_key));
+  keys.emplace(key_id,
+               KeyAndSalt::from_base_key(suite, key_id, usage, base_key));
 }
 
 static owned_bytes<KeyAndSalt::max_salt_size>
@@ -67,6 +68,9 @@ ContextBase::protect(const Header& header,
   }
 
   const auto& key_and_salt = keys.at(header.key_id);
+  if (key_and_salt.usage != KeyUsage::protect) {
+    throw invalid_key_usage_error("Decrypt-only key used for encryption");
+  }
 
   const auto aad = form_aad(header, metadata);
   const auto nonce = form_nonce(header.counter, key_and_salt.salt);
@@ -88,6 +92,9 @@ ContextBase::unprotect(const Header& header,
   }
 
   const auto& key_and_salt = keys.at(header.key_id);
+  if (key_and_salt.usage != KeyUsage::unprotect) {
+    throw invalid_key_usage_error("Encrypt-only key used for decryption");
+  }
 
   const auto aad = form_aad(header, metadata);
   const auto nonce = form_nonce(header.counter, key_and_salt.salt);
@@ -134,7 +141,10 @@ sframe_salt_label(CipherSuite suite, KeyID key_id)
 }
 
 KeyAndSalt
-KeyAndSalt::from_base_key(CipherSuite suite, KeyID key_id, input_bytes base_key)
+KeyAndSalt::from_base_key(CipherSuite suite,
+                          KeyID key_id,
+                          KeyUsage usage,
+                          input_bytes base_key)
 {
   auto key_size = cipher_key_size(suite);
   auto nonce_size = cipher_nonce_size(suite);
@@ -147,7 +157,7 @@ KeyAndSalt::from_base_key(CipherSuite suite, KeyID key_id, input_bytes base_key)
   auto key = hkdf_expand(suite, secret, key_label, key_size);
   auto salt = hkdf_expand(suite, secret, salt_label, nonce_size);
 
-  return KeyAndSalt{ key, salt, 0 };
+  return KeyAndSalt{ key, salt, usage, 0 };
 }
 
 ///
@@ -162,9 +172,9 @@ Context::Context(CipherSuite suite_in)
 Context::~Context() = default;
 
 void
-Context::add_key(KeyID key_id, input_bytes base_key)
+Context::add_key(KeyID key_id, KeyUsage usage, input_bytes base_key)
 {
-  ContextBase::add_key(key_id, base_key);
+  ContextBase::add_key(key_id, usage, base_key);
   counters.emplace(key_id, 0);
 }
 
@@ -263,7 +273,7 @@ MLSContext::protect(EpochID epoch_id,
                     input_bytes metadata)
 {
   auto key_id = form_key_id(epoch_id, sender_id, context_id);
-  ensure_key(key_id);
+  ensure_key(key_id, KeyUsage::protect);
   return Context::protect(key_id, ciphertext, plaintext, metadata);
 }
 
@@ -275,7 +285,7 @@ MLSContext::unprotect(output_bytes plaintext,
   const auto header = Header::parse(ciphertext);
   const auto inner_ciphertext = ciphertext.subspan(header.size());
 
-  ensure_key(header.key_id);
+  ensure_key(header.key_id, KeyUsage::unprotect);
   return ContextBase::unprotect(header, plaintext, inner_ciphertext, metadata);
 }
 
@@ -358,7 +368,7 @@ MLSContext::form_key_id(EpochID epoch_id,
 }
 
 void
-MLSContext::ensure_key(KeyID key_id)
+MLSContext::ensure_key(KeyID key_id, KeyUsage usage)
 {
   // If the required key already exists, we are done
   const auto epoch_index = key_id & epoch_mask;
@@ -374,7 +384,7 @@ MLSContext::ensure_key(KeyID key_id)
 
   // Otherwise, derive a key and implant it
   const auto sender_id = key_id >> epoch_bits;
-  Context::add_key(key_id, epoch->base_key(suite, sender_id));
+  Context::add_key(key_id, usage, epoch->base_key(suite, sender_id));
   return;
 }
 

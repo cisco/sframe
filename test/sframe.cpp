@@ -52,10 +52,10 @@ TEST_CASE("SFrame Round-Trip")
     auto& key = pair.second;
 
     auto send = Context(suite);
-    send.add_key(kid, key);
+    send.add_key(kid, KeyUsage::protect, key);
 
     auto recv = Context(suite);
-    recv.add_key(kid, key);
+    recv.add_key(kid, KeyUsage::unprotect, key);
 
     for (int i = 0; i < rounds; i++) {
       auto encrypted = to_bytes(send.protect(kid, ct_out, plaintext, {}));
