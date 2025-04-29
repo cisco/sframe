@@ -4,6 +4,7 @@
 #include <sframe/sframe.h>
 
 #include <crypto.h>
+#include <header.h>
 
 #include "common.h"
 
