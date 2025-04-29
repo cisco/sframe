@@ -79,7 +79,7 @@ KeyRecord::from_base_key(CipherSuite suite,
   auto key = hkdf_expand(suite, secret, key_label, key_size);
   auto salt = hkdf_expand(suite, secret, salt_label, nonce_size);
 
-  return KeyAndSalt{ key, salt, usage, 0 };
+  return KeyRecord{ key, salt, usage, 0 };
 }
 
 ///
@@ -96,7 +96,8 @@ Context::~Context() = default;
 void
 Context::add_key(KeyID key_id, KeyUsage usage, input_bytes base_key)
 {
-  keys.emplace(key_id, KeyRecord::from_base_key(suite, key_id, base_key));
+  keys.emplace(key_id,
+               KeyRecord::from_base_key(suite, key_id, usage, base_key));
 }
 
 static owned_bytes<KeyRecord::max_salt_size>
@@ -273,7 +274,7 @@ MLSContext::unprotect(output_bytes plaintext,
   const auto header = Header::parse(ciphertext);
   const auto inner_ciphertext = ciphertext.subspan(header.size());
 
-  ensure_key(header.key_id);
+  ensure_key(header.key_id, KeyUsage::unprotect);
   return Context::unprotect_inner(
     header, plaintext, inner_ciphertext, metadata);
 }

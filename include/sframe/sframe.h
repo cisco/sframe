@@ -61,6 +61,12 @@ using Counter = uint64_t;
 
 class Header;
 
+enum struct KeyUsage
+{
+  protect,
+  unprotect,
+};
+
 struct KeyRecord
 {
   static KeyRecord from_base_key(CipherSuite suite,
