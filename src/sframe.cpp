@@ -63,7 +63,10 @@ sframe_salt_label(CipherSuite suite, KeyID key_id)
 }
 
 KeyRecord
-KeyRecord::from_base_key(CipherSuite suite, KeyID key_id, KeyUsage usage, input_bytes base_key)
+KeyRecord::from_base_key(CipherSuite suite,
+                         KeyID key_id,
+                         KeyUsage usage,
+                         input_bytes base_key)
 {
   auto key_size = cipher_key_size(suite);
   auto nonce_size = cipher_nonce_size(suite);
