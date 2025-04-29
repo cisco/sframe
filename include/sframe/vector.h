@@ -2,6 +2,10 @@
 
 #include <gsl/gsl-lite.hpp>
 
+#ifdef NO_ALLOC
+
+namespace sframe {
+
 template<typename T, size_t N>
 class vector
 {
@@ -81,3 +85,47 @@ public:
   operator gsl::span<const T>() const { return gsl::span(_data).first(_size); }
   operator gsl::span<T>() { return gsl::span(_data).first(_size); }
 };
+
+} // namespace sframe
+
+#else // ifdef NO_ALLOC
+
+#include <vector>
+
+namespace sframe {
+
+template<typename T, size_t N>
+class vector : public std::vector<T>
+{
+private:
+  using parent = std::vector<T>;
+
+public:
+  constexpr vector()
+    : parent(N)
+  {}
+
+  constexpr vector(size_t size)
+    : parent(size)
+  {}
+
+  constexpr vector(gsl::span<const T> content)
+    : parent(content.begin(), content.end())
+  {}
+
+  template<size_t M>
+  constexpr vector(const vector<T, M>& content)
+    : parent(content)
+  {}
+
+  void append(gsl::span<const T> content)
+  {
+    const auto start = this->size();
+    this->resize(start + content.size());
+    std::copy(content.begin(), content.end(), this->begin() + start);
+  }
+};
+
+} // namespace sframe
+
+#endif

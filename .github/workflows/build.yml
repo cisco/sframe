@@ -51,15 +51,20 @@ jobs:
             ${{ env.CMAKE_BUILD_DIR }}/vcpkg_installed
         key: ${{ runner.os }}-${{ hashFiles( '**/vcpkg.json' ) }}
 
-    - name: configure to use clang-tidy and sanitizers
+    - name: Build and run unit tests (with allocator)
       run: |
         cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DCLANG_TIDY=ON -DTESTING=ON -DSANITIZERS=ON -DCMAKE_TOOLCHAIN_FILE="${{ matrix.vcpkg-cmake-file}}" .
-
-    - name: build
-      run: |
         cmake --build "${{ env.CMAKE_BUILD_DIR }}" --config Release
-
-    - name: Unit tests
-      run: |
         ctest --test-dir "${{ env.CMAKE_BUILD_DIR }}"
+
+    - name: Clear build artifacts
+      run: |
+        rm -rf "${{ env.CMAKE_BUILD_DIR }}"
+
+    - name: Build and run unit tests (without allocator)
+      run: |
+        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DCLANG_TIDY=ON -DTESTING=ON -DSANITIZERS=ON -DNO_ALLOC=ON -DCMAKE_TOOLCHAIN_FILE="${{ matrix.vcpkg-cmake-file}}" .
+        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --config Release
+        ctest --test-dir "${{ env.CMAKE_BUILD_DIR }}"
+
 

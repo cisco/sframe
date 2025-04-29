@@ -6,6 +6,17 @@
 #include <sframe/map.h>
 #include <sframe/vector.h>
 
+// These constants define the size of certain internal data structures if
+// we are configured not to depend on dynamic allocations, i.e., if the NO_ALLOC
+// flag is set.  If you are using an allocator, you can ignore them.
+#ifndef SFRAME_MAX_KEYS
+#define SFRAME_MAX_KEYS 200
+#endif
+
+#ifndef SFRAME_EPOCH_BITS
+#define SFRAME_EPOCH_BITS 4
+#endif
+
 namespace sframe {
 
 struct crypto_error : std::runtime_error
@@ -58,7 +69,6 @@ using owned_bytes = vector<uint8_t, N>;
 
 using KeyID = uint64_t;
 using Counter = uint64_t;
-
 class Header;
 
 enum struct KeyUsage
@@ -106,10 +116,8 @@ public:
   static constexpr size_t max_metadata_size = 512;
 
 protected:
-  static constexpr size_t max_keys = 200;
-
   CipherSuite suite;
-  map<KeyID, KeyRecord, max_keys> keys;
+  map<KeyID, KeyRecord, SFRAME_MAX_KEYS> keys;
 
   output_bytes protect_inner(const Header& header,
                              output_bytes ciphertext,
@@ -185,8 +193,7 @@ private:
   const size_t epoch_bits;
   const size_t epoch_mask;
 
-  // XXX(RLB) Make this an attribute of the class?
-  static constexpr size_t max_epochs = 16;
+  static constexpr size_t max_epochs = 1 << SFRAME_EPOCH_BITS;
   vector<std::optional<EpochKeys>, max_epochs> epoch_cache;
 };
 

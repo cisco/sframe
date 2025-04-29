@@ -2,6 +2,8 @@
 
 #include <sframe/vector.h>
 
+namespace sframe {
+
 template<typename K, typename V, size_t N>
 class map : private vector<std::optional<std::pair<K, V>>, N>
 {
@@ -64,3 +66,5 @@ public:
     std::replace_if(this->begin(), this->end(), to_erase, std::nullopt);
   }
 };
+
+} // namespace sframe
