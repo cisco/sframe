@@ -77,6 +77,13 @@ public:
 
 namespace sframe {
 
+// NOTE: NOT RECOMMENDED FOR USE OUTSIDE THIS LIBRARY
+//
+// We have used public inheritance from std::map<T> to simplify the interface
+// here.  This works fine for the use cases we have within this library.  If you
+// choose to use this map type outside this library, you MUST NOT store it as a
+// std::map<T> pointer or reference.  This will cause memory leaks, because the
+// destructor ~std::map<T> is not virtual.
 template<typename K, typename V, size_t N>
 class map : public std::map<K, V>
 {

@@ -94,6 +94,13 @@ public:
 
 namespace sframe {
 
+// NOTE: NOT RECOMMENDED FOR USE OUTSIDE THIS LIBRARY
+//
+// We have used public inheritance from std::vector<T> to simplify the interface
+// here.  This works fine for the use cases we have within this library.  If you
+// choose to use this vector type outside this library, you MUST NOT store it as
+// a std::vector<T> pointer or reference.  This will cause memory leaks, because
+// the destructor ~std::vector<T> is not virtual.
 template<typename T, size_t N>
 class vector : public std::vector<T>
 {
