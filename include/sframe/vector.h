@@ -103,20 +103,24 @@ private:
 public:
   constexpr vector()
     : parent(N)
-  {}
+  {
+  }
 
   constexpr vector(size_t size)
     : parent(size)
-  {}
+  {
+  }
 
   constexpr vector(gsl::span<const T> content)
     : parent(content.begin(), content.end())
-  {}
+  {
+  }
 
   template<size_t M>
   constexpr vector(const vector<T, M>& content)
     : parent(content)
-  {}
+  {
+  }
 
   void append(gsl::span<const T> content)
   {
@@ -128,4 +132,4 @@ public:
 
 } // namespace sframe
 
-#endif
+#endif // def NO_ALLOC

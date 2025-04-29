@@ -1,5 +1,7 @@
 #pragma once
 
+#ifdef NO_ALLOC
+
 #include <sframe/vector.h>
 
 namespace sframe {
@@ -68,3 +70,35 @@ public:
 };
 
 } // namespace sframe
+
+#else // ifdef NO_ALLOC
+
+#include <map>
+
+namespace sframe {
+
+template<typename K, typename V, size_t N>
+class map : public std::map<K, V>
+{
+private:
+  using parent = std::map<K, V>;
+
+public:
+  bool contains(const K& key) const { return this->count(key) > 0; }
+
+  template<typename F>
+  void erase_if_key(F&& f)
+  {
+    for (auto iter = this->begin(); iter != this->end();) {
+      if (f(iter->first)) {
+        iter = this->erase(iter);
+      } else {
+        ++iter;
+      }
+    }
+  }
+};
+
+} // namespace sframe
+
+#endif // def NO_ALLOC
