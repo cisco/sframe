@@ -87,13 +87,12 @@ hkdf_expand(CipherSuite suite, input_bytes prk, input_bytes info, size_t size)
   const auto* md = openssl_digest_type(suite);
   auto out = owned_bytes<max_hkdf_expand_size>(size);
   if (1 != HKDF_expand(out.data(),
-                        out.size(),
-                        md,
-                        prk.data(),
-                        prk.size(),
-                        info.data(),
-                        info.size())
-      ) {
+                       out.size(),
+                       md,
+                       prk.data(),
+                       prk.size(),
+                       info.data(),
+                       info.size())) {
     throw crypto_error();
   }
 
