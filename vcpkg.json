@@ -3,15 +3,12 @@
   "version-string": "0.1",
   "description": "Cisco SFrame C++ library",
   "dependencies": [
-    "openssl",
+    {
+      "name": "boringssl",
+      "version>=": "2023-10-13"
+    },    
     "doctest",
     "nlohmann-json"    
   ],
-  "builtin-baseline": "7476f0d4e77d3333fbb249657df8251c28c4faae",
-  "overrides": [
-    {
-      "name": "openssl",
-      "version-string": "3.1.2"
-    }
-  ]
+  "builtin-baseline": "7476f0d4e77d3333fbb249657df8251c28c4faae"
 }
