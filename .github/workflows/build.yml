@@ -41,7 +41,7 @@ jobs:
     - name: dependencies (macos)
       if: ${{ matrix.os == 'macos-latest' }}
       run: |
-        brew install llvm ninja
+        brew install llvm ninja nasm
         ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
         ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
 
@@ -53,11 +53,12 @@ jobs:
         key: ${{ runner.os }}-${{ hashFiles( '**/vcpkg.json' ) }}
 
     - name: configure to use clang-tidy and sanitizers
-      run: |
-        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON \
-              -DCLANG_TIDY=ON -DSANITIZERS=ON \
-              -DCMAKE_TOOLCHAIN_FILE="${{ matrix.vcpkg-cmake-file}}" \
-              -DCRYPTO=${{ matrix.crypto }} -DVCPKG_MANIFEST_DIR=alternatives/${{ matrix.crypto }}
+      run: >
+        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON
+              -DCLANG_TIDY=ON -DSANITIZERS=ON
+              -DCMAKE_TOOLCHAIN_FILE="${{ matrix.vcpkg-cmake-file}}"
+              -DCRYPTO="${{ matrix.crypto }}"
+              -DVCPKG_MANIFEST_DIR="alternatives/${{ matrix.crypto }}"
 
     - name: build
       run: |
