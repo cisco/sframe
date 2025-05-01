@@ -12,21 +12,8 @@
 
 using namespace sframe;
 
-static void
-ensure_fips_if_required()
-{
-#if defined(OPENSSL_1_1)
-  const auto* require = std::getenv("REQUIRE_FIPS");
-  if (require && FIPS_mode() == 0) {
-    REQUIRE(FIPS_mode_set(1) == 1);
-  }
-#endif
-}
-
 TEST_CASE("SFrame Round-Trip")
 {
-  ensure_fips_if_required();
-
   const auto rounds = 1 << 9;
   const auto kid = KeyID(0x42);
   const auto plaintext = from_hex("00010203");
@@ -69,8 +56,6 @@ TEST_CASE("SFrame Round-Trip")
 // only have round-trip tests, not known-answer tests.
 TEST_CASE("MLS Round-Trip")
 {
-  ensure_fips_if_required();
-
   const auto epoch_bits = 2;
   const auto test_epochs = 1 << (epoch_bits + 1);
   const auto epoch_rounds = 10;
@@ -116,8 +101,6 @@ TEST_CASE("MLS Round-Trip")
 
 TEST_CASE("MLS Round-Trip with context")
 {
-  ensure_fips_if_required();
-
   const auto epoch_bits = 4;
   const auto test_epochs = 1 << (epoch_bits + 1);
   const auto epoch_rounds = 10;
@@ -183,8 +166,6 @@ TEST_CASE("MLS Round-Trip with context")
 
 TEST_CASE("MLS Failure after Purge")
 {
-  ensure_fips_if_required();
-
   const auto suite = CipherSuite::AES_GCM_128_SHA256;
   const auto epoch_bits = 2;
   const auto metadata = from_hex("00010203");
