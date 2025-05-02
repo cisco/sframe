@@ -302,8 +302,8 @@ MLSContext::EpochKeys::EpochKeys(MLSContext::EpochID full_epoch_in,
   }
 
   context_bits = key_id_bits - sender_bits - epoch_bits;
-  max_sender_id = (one << (sender_bits + 1)) - 1;
-  max_context_id = (one << (context_bits + 1)) - 1;
+  max_sender_id = (one << sender_bits) - 1;
+  max_context_id = (one << context_bits) - 1;
 }
 
 owned_bytes<MLSContext::EpochKeys::max_secret_size>
