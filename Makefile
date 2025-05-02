@@ -11,7 +11,11 @@ LIB=./build/libsframe.a
 TEST_VECTOR_DIR=./build/test
 TEST_BIN=./build/test/sframe_test
 
-.PHONY: all tidy test clean cclean format
+OPENSSL_1_1_MANIFEST=alternatives/OPENSSL_1_1
+OPENSSL_3_MANIFEST=alternatives/OPENSSL_3
+BORINGSSL_MANIFEST=alternatives/BORINGSSL
+
+.PHONY: all dev dev1 devB tidy test clean cclean format
 
 ${LIB}: ${BUILD_DIR} src/* include/sframe/*
 	cmake --build ${BUILD_DIR} --target sframe
@@ -20,7 +24,19 @@ ${BUILD_DIR}: CMakeLists.txt test/CMakeLists.txt
 	cmake -B${BUILD_DIR} .
 
 dev: CMakeLists.txt test/CMakeLists.txt
-	cmake -B${BUILD_DIR} -DCMAKE_BUILD_TYPE=Debug -DCLANG_TIDY=ON -DTESTING=ON -DSANITIZERS=ON .
+	cmake -B${BUILD_DIR} -DCMAKE_BUILD_TYPE=Debug -DTESTING=ON \
+		-DCLANG_TIDY=ON -DSANITIZERS=ON \
+		-DCRYPTO=OPENSSL_3 -DVCPKG_MANIFEST_DIR=${OPENSSL_3_MANIFEST}
+
+dev1: CMakeLists.txt test/CMakeLists.txt
+	cmake -B${BUILD_DIR} -DCMAKE_BUILD_TYPE=Debug -DTESTING=ON \
+		-DCLANG_TIDY=ON -DSANITIZERS=ON \
+		-DCRYPTO=OPENSSL_1_1 -DVCPKG_MANIFEST_DIR=${OPENSSL_1_1_MANIFEST}
+
+devB: CMakeLists.txt test/CMakeLists.txt
+	cmake -B${BUILD_DIR} -DCMAKE_BUILD_TYPE=Debug -DTESTING=ON \
+		-DCLANG_TIDY=ON -DSANITIZERS=ON \
+		-DCRYPTO=BORINGSSL -DVCPKG_MANIFEST_DIR=${BORINGSSL_MANIFEST}
 
 dev-nostd: CMakeLists.txt test/CMakeLists.txt
 	cmake -B${BUILD_DIR} -DCMAKE_BUILD_TYPE=Debug -DCLANG_TIDY=ON -DTESTING=ON -DSANITIZERS=ON -DNO_ALLOC=ON .
