@@ -18,6 +18,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
+        crypto: [OPENSSL_1_1, OPENSSL_3, BORINGSSL]
         include:
             - os: windows-latest
               vcpkg-cmake-file: "$env:VCPKG_INSTALLATION_ROOT\\scripts\\buildsystems\\vcpkg.cmake"
@@ -37,10 +38,15 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: dependencies (ubuntu)
+      if: ${{ matrix.os == 'ubuntu-latest' }}
+      run: |
+        sudo apt-get install nasm
+
     - name: dependencies (macos)
       if: ${{ matrix.os == 'macos-latest' }}
       run: |
-        brew install llvm ninja
+        brew install llvm ninja nasm go
         ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
         ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
 
@@ -52,8 +58,8 @@ jobs:
         key: ${{ runner.os }}-${{ hashFiles( '**/vcpkg.json' ) }}
 
     - name: configure to use clang-tidy and sanitizers
-      run: |
-        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DCLANG_TIDY=ON -DTESTING=ON -DSANITIZERS=ON -DCMAKE_TOOLCHAIN_FILE="${{ matrix.vcpkg-cmake-file}}" .
+      run: >
+        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DCMAKE_TOOLCHAIN_FILE="${{ matrix.vcpkg-cmake-file}}" -DCRYPTO="${{ matrix.crypto }}" -DVCPKG_MANIFEST_DIR="alternatives/${{ matrix.crypto }}"
 
     - name: build
       run: |

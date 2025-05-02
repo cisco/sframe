@@ -1,21 +1,15 @@
-#if defined(OPENSSL_1_1)
+#if defined(BORINGSSL)
 
 #include "crypto.h"
 #include "header.h"
 
 #include <openssl/err.h>
 #include <openssl/evp.h>
+#include <openssl/hkdf.h>
 #include <openssl/hmac.h>
+#include <openssl/mem.h>
 
 namespace sframe {
-
-///
-/// Scoped pointers for OpenSSL objects
-///
-
-using scoped_evp_ctx =
-  std::unique_ptr<EVP_CIPHER_CTX, decltype(&EVP_CIPHER_CTX_free)>;
-using scoped_hmac_ctx = std::unique_ptr<HMAC_CTX, decltype(&HMAC_CTX_free)>;
 
 ///
 /// Convert between native identifiers / errors and OpenSSL ones
@@ -65,107 +59,41 @@ openssl_cipher(CipherSuite suite)
 }
 
 ///
-/// HMAC
-///
-
-struct HMAC
-{
-private:
-  scoped_hmac_ctx ctx;
-
-public:
-  HMAC(CipherSuite suite, input_bytes key)
-    : ctx(HMAC_CTX_new(), HMAC_CTX_free)
-  {
-    const auto type = openssl_digest_type(suite);
-
-    // Some FIPS-enabled libraries are overly conservative in their
-    // interpretation of NIST SP 800-131A, which requires HMAC keys to be at
-    // least 112 bits long. That document does not impose that requirement on
-    // HKDF, so we disable FIPS enforcement for purposes of HKDF.
-    //
-    // https://doi.org/10.6028/NIST.SP.800-131Ar2
-    static const auto fips_min_hmac_key_len = 14;
-    auto key_size = static_cast<int>(key.size());
-    if (FIPS_mode() != 0 && key_size < fips_min_hmac_key_len) {
-      HMAC_CTX_set_flags(ctx.get(), EVP_MD_CTX_FLAG_NON_FIPS_ALLOW);
-    }
-
-    // Guard against sending nullptr to HMAC_Init_ex
-    const auto* key_data = key.data();
-    const auto non_null_zero_length_key = uint8_t(0);
-    if (key_data == nullptr) {
-      key_data = &non_null_zero_length_key;
-    }
-
-    if (1 != HMAC_Init_ex(ctx.get(), key_data, key_size, type, nullptr)) {
-      throw crypto_error();
-    }
-  }
-
-  void write(input_bytes data)
-  {
-    if (1 != HMAC_Update(ctx.get(), data.data(), data.size())) {
-      throw crypto_error();
-    }
-  }
-
-  output_bytes digest(output_bytes md)
-  {
-    unsigned int size = md.size();
-    if (1 != HMAC_Final(ctx.get(), md.data(), &size)) {
-      throw crypto_error();
-    }
-
-    return md.first(size);
-  }
-};
-
-///
 /// HKDF
 ///
 
 owned_bytes<max_hkdf_expand_size>
 hkdf_extract(CipherSuite suite, input_bytes salt, input_bytes ikm)
 {
-  auto h = HMAC(suite, salt);
-  h.write(ikm);
+  const auto* md = openssl_digest_type(suite);
+  auto out = owned_bytes<max_hkdf_expand_size>(EVP_MD_size(md));
+  auto out_len = size_t(out.size());
+  if (1 != HKDF_extract(out.data(),
+                        &out_len,
+                        md,
+                        ikm.data(),
+                        ikm.size(),
+                        salt.data(),
+                        salt.size())) {
+    throw crypto_error();
+  }
 
-  auto out = owned_bytes<max_hkdf_expand_size>();
-  const auto md = h.digest(out);
-  out.resize(md.size());
   return out;
 }
 
 owned_bytes<max_hkdf_extract_size>
 hkdf_expand(CipherSuite suite, input_bytes prk, input_bytes info, size_t size)
 {
-  // Ensure that we need only one hash invocation
-  if (size > max_hkdf_extract_size) {
-    throw invalid_parameter_error("Size too big for hkdf_expand");
-  }
-
-  auto out = owned_bytes<max_hkdf_extract_size>(0);
-
-  auto block = owned_bytes<max_hkdf_extract_size>(0);
-  const auto block_size = cipher_digest_size(suite);
-  auto counter = uint8_t(0x01);
-  while (out.size() < size) {
-    // for (auto start = size_t(0); start < out.size(); start += block_size) {
-    auto h = HMAC(suite, prk);
-    h.write(block);
-    h.write(info);
-    h.write(owned_bytes<1>{ counter });
-
-    block.resize(block.capacity());
-    const auto md = h.digest(block);
-    block.resize(md.size());
-
-    const auto remaining = size - out.size();
-    const auto to_write = (remaining < block_size) ? remaining : block_size;
-    out.append(input_bytes(block).first(to_write));
-
-    counter += 1;
+  const auto* md = openssl_digest_type(suite);
+  auto out = owned_bytes<max_hkdf_expand_size>(size);
+  if (1 != HKDF_expand(out.data(),
+                       out.size(),
+                       md,
+                       prk.data(),
+                       prk.size(),
+                       info.data(),
+                       info.size())) {
+    throw crypto_error();
   }
 
   return out;
@@ -183,23 +111,56 @@ compute_tag(CipherSuite suite,
             input_bytes ct,
             size_t tag_size)
 {
+  using scoped_hmac_ctx = std::unique_ptr<HMAC_CTX, decltype(&HMAC_CTX_free)>;
+
+  auto ctx = scoped_hmac_ctx(HMAC_CTX_new(), HMAC_CTX_free);
+  const auto md = openssl_digest_type(suite);
+
+  // Guard against sending nullptr to HMAC_Init_ex
+  const auto* key_data = auth_key.data();
+  auto key_size = static_cast<int>(auth_key.size());
+  const auto non_null_zero_length_key = uint8_t(0);
+  if (key_data == nullptr) {
+    key_data = &non_null_zero_length_key;
+  }
+
+  if (1 != HMAC_Init_ex(ctx.get(), key_data, key_size, md, nullptr)) {
+    throw crypto_error();
+  }
+
   auto len_block = owned_bytes<24>();
   auto len_view = output_bytes(len_block);
   encode_uint(aad.size(), len_view.first(8));
   encode_uint(ct.size(), len_view.first(16).last(8));
   encode_uint(tag_size, len_view.last(8));
+  if (1 != HMAC_Update(ctx.get(), len_block.data(), len_block.size())) {
+    throw crypto_error();
+  }
 
-  auto h = HMAC(suite, auth_key);
-  h.write(len_block);
-  h.write(nonce);
-  h.write(aad);
-  h.write(ct);
+  if (1 != HMAC_Update(ctx.get(), nonce.data(), nonce.size())) {
+    throw crypto_error();
+  }
+
+  if (1 != HMAC_Update(ctx.get(), aad.data(), aad.size())) {
+    throw crypto_error();
+  }
+
+  if (1 != HMAC_Update(ctx.get(), ct.data(), ct.size())) {
+    throw crypto_error();
+  }
 
   auto tag = owned_bytes<64>();
-  h.digest(tag);
+  auto size = static_cast<unsigned int>(EVP_MD_size(md));
+  if (1 != HMAC_Final(ctx.get(), tag.data(), &size)) {
+    throw crypto_error();
+  }
+
   tag.resize(tag_size);
   return tag;
 }
+
+using scoped_evp_cipher_ctx =
+  std::unique_ptr<EVP_CIPHER_CTX, decltype(&EVP_CIPHER_CTX_free)>;
 
 static void
 ctr_crypt(CipherSuite suite,
@@ -212,7 +173,7 @@ ctr_crypt(CipherSuite suite,
     throw buffer_too_small_error("CTR size mismatch");
   }
 
-  auto ctx = scoped_evp_ctx(EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free);
+  auto ctx = scoped_evp_cipher_ctx(EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free);
   if (ctx.get() == nullptr) {
     throw crypto_error();
   }
@@ -282,7 +243,7 @@ seal_aead(CipherSuite suite,
     throw buffer_too_small_error("Ciphertext buffer too small");
   }
 
-  auto ctx = scoped_evp_ctx(EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free);
+  auto ctx = scoped_evp_cipher_ctx(EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free);
   if (ctx.get() == nullptr) {
     throw crypto_error();
   }
@@ -401,7 +362,7 @@ open_aead(CipherSuite suite,
     throw buffer_too_small_error("Plaintext buffer too small");
   }
 
-  auto ctx = scoped_evp_ctx(EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free);
+  auto ctx = scoped_evp_cipher_ctx(EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free);
   if (ctx.get() == nullptr) {
     throw crypto_error();
   }
@@ -469,4 +430,4 @@ open(CipherSuite suite,
 
 } // namespace sframe
 
-#endif // defined(OPENSSL_1_1)
+#endif // defined(OPENSSL_3)
