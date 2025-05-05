@@ -8,6 +8,7 @@ project(sframe
 option(TESTING    "Build tests" OFF)
 option(CLANG_TIDY "Perform linting with clang-tidy" OFF)
 option(SANITIZERS "Enable sanitizers" OFF)
+option(NO_ALLOC   "Build without needing an allocator" OFF)
 
 # Use -DCRYPTO=(OPENSSL_1_1 | OPENSSL_3 | BORINGSSL) to configure crypto
 if(NOT DEFINED CRYPTO)
@@ -47,6 +48,11 @@ if(CLANG_TIDY)
   else()
     message(WARNING "clang-tidy requested, but not found")
   endif()
+endif()
+
+if(NO_ALLOC)
+  message(STATUS "Configuring no-allocator version")
+  add_definitions(-DNO_ALLOC)
 endif()
 
 ###

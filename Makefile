@@ -38,6 +38,9 @@ devB: CMakeLists.txt test/CMakeLists.txt
 		-DCLANG_TIDY=ON -DSANITIZERS=ON \
 		-DCRYPTO=BORINGSSL -DVCPKG_MANIFEST_DIR=${BORINGSSL_MANIFEST}
 
+dev-nostd: CMakeLists.txt test/CMakeLists.txt
+	cmake -B${BUILD_DIR} -DCMAKE_BUILD_TYPE=Debug -DCLANG_TIDY=ON -DTESTING=ON -DSANITIZERS=ON -DNO_ALLOC=ON .
+
 ${TEST_BIN}: ${LIB} test/*
 	cmake --build ${BUILD_DIR} --target sframe_test
 

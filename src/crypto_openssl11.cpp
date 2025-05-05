@@ -149,23 +149,22 @@ hkdf_expand(CipherSuite suite, input_bytes prk, input_bytes info, size_t size)
 
   auto block = owned_bytes<max_hkdf_extract_size>(0);
   const auto block_size = cipher_digest_size(suite);
-  auto counter = uint8_t(0x01);
+  auto counter = owned_bytes<1>();
+  counter[0] = 0x01;
   while (out.size() < size) {
-    // for (auto start = size_t(0); start < out.size(); start += block_size) {
     auto h = HMAC(suite, prk);
     h.write(block);
     h.write(info);
-    h.write(owned_bytes<1>{ counter });
+    h.write(counter);
 
-    block.resize(block.capacity());
-    const auto md = h.digest(block);
-    block.resize(md.size());
+    block.resize(block_size);
+    h.digest(block);
 
     const auto remaining = size - out.size();
     const auto to_write = (remaining < block_size) ? remaining : block_size;
     out.append(input_bytes(block).first(to_write));
 
-    counter += 1;
+    counter[0] += 1;
   }
 
   return out;

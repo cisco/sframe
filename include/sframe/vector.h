@@ -2,6 +2,10 @@
 
 #include <gsl/gsl-lite.hpp>
 
+#ifdef NO_ALLOC
+
+namespace sframe {
+
 template<typename T, size_t N>
 class vector
 {
@@ -81,3 +85,58 @@ public:
   operator gsl::span<const T>() const { return gsl::span(_data).first(_size); }
   operator gsl::span<T>() { return gsl::span(_data).first(_size); }
 };
+
+} // namespace sframe
+
+#else // ifdef NO_ALLOC
+
+#include <vector>
+
+namespace sframe {
+
+// NOTE: NOT RECOMMENDED FOR USE OUTSIDE THIS LIBRARY
+//
+// We have used public inheritance from std::vector<T> to simplify the interface
+// here.  This works fine for the use cases we have within this library.  If you
+// choose to use this vector type outside this library, you MUST NOT store it as
+// a std::vector<T> pointer or reference.  This will cause memory leaks, because
+// the destructor ~std::vector<T> is not virtual.
+template<typename T, size_t N>
+class vector : public std::vector<T>
+{
+private:
+  using parent = std::vector<T>;
+
+public:
+  constexpr vector()
+    : parent(N)
+  {
+  }
+
+  constexpr vector(size_t size)
+    : parent(size)
+  {
+  }
+
+  constexpr vector(gsl::span<const T> content)
+    : parent(content.begin(), content.end())
+  {
+  }
+
+  template<size_t M>
+  constexpr vector(const vector<T, M>& content)
+    : parent(content)
+  {
+  }
+
+  void append(gsl::span<const T> content)
+  {
+    const auto start = this->size();
+    this->resize(start + content.size());
+    std::copy(content.begin(), content.end(), this->begin() + start);
+  }
+};
+
+} // namespace sframe
+
+#endif // def NO_ALLOC
