@@ -59,12 +59,12 @@ jobs:
         key: ${{ runner.os }}-${{ hashFiles( '**/vcpkg.json' ) }}
 
     - name: configure to use clang-tidy and sanitizers
-      run: 'cmake -B "${{ env.CMAKE_BUILD_DIR }}" \
-                  -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON \
-                  -DCMAKE_TOOLCHAIN_FILE="${{ matrix.vcpkg-cmake-file}}" \
-                  -DCRYPTO="${{ matrix.crypto }}" \
-                  -DVCPKG_MANIFEST_DIR="alternatives/${{ matrix.crypto }}" \
-                  -DNO_ALLOC="${{ matrix.no_alloc }}"'
+      run: cmake -B "${{ env.CMAKE_BUILD_DIR }}"
+                 -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON
+                 -DCMAKE_TOOLCHAIN_FILE="${{ matrix.vcpkg-cmake-file}}"
+                 -DCRYPTO="${{ matrix.crypto }}"
+                 -DVCPKG_MANIFEST_DIR="alternatives/${{ matrix.crypto }}"
+                 -DNO_ALLOC="${{ matrix.no_alloc }}"
 
     - name: build
       run: |
