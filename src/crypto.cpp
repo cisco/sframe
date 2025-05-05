@@ -1,9 +1,6 @@
 #include "crypto.h"
 #include "header.h"
 
-#include <openssl/err.h>
-#include <openssl/evp.h>
-
 namespace sframe {
 
 size_t

@@ -9,6 +9,11 @@
 // These constants define the size of certain internal data structures if
 // we are configured not to depend on dynamic allocations, i.e., if the NO_ALLOC
 // flag is set.  If you are using an allocator, you can ignore them.
+//
+// Note that these constants must be the same at the time when the library is
+// built as at the time when it is used.  If you are using a pre-built binary,
+// you must make sure that these parameters have the same values as when the
+// library was built.
 #ifndef SFRAME_MAX_KEYS
 #define SFRAME_MAX_KEYS 200
 #endif
