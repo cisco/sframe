@@ -1,7 +1,7 @@
 #pragma once
 
-#include <namespace.h>
 #include <gsl/gsl-lite.hpp>
+#include <namespace.h>
 
 #ifdef NO_ALLOC
 

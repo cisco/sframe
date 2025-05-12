@@ -1,5 +1,5 @@
-#include <sframe/sframe.h>
 #include <namespace.h>
+#include <sframe/sframe.h>
 
 #include <string>
 #include <vector>
