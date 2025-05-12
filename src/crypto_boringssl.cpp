@@ -9,7 +9,7 @@
 #include <openssl/hmac.h>
 #include <openssl/mem.h>
 
-namespace sframe {
+namespace SFRAME_NAMESPACE {
 
 ///
 /// Convert between native identifiers / errors and OpenSSL ones
@@ -428,6 +428,6 @@ open(CipherSuite suite,
   throw unsupported_ciphersuite_error();
 }
 
-} // namespace sframe
+} // namespace SFRAME_NAMESPACE
 
 #endif // defined(OPENSSL_3)

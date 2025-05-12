@@ -1,10 +1,11 @@
 #pragma once
 
 #include <gsl/gsl-lite.hpp>
+#include <namespace.h>
 
 #ifdef NO_ALLOC
 
-namespace sframe {
+namespace SFRAME_NAMESPACE {
 
 template<typename T, size_t N>
 class vector
@@ -86,13 +87,13 @@ public:
   operator gsl::span<T>() { return gsl::span(_data).first(_size); }
 };
 
-} // namespace sframe
+} // namespace SFRAME_NAMESPACE
 
 #else // ifdef NO_ALLOC
 
 #include <vector>
 
-namespace sframe {
+namespace SFRAME_NAMESPACE {
 
 // NOTE: NOT RECOMMENDED FOR USE OUTSIDE THIS LIBRARY
 //
@@ -137,6 +138,6 @@ public:
   }
 };
 
-} // namespace sframe
+} // namespace SFRAME_NAMESPACE
 
 #endif // def NO_ALLOC

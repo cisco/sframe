@@ -9,6 +9,17 @@ option(TESTING    "Build tests" OFF)
 option(CLANG_TIDY "Perform linting with clang-tidy" OFF)
 option(SANITIZERS "Enable sanitizers" OFF)
 option(NO_ALLOC   "Build without needing an allocator" OFF)
+option(NAMESPACE_SUFFIX "Namespace Suffix for CXX and CMake Export")
+
+if(NAMESPACE_SUFFIX)
+    set(SFRAME_CXX_NAMESPACE "sframe_${NAMESPACE_SUFFIX}" CACHE STRING "Top-level Namespace for CXX")
+    set(SFRAME_EXPORT_NAMESPACE "SFrame${NAMESPACE_SUFFIX}" CACHE STRING "Namespace for CMake Export")
+else()
+    set(SFRAME_CXX_NAMESPACE "sframe" CACHE STRING "Top-level Namespace for CXX")
+    set(SFRAME_EXPORT_NAMESPACE "SFrame" CACHE STRING "Namespace for CMake Export")
+endif()
+message(STATUS "CXX Namespace: ${SFRAME_CXX_NAMESPACE}")
+message(STATUS "CMake Export Namespace: ${SFRAME_EXPORT_NAMESPACE}")
 
 # Use -DCRYPTO=(OPENSSL_1_1 | OPENSSL_3 | BORINGSSL) to configure crypto
 if(NOT DEFINED CRYPTO)
@@ -19,6 +30,12 @@ endif()
 ### Global Config
 ###
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+
+configure_file(
+  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/namespace.h.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/include/namespace.h"
+  @ONLY
+)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -87,13 +104,15 @@ endif()
 set(LIB_NAME "${PROJECT_NAME}")
 
 file(GLOB_RECURSE LIB_HEADERS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h")
+file(GLOB_RECURSE LIB_GENERATED_HEADERS CONFIGURE_DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/include/*.h")
 file(GLOB_RECURSE LIB_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 
-add_library(${LIB_NAME} ${LIB_HEADERS} ${LIB_SOURCES})
+add_library(${LIB_NAME} ${LIB_HEADERS} ${LIB_GENERATED_HEADERS} ${LIB_SOURCES})
 target_link_libraries(${LIB_NAME} PRIVATE ${CRYPTO_LIB})
 target_include_directories(${LIB_NAME}
   PUBLIC
-    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
     $<INSTALL_INTERFACE:include/${PROJECT_NAME}-${PROJECT_VERSION}>
 )
 

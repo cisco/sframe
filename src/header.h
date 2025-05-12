@@ -2,7 +2,7 @@
 
 #include <sframe/sframe.h>
 
-namespace sframe {
+namespace SFRAME_NAMESPACE {
 
 void
 encode_uint(uint64_t val, output_bytes buffer);
@@ -31,4 +31,4 @@ private:
   Header(KeyID key_id_in, Counter counter_in, input_bytes encoded_in);
 };
 
-} // namespace sframe
+} // namespace SFRAME_NAMESPACE

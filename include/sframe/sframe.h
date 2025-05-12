@@ -6,6 +6,8 @@
 #include <sframe/map.h>
 #include <sframe/vector.h>
 
+#include <namespace.h>
+
 // These constants define the size of certain internal data structures if
 // we are configured not to depend on dynamic allocations, i.e., if the NO_ALLOC
 // flag is set.  If you are using an allocator, you can ignore them.
@@ -22,7 +24,7 @@
 #define SFRAME_EPOCH_BITS 4
 #endif
 
-namespace sframe {
+namespace SFRAME_NAMESPACE {
 
 struct crypto_error : std::runtime_error
 {
@@ -202,4 +204,4 @@ private:
   vector<std::optional<EpochKeys>, max_epochs> epoch_cache;
 };
 
-} // namespace sframe
+} // namespace SFRAME_NAMESPACE

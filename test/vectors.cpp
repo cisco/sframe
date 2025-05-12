@@ -8,7 +8,7 @@
 
 #include "common.h"
 
-using namespace sframe;
+using namespace SFRAME_NAMESPACE;
 using nlohmann::json;
 
 struct HexBytes

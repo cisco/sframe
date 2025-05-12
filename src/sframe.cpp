@@ -3,7 +3,7 @@
 #include "crypto.h"
 #include "header.h"
 
-namespace sframe {
+namespace SFRAME_NAMESPACE {
 
 ///
 /// Errors
@@ -378,4 +378,4 @@ MLSContext::ensure_key(KeyID key_id, KeyUsage usage)
   return;
 }
 
-} // namespace sframe
+} // namespace SFRAME_NAMESPACE

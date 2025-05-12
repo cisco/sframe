@@ -1,7 +1,7 @@
 #include "crypto.h"
 #include "header.h"
 
-namespace sframe {
+namespace SFRAME_NAMESPACE {
 
 size_t
 cipher_digest_size(CipherSuite suite)
@@ -94,4 +94,4 @@ cipher_overhead(CipherSuite suite)
   }
 }
 
-} // namespace sframe
+} // namespace SFRAME_NAMESPACE

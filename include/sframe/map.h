@@ -4,7 +4,7 @@
 
 #include <sframe/vector.h>
 
-namespace sframe {
+namespace SFRAME_NAMESPACE {
 
 template<typename K, typename V, size_t N>
 class map : private vector<std::optional<std::pair<K, V>>, N>
@@ -69,13 +69,14 @@ public:
   }
 };
 
-} // namespace sframe
+} // namespace SFRAME_NAMESPACE
 
 #else // ifdef NO_ALLOC
 
 #include <map>
+#include <namespace.h>
 
-namespace sframe {
+namespace SFRAME_NAMESPACE {
 
 // NOTE: NOT RECOMMENDED FOR USE OUTSIDE THIS LIBRARY
 //
@@ -106,6 +107,6 @@ public:
   }
 };
 
-} // namespace sframe
+} // namespace SFRAME_NAMESPACE
 
 #endif // def NO_ALLOC

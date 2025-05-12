@@ -7,7 +7,7 @@
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
 
-namespace sframe {
+namespace SFRAME_NAMESPACE {
 
 ///
 /// Scoped pointers for OpenSSL objects
@@ -466,6 +466,6 @@ open(CipherSuite suite,
   throw unsupported_ciphersuite_error();
 }
 
-} // namespace sframe
+} // namespace SFRAME_NAMESPACE
 
 #endif // defined(OPENSSL_1_1)
