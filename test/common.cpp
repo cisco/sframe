@@ -21,7 +21,7 @@ from_hex(const std::string& hex)
 }
 
 std::string
-to_hex(const sframe::input_bytes data)
+to_hex(const SFRAME_NAMESPACE::input_bytes data)
 {
   std::stringstream hex(std::ios_base::out);
   hex.flags(std::ios::hex);

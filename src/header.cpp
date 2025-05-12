@@ -1,6 +1,6 @@
 #include "header.h"
 
-namespace sframe {
+namespace SFRAME_NAMESPACE {
 
 static size_t
 uint_size(uint64_t val)
@@ -200,4 +200,4 @@ Header::encode(output_bytes buffer) const
 }
 #endif
 
-} // namespace sframe
+} // namespace SFRAME_NAMESPACE
