@@ -21,7 +21,7 @@ endif()
 message(STATUS "CXX Namespace: ${SFRAME_CXX_NAMESPACE}")
 message(STATUS "CMake Export Namespace: ${SFRAME_EXPORT_NAMESPACE}")
 
-# Use -DCRYPTO=(OPENSSL_1_1 | OPENSSL_3 | BORINGSSL) to configure crypto
+# Use -DCRYPTO=(OPENSSL_1_1 | OPENSSL_3 | BORINGSSL | STM32) to configure crypto
 if(NOT DEFINED CRYPTO)
   set(CRYPTO "OPENSSL_3")
 endif()
@@ -92,8 +92,13 @@ elseif(${CRYPTO} STREQUAL "BORINGSSL")
   find_package(OpenSSL REQUIRED)
   add_compile_definitions(BORINGSSL)
   set(CRYPTO_LIB OpenSSL::Crypto)
+elseif(${CRYPTO} STREQUAL "STM32")
+  message(STATUS "Configuring with STM32 Crypto")
+  find_package(STM32Cryptographic REQUIRED)
+  add_compile_definitions(STM32_CRYPTO)
+  set(CRYPTO_LIB STM32Cryptographic)
 else()
-  message(FATAL_ERROR "Please select a crypto back-end (OPENSSL_1_1 or OPENSSL_3) [${CRYPTO}]")
+  message(FATAL_ERROR "Please select a crypto back-end (OPENSSL_1_1, OPENSSL_3, BORINGSSL, STM32) [${CRYPTO}]")
 endif()
 
 
