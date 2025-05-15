@@ -9,6 +9,11 @@ option(TESTING    "Build tests" OFF)
 option(CLANG_TIDY "Perform linting with clang-tidy" OFF)
 option(SANITIZERS "Enable sanitizers" OFF)
 
+# Use -DCRYPTO=(OPENSSL_1_1 | OPENSSL_3 | BORINGSSL) to configure crypto
+if(NOT DEFINED CRYPTO)
+  set(CRYPTO "OPENSSL_3")
+endif()
+
 ###
 ### Global Config
 ###
@@ -49,7 +54,24 @@ endif()
 ###
 
 # External libraries
-find_package(OpenSSL 1.1 REQUIRED)
+if(${CRYPTO} STREQUAL "OPENSSL_1_1")
+  message(STATUS "Configuring with OpenSSL 1.1")
+  find_package(OpenSSL 1.1 EXACT REQUIRED)
+  add_compile_definitions(OPENSSL_1_1)
+  set(CRYPTO_LIB OpenSSL::Crypto)
+elseif(${CRYPTO} STREQUAL "OPENSSL_3")
+  message(STATUS "Configuring with OpenSSL 3")
+  find_package(OpenSSL 3 EXACT REQUIRED)
+  add_compile_definitions(OPENSSL_3)
+  set(CRYPTO_LIB OpenSSL::Crypto)
+elseif(${CRYPTO} STREQUAL "BORINGSSL")
+  message(STATUS "Configuring with BoringSSL")
+  find_package(OpenSSL REQUIRED)
+  add_compile_definitions(BORINGSSL)
+  set(CRYPTO_LIB OpenSSL::Crypto)
+else()
+  message(FATAL_ERROR "Please select a crypto back-end (OPENSSL_1_1 or OPENSSL_3) [${CRYPTO}]")
+endif()
 
 # gsl-lite fetched from GitHub
 include( ExternalProject )
