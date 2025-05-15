@@ -10,6 +10,10 @@ CLANG_FORMAT=clang-format -i
 TEST_VECTOR_DIR=./build/test
 TEST_GEN=./build/cmd/test_gen/test_gen
 
+OPENSSL_1_1_MANIFEST=alternatives/OPENSSL_1_1
+OPENSSL_3_MANIFEST=alternatives/OPENSSL_3
+BORINGSSL_MANIFEST=alternatives/BORINGSSL
+
 .PHONY: all tidy test clean cclean format
 
 all: ${BUILD_DIR}
@@ -19,7 +23,19 @@ ${BUILD_DIR}: CMakeLists.txt test/CMakeLists.txt
 	cmake -B${BUILD_DIR} .
 
 dev: CMakeLists.txt test/CMakeLists.txt
-	cmake -B${BUILD_DIR} -DCLANG_TIDY=ON -DTESTING=ON -DSANITIZERS=ON .
+	cmake -B${BUILD_DIR} -DCMAKE_BUILD_TYPE=Debug -DTESTING=ON \
+		-DCLANG_TIDY=ON -DSANITIZERS=ON \
+		-DCRYPTO=OPENSSL_3 -DVCPKG_MANIFEST_DIR=${OPENSSL_3_MANIFEST}
+
+dev1: CMakeLists.txt test/CMakeLists.txt
+	cmake -B${BUILD_DIR} -DCMAKE_BUILD_TYPE=Debug -DTESTING=ON \
+		-DCLANG_TIDY=ON -DSANITIZERS=ON \
+		-DCRYPTO=OPENSSL_1_1 -DVCPKG_MANIFEST_DIR=${OPENSSL_1_1_MANIFEST}
+
+devB: CMakeLists.txt test/CMakeLists.txt
+	cmake -B${BUILD_DIR} -DCMAKE_BUILD_TYPE=Debug -DTESTING=ON \
+		-DCLANG_TIDY=ON -DSANITIZERS=ON \
+		-DCRYPTO=BORINGSSL -DVCPKG_MANIFEST_DIR=${BORINGSSL_MANIFEST}
 
 test: ${BUILD_DIR} test/*
 	cmake --build ${BUILD_DIR} --target sframe_test
