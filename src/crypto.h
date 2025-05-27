@@ -2,7 +2,7 @@
 
 #include <sframe/sframe.h>
 
-namespace sframe {
+namespace SFRAME_NAMESPACE {
 
 size_t
 cipher_digest_size(CipherSuite suite);
@@ -48,4 +48,4 @@ open(CipherSuite suite,
      input_bytes aad,
      input_bytes ct);
 
-} // namespace sframe
+} // namespace SFRAME_NAMESPACE

@@ -9,7 +9,7 @@
 #include <map>       // for map
 #include <stdexcept> // for invalid_argument
 
-using namespace sframe;
+using namespace SFRAME_NAMESPACE;
 
 TEST_CASE("Header Known-Answer")
 {

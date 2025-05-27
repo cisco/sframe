@@ -1,3 +1,4 @@
+#include <namespace.h>
 #include <sframe/sframe.h>
 
 #include <string>
@@ -8,7 +9,7 @@ using bytes = std::vector<uint8_t>;
 bytes
 from_hex(const std::string& hex);
 std::string
-to_hex(const sframe::input_bytes data);
+to_hex(const SFRAME_NAMESPACE::input_bytes data);
 
 template<typename T>
 bytes
