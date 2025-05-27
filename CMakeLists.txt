@@ -92,11 +92,27 @@ elseif(${CRYPTO} STREQUAL "BORINGSSL")
   find_package(OpenSSL REQUIRED)
   add_compile_definitions(BORINGSSL)
   set(CRYPTO_LIB OpenSSL::Crypto)
-elseif(${CRYPTO} STREQUAL "STM32")
+elseif(${CRYPTO} MATCHES "STM32")
   message(STATUS "Configuring with STM32 Crypto")
+  if(${CRYPTO} STREQUAL "STM32_CM0_CM0PLUS")
+    set(CRYPTO_LIB STM32Cryptographic_CM0_CM0PLUS)
+  elseif(${CRYPTO} STREQUAL "STM32_CM3")
+    set(CRYPTO_LIB STM32Cryptographic_CM3)
+  elseif(${CRYPTO} STREQUAL "STM32_CM33")
+    set(CRYPTO_LIB STM32Cryptographic_CM33)
+  elseif(${CRYPTO} STREQUAL "STM32_CM4")
+    set(CRYPTO_LIB STM32Cryptographic_CM4)
+  elseif(${CRYPTO} STREQUAL "STM32_CM7")
+    set(CRYPTO_LIB STM32Cryptographic_CM7)
+  else()
+    message(FATAL_ERROR "Please select a specific STM32 crypto back-end (STM32_CM0_CM0PLUS, STM32_CM3, STM32_CM33, STM32_CM4, STM32_CM7) [${CRYPTO}]")
+  endif()
+
+  list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
   find_package(STM32Cryptographic REQUIRED)
-  add_compile_definitions(STM32_CRYPTO)
-  set(CRYPTO_LIB STM32Cryptographic)
+
+  add_compile_definitions(STM32)
+  set(CRYPTO_INCLUDE_DIR ${STM32Cryptographic_INCLUDE_DIR})
 else()
   message(FATAL_ERROR "Please select a crypto back-end (OPENSSL_1_1, OPENSSL_3, BORINGSSL, STM32) [${CRYPTO}]")
 endif()
@@ -119,6 +135,7 @@ target_include_directories(${LIB_NAME}
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
     $<INSTALL_INTERFACE:include/${PROJECT_NAME}-${PROJECT_VERSION}>
+    ${CRYPTO_INCLUDE_DIR}
 )
 
 ###
