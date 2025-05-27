@@ -10,7 +10,7 @@
 #include <stdexcept>
 #include <tuple>
 
-namespace sframe {
+namespace SFRAME_NAMESPACE {
 
 std::ostream&
 operator<<(std::ostream& str, const input_bytes data)
@@ -294,4 +294,4 @@ MLSContext::get_state(KeyID key_id)
   return epoch->get(suite, sender_id);
 }
 
-} // namespace sframe
+} // namespace SFRAME_NAMESPACE

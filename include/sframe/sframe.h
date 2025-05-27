@@ -5,9 +5,10 @@
 #include <memory>
 #include <vector>
 
+#include <namespace.h>
 #include <gsl/gsl-lite.hpp>
 
-namespace sframe {
+namespace SFRAME_NAMESPACE {
 
 struct openssl_error : std::runtime_error
 {
@@ -147,4 +148,4 @@ private:
   KeyState& get_state(KeyID key_id) override;
 };
 
-} // namespace sframe
+} // namespace SFRAME_NAMESPACE

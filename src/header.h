@@ -2,7 +2,7 @@
 
 #include <sframe/sframe.h>
 
-namespace sframe {
+namespace SFRAME_NAMESPACE {
 
 void
 encode_uint(uint64_t val, output_bytes buffer);
@@ -21,4 +21,4 @@ struct Header
   static constexpr size_t max_size = 1 + 7 + 7;
 };
 
-} // namespace sframe
+} // namespace SFRAME_NAMESPACE

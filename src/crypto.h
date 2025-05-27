@@ -4,7 +4,7 @@
 
 #include <array>
 
-namespace sframe {
+namespace SFRAME_NAMESPACE {
 
 ///
 /// Information about algorithms
@@ -54,4 +54,4 @@ open(CipherSuite suite,
      input_bytes aad,
      input_bytes ct);
 
-} // namespace sframe
+} // namespace SFRAME_NAMESPACE

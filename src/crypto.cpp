@@ -1,6 +1,6 @@
 #include "crypto.h"
 
-namespace sframe {
+namespace SFRAME_NAMESPACE {
 
 ///
 /// Information about algorithms
@@ -91,4 +91,4 @@ cipher_overhead(CipherSuite suite)
   }
 }
 
-} // namespace sframe
+} // namespace SFRAME_NAMESPACE

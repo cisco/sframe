@@ -8,7 +8,7 @@
 #include <stdexcept> // for invalid_argument
 #include <string>    // for basic_string, operator==
 
-using namespace sframe;
+using namespace SFRAME_NAMESPACE;
 
 static bytes
 from_hex(const std::string& hex)
