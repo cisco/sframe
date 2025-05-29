@@ -108,8 +108,6 @@ elseif(${CRYPTO} MATCHES "STM32")
     message(FATAL_ERROR "Please select a specific STM32 crypto back-end (STM32_CM0_CM0PLUS, STM32_CM3, STM32_CM33, STM32_CM4, STM32_CM7) [${CRYPTO}]")
   endif()
 
-  message(STATUS "Crypto component=${STM32_CRYPTO_LIB}")
-
   list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
   find_package(STM32Cryptographic COMPONENTS ${STM32_CRYPTO_LIB} REQUIRED)
 
@@ -117,7 +115,7 @@ elseif(${CRYPTO} MATCHES "STM32")
   set(CRYPTO_INCLUDE_DIR ${STM32Cryptographic_INCLUDE_DIR})
   set(CRYPTO_LIB ${STM32Cryptographic_LIBRARIES})
 else()
-  message(FATAL_ERROR "Please select a crypto back-end (OPENSSL_1_1, OPENSSL_3, BORINGSSL, STM32) [${CRYPTO}]")
+  message(FATAL_ERROR "Please select a crypto back-end (OPENSSL_1_1, OPENSSL_3, BORINGSSL, STM32_CM0_CM0PLUS, STM32_CM3, STM32_CM33, STM32_CM4, STM32_CM7) [${CRYPTO}]")
 endif()
 
 
