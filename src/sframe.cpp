@@ -71,7 +71,11 @@ KeyRecord::from_base_key(CipherSuite suite,
   auto key_size = cipher_key_size(suite);
   auto nonce_size = cipher_nonce_size(suite);
 
+#ifdef STM32
+  const auto empty_byte_string = owned_bytes<1>(0);
+#else
   const auto empty_byte_string = owned_bytes<0>();
+#endif
   const auto key_label = sframe_key_label(suite, key_id);
   const auto salt_label = sframe_salt_label(suite, key_id);
 
