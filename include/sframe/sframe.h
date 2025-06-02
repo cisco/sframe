@@ -29,6 +29,8 @@ namespace SFRAME_NAMESPACE {
 struct crypto_error : std::runtime_error
 {
   crypto_error();
+  crypto_error(std::size_t err_code);
+  crypto_error(const std::string& err_str);
 };
 
 struct unsupported_ciphersuite_error : std::runtime_error

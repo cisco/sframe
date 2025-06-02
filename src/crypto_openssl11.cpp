@@ -26,6 +26,16 @@ crypto_error::crypto_error()
 {
 }
 
+crypto_error::crypto_error(std::size_t err_code)
+  : std::runtime_error(ERR_error_string(err_code, nullptr))
+{
+}
+
+crypto_error::crypto_error(const std::string& err_str)
+  : std::runtime_error(err_str)
+{
+}
+
 static const EVP_MD*
 openssl_digest_type(CipherSuite suite)
 {
