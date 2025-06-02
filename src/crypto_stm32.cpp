@@ -14,10 +14,9 @@ namespace sframe {
 
 #define VERIFY_CMOX_CALL(func, success_code)                                   \
   do {                                                                         \
-    auto retval = func;                                                        \
+    const auto retval = func;                                                  \
     if (retval != success_code) {                                              \
-      cmox_error = retval;                                                     \
-      throw crypto_error();                                                    \
+      throw crypto_error(retval);                                              \
     }                                                                          \
   } while (0)
 
@@ -25,61 +24,67 @@ namespace sframe {
 /// Convert between native identifiers / errors and cmox ones
 ///
 
-std::optional<int> cmox_error;
-
 crypto_error::crypto_error()
-  : std::runtime_error(
-      cmox_error.has_value()
-        ? "CMOX crypto error (error=" + std::to_string(cmox_error.value()) + ")"
-        : "unknown CMOX crypto error")
+  : std::runtime_error("unknown CMOX crypto error")
 {
 }
 
-extern "C"
+crypto_error::crypto_error(std::size_t err_code)
+  : std::runtime_error(
+      "CMOX crypto error (error_code=" + std::to_string(err_code) + ")")
 {
-  static cmox_mac_algo_t cmox_hmac_algo(CipherSuite suite)
-  {
-    switch (suite) {
-      case CipherSuite::AES_128_CTR_HMAC_SHA256_80:
-      case CipherSuite::AES_128_CTR_HMAC_SHA256_64:
-      case CipherSuite::AES_128_CTR_HMAC_SHA256_32:
-      case CipherSuite::AES_GCM_128_SHA256:
-        return CMOX_HMAC_SHA256_ALGO;
-      case CipherSuite::AES_GCM_256_SHA512:
-        return CMOX_HMAC_SHA512_ALGO;
-      default:
-        throw unsupported_ciphersuite_error();
-    }
-  }
+}
 
-  static cmox_hmac_impl_t cmox_hmac_impl(CipherSuite suite)
-  {
-    switch (suite) {
-      case CipherSuite::AES_128_CTR_HMAC_SHA256_80:
-      case CipherSuite::AES_128_CTR_HMAC_SHA256_64:
-      case CipherSuite::AES_128_CTR_HMAC_SHA256_32:
-      case CipherSuite::AES_GCM_128_SHA256:
-        return CMOX_HMAC_SHA256;
-      case CipherSuite::AES_GCM_256_SHA512:
-        return CMOX_HMAC_SHA512;
-      default:
-        throw unsupported_ciphersuite_error();
-    }
-  }
+crypto_error::crypto_error(const std::string& err_str)
+  : std::runtime_error("CMOX crypto error (error=" + err_str + ")")
+{
+}
 
-  static std::size_t cmox_hmac_size(CipherSuite suite)
-  {
-    switch (suite) {
-      case CipherSuite::AES_128_CTR_HMAC_SHA256_80:
-      case CipherSuite::AES_128_CTR_HMAC_SHA256_64:
-      case CipherSuite::AES_128_CTR_HMAC_SHA256_32:
-      case CipherSuite::AES_GCM_128_SHA256:
-        return CMOX_SHA256_SIZE;
-      case CipherSuite::AES_GCM_256_SHA512:
-        return CMOX_SHA512_SIZE;
-      default:
-        throw unsupported_ciphersuite_error();
-    }
+static cmox_mac_algo_t
+cmox_hmac_algo(CipherSuite suite)
+{
+  switch (suite) {
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_80:
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_64:
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_32:
+    case CipherSuite::AES_GCM_128_SHA256:
+      return CMOX_HMAC_SHA256_ALGO;
+    case CipherSuite::AES_GCM_256_SHA512:
+      return CMOX_HMAC_SHA512_ALGO;
+    default:
+      throw unsupported_ciphersuite_error();
+  }
+}
+
+static cmox_hmac_impl_t
+cmox_hmac_impl(CipherSuite suite)
+{
+  switch (suite) {
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_80:
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_64:
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_32:
+    case CipherSuite::AES_GCM_128_SHA256:
+      return CMOX_HMAC_SHA256;
+    case CipherSuite::AES_GCM_256_SHA512:
+      return CMOX_HMAC_SHA512;
+    default:
+      throw unsupported_ciphersuite_error();
+  }
+}
+
+static std::size_t
+cmox_hmac_size(CipherSuite suite)
+{
+  switch (suite) {
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_80:
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_64:
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_32:
+    case CipherSuite::AES_GCM_128_SHA256:
+      return CMOX_SHA256_SIZE;
+    case CipherSuite::AES_GCM_256_SHA512:
+      return CMOX_SHA512_SIZE;
+    default:
+      throw unsupported_ciphersuite_error();
   }
 }
 
@@ -115,51 +120,38 @@ hkdf_expand(CipherSuite suite, input_bytes prk, input_bytes info, size_t size)
   cmox_mac_handle_t* mac_ctx;
 
   const auto digest_size = cmox_hmac_size(suite);
-  auto N = static_cast<uint32_t>(size / digest_size);
-  if ((N * digest_size) < size) {
-    N++;
-  }
+  auto N = static_cast<uint32_t>((size + digest_size - 1) / digest_size);
 
   mac_ctx = cmox_hmac_construct(&Hmac_Ctx, cmox_hmac_impl(suite));
   if (mac_ctx == nullptr) {
     throw crypto_error();
   }
 
-  owned_bytes<max_hkdf_expand_size> computed_hash(size);
+  owned_bytes<max_hkdf_extract_size> computed_hash(digest_size);
   owned_bytes<max_hkdf_expand_size> out(size);
 
   uint32_t index = 0;
   for (uint8_t i = 1; i <= N; i++) {
-    VERIFY_CMOX_CALL(cmox_mac_init(mac_ctx), CMOX_MAC_SUCCESS);
+    computed_hash.resize(0);
 
-    if (i == N) {
-      VERIFY_CMOX_CALL(cmox_mac_setTagLen(mac_ctx, size - index),
-                       CMOX_MAC_SUCCESS);
-    }
+    VERIFY_CMOX_CALL(cmox_mac_init(mac_ctx), CMOX_MAC_SUCCESS);
 
     VERIFY_CMOX_CALL(cmox_mac_setKey(mac_ctx, prk.data(), prk.size()),
                      CMOX_MAC_SUCCESS);
 
-    if (i > 1) {
-      VERIFY_CMOX_CALL(
-        cmox_mac_append(mac_ctx, computed_hash.data(), digest_size),
-        CMOX_MAC_SUCCESS);
-    }
-
     VERIFY_CMOX_CALL(cmox_mac_append(mac_ctx, info.data(), info.size()),
                      CMOX_MAC_SUCCESS);
+
     VERIFY_CMOX_CALL(cmox_mac_append(mac_ctx, &i, 1), CMOX_MAC_SUCCESS);
+
+    computed_hash.resize(digest_size);
     VERIFY_CMOX_CALL(
       cmox_mac_generateTag(mac_ctx, computed_hash.data(), nullptr),
       CMOX_MAC_SUCCESS);
 
-    if (i == N) {
-      memcpy(&out[index], computed_hash.data(), size - index);
-      index = size;
-    } else {
-      memcpy(&out[index], computed_hash.data(), digest_size);
-      index += digest_size;
-    }
+    const auto to_copy = (i == N) ? size - index : digest_size;
+    std::memcpy(&out[index], computed_hash.data(), to_copy);
+    index += to_copy;
   }
 
   VERIFY_CMOX_CALL(cmox_mac_cleanup(mac_ctx), CMOX_MAC_SUCCESS);
@@ -181,7 +173,6 @@ seal_aead(CipherSuite suite,
   }
 
   std::size_t computed_size = 0;
-
   VERIFY_CMOX_CALL(cmox_aead_encrypt(CMOX_AESFAST_GCMFAST_ENC_ALGO,
                                      pt.data(),
                                      pt.size(),
@@ -211,6 +202,7 @@ seal(CipherSuite suite,
     case CipherSuite::AES_128_CTR_HMAC_SHA256_80:
     case CipherSuite::AES_128_CTR_HMAC_SHA256_64:
     case CipherSuite::AES_128_CTR_HMAC_SHA256_32: {
+      // TODO(GhostofCookie): return seal_ctr(suite, key, nonce, ct, aad, pt);
       throw unsupported_ciphersuite_error();
     }
 
@@ -218,9 +210,6 @@ seal(CipherSuite suite,
     case CipherSuite::AES_GCM_256_SHA512: {
       return seal_aead(suite, key, nonce, ct, aad, pt);
     }
-
-    default:
-      throw unsupported_ciphersuite_error();
   }
 
   throw unsupported_ciphersuite_error();
@@ -240,7 +229,6 @@ open_aead(CipherSuite suite,
   }
 
   std::size_t computed_size = 0;
-
   VERIFY_CMOX_CALL(cmox_aead_decrypt(CMOX_AESFAST_GCMFAST_DEC_ALGO,
                                      ct.data(),
                                      ct.size(),
@@ -270,16 +258,14 @@ open(CipherSuite suite,
     case CipherSuite::AES_128_CTR_HMAC_SHA256_80:
     case CipherSuite::AES_128_CTR_HMAC_SHA256_64:
     case CipherSuite::AES_128_CTR_HMAC_SHA256_32: {
+      // TODO(GhostofCookie): return open_ctr(suite, key, nonce, pt, aad, ct);
       throw unsupported_ciphersuite_error();
-      // return open_ctr(suite, key, nonce, pt, aad, ct);
     }
 
     case CipherSuite::AES_GCM_128_SHA256:
     case CipherSuite::AES_GCM_256_SHA512: {
       return open_aead(suite, key, nonce, pt, aad, ct);
     }
-    default:
-      throw unsupported_ciphersuite_error();
   }
 
   throw unsupported_ciphersuite_error();
