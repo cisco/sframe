@@ -22,4 +22,10 @@ CMake parameters.
 ## Prerequisites
 
 You need openssl 1.1 or greater installed, C++ compiler, make, and cmake.  To
-run tests, you will need the doctest framework.
+run tests, you will need the doctest framework and Niels Lohmann's json library.
+To automatically format the code, you will need clang-format.
+
+Here is an example command to install these packages on Linux Ubuntu:
+```
+sudo apt update && sudo apt-get -y install clang clang-format clang-tidy cmake doctest-dev libssl-dev nlohmann-json3-dev
+```
