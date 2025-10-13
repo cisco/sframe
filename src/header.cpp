@@ -1,4 +1,5 @@
 #include "header.h"
+#include "sframe/result.h"
 
 namespace SFRAME_NAMESPACE {
 
@@ -28,11 +29,12 @@ encode_uint(uint64_t val, output_bytes buffer)
   }
 }
 
-static uint64_t
+static Result<uint64_t>
 decode_uint(input_bytes data)
 {
   if (!data.empty() && data[0] == 0) {
-    throw invalid_parameter_error("Integer is not minimally encoded");
+    return Err<uint64_t>(SFrameErrorType::INVALID_PARAMETER_ERROR,
+                         "Integer is not minimally encoded");
   }
 
   uint64_t val = 0;
@@ -85,7 +87,12 @@ struct ValueOrLength
     }
 
     const auto size = value_size();
-    const auto value = decode_uint(data.subspan(0, size));
+    const auto value_result = decode_uint(data.subspan(0, size));
+    if (!value_result.ok()) {
+      // Handle error - for now, throw or return default
+      throw std::runtime_error("Failed to decode uint");
+    }
+    const auto value = value_result.value();
     const auto remaining = data.subspan(size);
     return { value, remaining };
   }
