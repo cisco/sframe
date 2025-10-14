@@ -114,7 +114,9 @@ public:
     return SFrameError(); // Default OK error
   }
 
-  bool ok() const { return std::holds_alternative<T>(data_); }
+  bool is_ok() const { return std::holds_alternative<T>(data_); }
+
+  bool is_err() const { return std::holds_alternative<SFrameError>(data_); }
 
   const T& value() const { return std::get<T>(data_); }
 

@@ -90,7 +90,7 @@ struct ValueOrLength
 
     const auto size = value_size();
     auto value_result = decode_uint(data.subspan(0, size));
-    if (!value_result.ok()) {
+    if (!value_result.is_ok()) {
       return value_result.MoveError();
     }
     const auto value = value_result.MoveValue();
@@ -159,13 +159,13 @@ Header::parse(input_bytes buffer)
   const auto cfg = ConfigByte{ buffer[0] };
   const auto after_cfg = buffer.subspan(1);
   auto read_result = cfg.kid.read(after_cfg);
-  if (!read_result.ok()) {
+  if (!read_result.is_ok()) {
     return read_result.MoveError();
   }
   auto [key_id, after_kid] = read_result.MoveValue();
 
   read_result = cfg.ctr.read(after_kid);
-  if (!read_result.ok()) {
+  if (!read_result.is_ok()) {
     return read_result.MoveError();
   }
   auto [counter, _] = read_result.MoveValue();

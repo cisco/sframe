@@ -156,7 +156,7 @@ Context::unprotect(output_bytes plaintext,
                    input_bytes metadata)
 {
   auto header_parse_result = Header::parse(ciphertext);
-  if (!header_parse_result.ok()) {
+  if (!header_parse_result.is_ok()) {
     return header_parse_result.MoveError();
   }
   const auto header = header_parse_result.MoveValue();
@@ -280,7 +280,7 @@ MLSContext::unprotect(output_bytes plaintext,
                       input_bytes metadata)
 {
   auto header_parse_result = Header::parse(ciphertext);
-  if (!header_parse_result.ok()) {
+  if (!header_parse_result.is_ok()) {
     return header_parse_result.MoveError();
   }
   const auto header = header_parse_result.MoveValue();
