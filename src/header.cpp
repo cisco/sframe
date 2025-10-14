@@ -33,15 +33,16 @@ static Result<uint64_t>
 decode_uint(input_bytes data)
 {
   if (!data.empty() && data[0] == 0) {
-    return Err<uint64_t>(SFrameErrorType::INVALID_PARAMETER_ERROR,
-                         "Integer is not minimally encoded");
+    return Result<uint64_t>::err(SFrameErrorType::invalid_parameter_error,
+                                 "Integer is not minimally encoded");
   }
 
   uint64_t val = 0;
   for (size_t i = 0; i < data.size(); i++) {
     val = (val << 8) + static_cast<uint64_t>(data[i]);
   }
-  return val;
+
+  return Result<uint64_t>::ok(val);
 }
 
 struct ValueOrLength
@@ -79,22 +80,22 @@ struct ValueOrLength
     return value_or_length + 1;
   }
 
-  std::tuple<uint64_t, input_bytes> read(input_bytes data) const
+  Result<std::tuple<uint64_t, input_bytes>> read(input_bytes data) const
   {
     if (!is_length) {
       // Nothing to read; value is already in config byte
-      return { value_or_length, data };
+      return Result<std::tuple<uint64_t, input_bytes>>::ok(
+        { value_or_length, data });
     }
 
     const auto size = value_size();
-    const auto value_result = decode_uint(data.subspan(0, size));
+    auto value_result = decode_uint(data.subspan(0, size));
     if (!value_result.ok()) {
-      // Handle error - for now, throw or return default
-      throw std::runtime_error("Failed to decode uint");
+      return value_result.MoveError();
     }
-    const auto value = value_result.value();
+    const auto value = value_result.MoveValue();
     const auto remaining = data.subspan(size);
-    return { value, remaining };
+    return Result<std::tuple<uint64_t, input_bytes>>::ok({ value, remaining });
   }
 
 private:
@@ -147,17 +148,28 @@ Header::Header(KeyID key_id_in, Counter counter_in)
   encode_uint(counter, after_kid.subspan(0, cfg.ctr.value_size()));
 }
 
-Header
+Result<Header>
 Header::parse(input_bytes buffer)
 {
   if (buffer.size() < Header::min_size) {
-    throw buffer_too_small_error("Ciphertext too small to decode header");
+    return Result<Header>::err(SFrameErrorType::buffer_too_small_error,
+                               "Ciphertext too small to decode header");
   }
 
   const auto cfg = ConfigByte{ buffer[0] };
   const auto after_cfg = buffer.subspan(1);
-  const auto [key_id, after_kid] = cfg.kid.read(after_cfg);
-  const auto [counter, _] = cfg.ctr.read(after_kid);
+  auto read_result = cfg.kid.read(after_cfg);
+  if (!read_result.ok()) {
+    return read_result.MoveError();
+  }
+  auto [key_id, after_kid] = read_result.MoveValue();
+
+  read_result = cfg.ctr.read(after_kid);
+  if (!read_result.ok()) {
+    return read_result.MoveError();
+  }
+  auto [counter, _] = read_result.MoveValue();
+
   const auto encoded = buffer.subspan(0, cfg.encoded_size());
 
   return Header(key_id, counter, encoded);

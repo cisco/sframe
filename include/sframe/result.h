@@ -1,16 +1,17 @@
 #pragma once
 
-#include <optional>
 #include <utility>
+#include <variant>
 
 namespace SFRAME_NAMESPACE {
 
 // Error types to replace exceptions
 enum class SFrameErrorType
 {
-  NONE = 0,
-  INTERNAL_ERROR,
-  INVALID_PARAMETER_ERROR,
+  none = 0,
+  internal_error,
+  invalid_parameter_error,
+  buffer_too_small_error,
 };
 
 class SFrameError
@@ -33,39 +34,40 @@ public:
 
   const char* message() const { return message_.c_str(); }
 
-  bool ok() const { return type_ == SFrameErrorType::NONE; }
+  bool ok() const { return type_ == SFrameErrorType::none; }
 
 private:
-  SFrameErrorType type_ = SFrameErrorType::NONE;
+  SFrameErrorType type_ = SFrameErrorType::none;
   std::string message_;
 };
 
 template<typename T>
 class Result
 {
-  template<typename U>
-  friend class Result;
-
 public:
   typedef T element_type;
 
-  explicit Result()
-    : error_(SFrameErrorType::INTERNAL_ERROR)
+  static Result<T> ok(const T& value) { return Result<T>(value); }
+
+  static Result<T> ok(T&& value) { return Result<T>(std::move(value)); }
+
+  static Result<T> err(SFrameErrorType error, const char* message = "")
   {
+    return Result<T>(SFrameError(error, message));
   }
 
   Result(SFrameError error)
-    : error_(error)
+    : data_(std::move(error))
   {
   }
 
   Result(const T& value)
-    : value_(value)
+    : data_(value)
   {
   }
 
   Result(T&& value)
-    : value_(std::move(value))
+    : data_(std::move(value))
   {
   }
 
@@ -73,76 +75,55 @@ public:
   Result& operator=(const Result& other) = delete;
 
   Result(Result&& other) noexcept
-    : error_(std::move(other.error_))
-    , value_(std::move(other.value_))
+    : data_(std::move(other.data_))
   {
   }
 
   Result& operator=(Result&& other) noexcept
   {
-    error_ = std::move(other.error_);
-    value_ = std::move(other.value_);
+    data_ = std::move(other.data_);
     return *this;
   }
 
   template<typename U>
-  Result(Result<U> other)
-    : error_(std::move(other.error_))
-    , value_(std::move(other.value_))
+  Result(Result<U>&& other)
+    : data_(std::move(other.data_))
   {
   }
 
   template<typename U>
-  Result& operator=(Result<U> other)
+  Result& operator=(Result<U>&& other)
   {
-    error_ = std::move(other.error_);
-    value_ = std::move(other.value_);
+    data_ = std::move(other.data_);
     return *this;
   }
 
   SFrameError error() const
   {
-    return error_;
+    if (std::holds_alternative<SFrameError>(data_)) {
+      return std::get<SFrameError>(data_);
+    }
+    return SFrameError(); // Default OK error
   }
 
   SFrameError MoveError()
   {
-    return std::move(error_);
+    if (std::holds_alternative<SFrameError>(data_)) {
+      return std::move(std::get<SFrameError>(data_));
+    }
+    return SFrameError(); // Default OK error
   }
 
-  bool ok() const { return error_.ok(); }
+  bool ok() const { return std::holds_alternative<T>(data_); }
 
-  const T& value() const { return *value_; }
+  const T& value() const { return std::get<T>(data_); }
 
-  T& value() { return *value_; }
+  T& value() { return std::get<T>(data_); }
 
-  T MoveValue() { return std::move(*value_); }
+  T MoveValue() { return std::move(std::get<T>(data_)); }
 
 private:
-  SFrameError error_;
-  std::optional<T> value_;
+  std::variant<SFrameError, T> data_;
 };
-
-// Helper functions to create Results
-template<typename T>
-Result<T>
-Ok(const T& value)
-{
-  return Result<T>(value);
-}
-
-template<typename T>
-Result<T>
-Ok(T&& value)
-{
-  return Result<T>(std::move(value));
-}
-
-template<typename T>
-Result<T>
-Err(SFrameErrorType error, const char* message = "")
-{
-  return Result<T>(SFrameError(error, message));
-}
 
 } // namespace SFRAME_NAMESPACE

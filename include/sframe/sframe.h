@@ -4,6 +4,7 @@
 #include <optional>
 
 #include <sframe/map.h>
+#include <sframe/result.h>
 #include <sframe/vector.h>
 
 #include <namespace.h>
@@ -115,9 +116,9 @@ public:
                        output_bytes ciphertext,
                        input_bytes plaintext,
                        input_bytes metadata);
-  output_bytes unprotect(output_bytes plaintext,
-                         input_bytes ciphertext,
-                         input_bytes metadata);
+  Result<output_bytes> unprotect(output_bytes plaintext,
+                                 input_bytes ciphertext,
+                                 input_bytes metadata);
 
   static constexpr size_t max_overhead = 17 + 16;
   static constexpr size_t max_metadata_size = 512;
@@ -130,10 +131,10 @@ protected:
                              output_bytes ciphertext,
                              input_bytes plaintext,
                              input_bytes metadata);
-  output_bytes unprotect_inner(const Header& header,
-                               output_bytes ciphertext,
-                               input_bytes plaintext,
-                               input_bytes metadata);
+  Result<output_bytes> unprotect_inner(const Header& header,
+                                       output_bytes ciphertext,
+                                       input_bytes plaintext,
+                                       input_bytes metadata);
 };
 
 // MLSContext augments Context with logic for deriving keys from MLS.  Instead
@@ -166,9 +167,9 @@ public:
                        input_bytes plaintext,
                        input_bytes metadata);
 
-  output_bytes unprotect(output_bytes plaintext,
-                         input_bytes ciphertext,
-                         input_bytes metadata);
+  Result<output_bytes> unprotect(output_bytes plaintext,
+                                 input_bytes ciphertext,
+                                 input_bytes metadata);
 
 private:
   struct EpochKeys

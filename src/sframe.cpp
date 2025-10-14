@@ -150,12 +150,17 @@ Context::protect(KeyID key_id,
   return ciphertext.first(header_data.size() + final_ciphertext.size());
 }
 
-output_bytes
+Result<output_bytes>
 Context::unprotect(output_bytes plaintext,
                    input_bytes ciphertext,
                    input_bytes metadata)
 {
-  const auto header = Header::parse(ciphertext);
+  auto header_parse_result = Header::parse(ciphertext);
+  if (!header_parse_result.ok()) {
+    return header_parse_result.MoveError();
+  }
+  const auto header = header_parse_result.MoveValue();
+
   const auto inner_ciphertext = ciphertext.subspan(header.size());
   return Context::unprotect_inner(
     header, plaintext, inner_ciphertext, metadata);
@@ -178,18 +183,21 @@ Context::protect_inner(const Header& header,
   return seal(suite, key_and_salt.key, nonce, ciphertext, aad, plaintext);
 }
 
-output_bytes
+Result<output_bytes>
 Context::unprotect_inner(const Header& header,
                          output_bytes plaintext,
                          input_bytes ciphertext,
                          input_bytes metadata)
 {
   if (ciphertext.size() < cipher_overhead(suite)) {
-    throw buffer_too_small_error("Ciphertext too small for cipher overhead");
+    return Result<output_bytes>::err(
+      SFrameErrorType::buffer_too_small_error,
+      "Ciphertext too small for cipher overhead");
   }
 
   if (plaintext.size() < ciphertext.size() - cipher_overhead(suite)) {
-    throw buffer_too_small_error("Plaintext too small for decrypted value");
+    return Result<output_bytes>::err(SFrameErrorType::buffer_too_small_error,
+                                     "Plaintext too small for decrypted value");
   }
 
   const auto& key_and_salt = keys.at(header.key_id);
@@ -266,12 +274,17 @@ MLSContext::protect(EpochID epoch_id,
   return Context::protect(key_id, ciphertext, plaintext, metadata);
 }
 
-output_bytes
+Result<output_bytes>
 MLSContext::unprotect(output_bytes plaintext,
                       input_bytes ciphertext,
                       input_bytes metadata)
 {
-  const auto header = Header::parse(ciphertext);
+  auto header_parse_result = Header::parse(ciphertext);
+  if (!header_parse_result.ok()) {
+    return header_parse_result.MoveError();
+  }
+  const auto header = header_parse_result.MoveValue();
+
   const auto inner_ciphertext = ciphertext.subspan(header.size());
 
   ensure_key(header.key_id, KeyUsage::unprotect);
