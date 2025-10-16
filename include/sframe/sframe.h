@@ -112,10 +112,10 @@ public:
 
   void add_key(KeyID kid, KeyUsage usage, input_bytes key);
 
-  output_bytes protect(KeyID key_id,
-                       output_bytes ciphertext,
-                       input_bytes plaintext,
-                       input_bytes metadata);
+  Result<output_bytes> protect(KeyID key_id,
+                               output_bytes ciphertext,
+                               input_bytes plaintext,
+                               input_bytes metadata);
   Result<output_bytes> unprotect(output_bytes plaintext,
                                  input_bytes ciphertext,
                                  input_bytes metadata);
@@ -127,10 +127,10 @@ protected:
   CipherSuite suite;
   map<KeyID, KeyRecord, SFRAME_MAX_KEYS> keys;
 
-  output_bytes protect_inner(const Header& header,
-                             output_bytes ciphertext,
-                             input_bytes plaintext,
-                             input_bytes metadata);
+  Result<output_bytes> protect_inner(const Header& header,
+                                     output_bytes ciphertext,
+                                     input_bytes plaintext,
+                                     input_bytes metadata);
   Result<output_bytes> unprotect_inner(const Header& header,
                                        output_bytes ciphertext,
                                        input_bytes plaintext,
@@ -155,17 +155,17 @@ public:
                  size_t sender_bits);
   void purge_before(EpochID keeper);
 
-  output_bytes protect(EpochID epoch_id,
-                       SenderID sender_id,
-                       output_bytes ciphertext,
-                       input_bytes plaintext,
-                       input_bytes metadata);
-  output_bytes protect(EpochID epoch_id,
-                       SenderID sender_id,
-                       ContextID context_id,
-                       output_bytes ciphertext,
-                       input_bytes plaintext,
-                       input_bytes metadata);
+  Result<output_bytes> protect(EpochID epoch_id,
+                               SenderID sender_id,
+                               output_bytes ciphertext,
+                               input_bytes plaintext,
+                               input_bytes metadata);
+  Result<output_bytes> protect(EpochID epoch_id,
+                               SenderID sender_id,
+                               ContextID context_id,
+                               output_bytes ciphertext,
+                               input_bytes plaintext,
+                               input_bytes metadata);
 
   Result<output_bytes> unprotect(output_bytes plaintext,
                                  input_bytes ciphertext,
@@ -193,10 +193,10 @@ private:
 
   void purge_epoch(EpochID epoch_id);
 
-  KeyID form_key_id(EpochID epoch_id,
+  Result<KeyID> form_key_id(EpochID epoch_id,
                     SenderID sender_id,
                     ContextID context_id) const;
-  void ensure_key(KeyID key_id, KeyUsage usage);
+  bool ensure_key(KeyID key_id, KeyUsage usage);
 
   const size_t epoch_bits;
   const size_t epoch_mask;

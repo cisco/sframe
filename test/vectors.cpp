@@ -65,7 +65,9 @@ struct HeaderTestVector
   void verify() const
   {
     // Decode
-    const auto decoded = Header::parse(encoded);
+    auto decode_result = Header::parse(encoded);
+    REQUIRE(decode_result.is_ok());
+    const auto decoded = decode_result.value();
     REQUIRE(decoded.key_id == kid);
     REQUIRE(decoded.counter == ctr);
     REQUIRE(decoded.size() == encoded.data.size());
@@ -150,11 +152,14 @@ struct SFrameTestVector
     auto ct_data = owned_bytes<128>();
     auto next_ctr = uint64_t(0);
     while (next_ctr < ctr) {
-      send_ctx.protect(kid, ct_data, pt, metadata);
+      auto protect_result = send_ctx.protect(kid, ct_data, pt, metadata);
+      REQUIRE(protect_result.is_ok());
       next_ctr += 1;
     }
 
-    const auto ct_out = send_ctx.protect(kid, ct_data, pt, metadata);
+    const auto protect_result_final = send_ctx.protect(kid, ct_data, pt, metadata);
+    REQUIRE(protect_result_final.is_ok());
+    const auto ct_out = protect_result_final.value();
 
     const auto act_ct_hex = to_hex(ct_out);
     const auto exp_ct_hex = to_hex(ct);
@@ -167,7 +172,9 @@ struct SFrameTestVector
     recv_ctx.add_key(kid, KeyUsage::unprotect, base_key);
 
     auto pt_data = owned_bytes<128>();
-    auto pt_out = recv_ctx.unprotect(pt_data, ct, metadata);
+    auto unprotect_result = recv_ctx.unprotect(pt_data, ct, metadata);
+    REQUIRE(unprotect_result.is_ok());
+    auto pt_out = unprotect_result.value();
     REQUIRE(pt_out == pt);
   }
 };

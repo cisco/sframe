@@ -12,22 +12,66 @@ enum class SFrameErrorType
   internal_error,
   invalid_parameter_error,
   buffer_too_small_error,
+  crypto_error,
+  unsupported_ciphersuite_error,
+  authentication_error,
+  invalid_key_usage_error,
 };
 
 class SFrameError
 {
 public:
-  SFrameError() = default;
+  SFrameError()
+    : type_(SFrameErrorType::none)
+    , message_()
+  {
+  }
 
   explicit SFrameError(SFrameErrorType type)
     : type_(type)
+    , message_()
   {
   }
 
   SFrameError(SFrameErrorType type, std::string message)
     : type_(type)
-    , message_(message)
+    , message_(std::move(message))
   {
+  }
+
+  // Copy constructor
+  SFrameError(const SFrameError& other)
+    : type_(SFrameErrorType::none)
+    , message_(other.message_)
+  {
+    type_ = other.type_;
+  }
+  
+  // Copy assignment
+  SFrameError& operator=(const SFrameError& other)
+  {
+    if (this != &other) {
+      type_ = other.type_;
+      message_ = other.message_;
+    }
+    return *this;
+  }
+
+  // Move constructor
+  SFrameError(SFrameError&& other) noexcept
+    : type_(other.type_)
+    , message_(std::move(other.message_))
+  {
+  }
+  
+  // Move assignment
+  SFrameError& operator=(SFrameError&& other) noexcept
+  {
+    if (this != &other) {
+      type_ = other.type_;
+      message_ = std::move(other.message_);
+    }
+    return *this;
   }
 
   SFrameErrorType type() const { return type_; }
@@ -51,7 +95,7 @@ public:
 
   static Result<T> ok(T&& value) { return Result<T>(std::move(value)); }
 
-  static Result<T> err(SFrameErrorType error, const char* message = "")
+  static Result<T> err(SFrameErrorType error, const std::string& message = "")
   {
     return Result<T>(SFrameError(error, message));
   }
@@ -109,7 +153,8 @@ public:
   SFrameError MoveError()
   {
     if (std::holds_alternative<SFrameError>(data_)) {
-      return std::move(std::get<SFrameError>(data_));
+      auto error = std::get<SFrameError>(data_);
+      return error;
     }
     return SFrameError(); // Default OK error
   }
@@ -125,7 +170,7 @@ public:
   T MoveValue() { return std::move(std::get<T>(data_)); }
 
 private:
-  std::variant<SFrameError, T> data_;
+  std::variant<T, SFrameError> data_;
 };
 
 } // namespace SFRAME_NAMESPACE
