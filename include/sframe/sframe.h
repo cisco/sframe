@@ -87,10 +87,10 @@ enum struct KeyUsage
 
 struct KeyRecord
 {
-  static KeyRecord from_base_key(CipherSuite suite,
-                                 KeyID key_id,
-                                 KeyUsage usage,
-                                 input_bytes base_key);
+  static Result<KeyRecord> from_base_key(CipherSuite suite,
+                                         KeyID key_id,
+                                         KeyUsage usage,
+                                         input_bytes base_key);
 
   static constexpr size_t max_key_size = 48;
   static constexpr size_t max_salt_size = 12;
@@ -110,7 +110,7 @@ public:
   Context(CipherSuite suite);
   virtual ~Context();
 
-  void add_key(KeyID kid, KeyUsage usage, input_bytes key);
+  Result<void> add_key(KeyID kid, KeyUsage usage, input_bytes key);
 
   Result<output_bytes> protect(KeyID key_id,
                                output_bytes ciphertext,
@@ -149,8 +149,8 @@ public:
 
   MLSContext(CipherSuite suite_in, size_t epoch_bits_in);
 
-  void add_epoch(EpochID epoch_id, input_bytes sframe_epoch_secret);
-  void add_epoch(EpochID epoch_id,
+  bool add_epoch(EpochID epoch_id, input_bytes sframe_epoch_secret);
+  bool add_epoch(EpochID epoch_id,
                  input_bytes sframe_epoch_secret,
                  size_t sender_bits);
   void purge_before(EpochID keeper);
@@ -187,15 +187,15 @@ private:
               input_bytes sframe_epoch_secret_in,
               size_t epoch_bits,
               size_t sender_bits_in);
-    owned_bytes<max_secret_size> base_key(CipherSuite suite,
+    Result<owned_bytes<max_secret_size>> base_key(CipherSuite suite,
                                           SenderID sender_id) const;
   };
 
   void purge_epoch(EpochID epoch_id);
 
   Result<KeyID> form_key_id(EpochID epoch_id,
-                    SenderID sender_id,
-                    ContextID context_id) const;
+                            SenderID sender_id,
+                            ContextID context_id) const;
   bool ensure_key(KeyID key_id, KeyUsage usage);
 
   const size_t epoch_bits;

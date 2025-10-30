@@ -2,6 +2,7 @@
 
 #include <utility>
 #include <variant>
+#include <string>
 
 namespace SFRAME_NAMESPACE {
 
@@ -46,7 +47,7 @@ public:
   {
     type_ = other.type_;
   }
-  
+
   // Copy assignment
   SFrameError& operator=(const SFrameError& other)
   {
@@ -63,7 +64,7 @@ public:
     , message_(std::move(other.message_))
   {
   }
-  
+
   // Move assignment
   SFrameError& operator=(SFrameError&& other) noexcept
   {
@@ -98,6 +99,11 @@ public:
   static Result<T> err(SFrameErrorType error, const std::string& message = "")
   {
     return Result<T>(SFrameError(error, message));
+  }
+
+  static Result<T> err(SFrameError&& error)
+  {
+    return Result<T>(std::move(error));
   }
 
   Result(SFrameError error)
@@ -142,13 +148,7 @@ public:
     return *this;
   }
 
-  SFrameError error() const
-  {
-    if (std::holds_alternative<SFrameError>(data_)) {
-      return std::get<SFrameError>(data_);
-    }
-    return SFrameError(); // Default OK error
-  }
+  T MoveValue() { return std::move(std::get<T>(data_)); }
 
   SFrameError MoveError()
   {
@@ -163,14 +163,71 @@ public:
 
   bool is_err() const { return std::holds_alternative<SFrameError>(data_); }
 
-  const T& value() const { return std::get<T>(data_); }
-
-  T& value() { return std::get<T>(data_); }
-
-  T MoveValue() { return std::move(std::get<T>(data_)); }
-
 private:
   std::variant<T, SFrameError> data_;
+};
+
+// Specialization for Result<void>
+template<>
+class Result<void>
+{
+public:
+  typedef void element_type;
+
+  static Result<void> ok() { return Result<void>(); }
+
+  static Result<void> err(SFrameErrorType error,
+                          const std::string& message = "")
+  {
+    return Result<void>(SFrameError(error, message));
+  }
+
+  static Result<void> err(SFrameError&& error)
+  {
+    return Result<void>(std::move(error));
+  }
+
+  Result()
+    : is_ok_(true)
+    , error_()
+  {
+  }
+
+  Result(SFrameError error)
+    : is_ok_(false)
+    , error_(std::move(error))
+  {
+  }
+
+  Result(const Result& other) = delete;
+  Result& operator=(const Result& other) = delete;
+
+  Result(Result&& other) noexcept
+    : is_ok_(other.is_ok_)
+    , error_(std::move(other.error_))
+  {
+  }
+
+  Result& operator=(Result&& other) noexcept
+  {
+    is_ok_ = other.is_ok_;
+    error_ = std::move(other.error_);
+    return *this;
+  }
+
+  void MoveValue() { /* void has no value to move */ }
+
+  SFrameError MoveError() { return error_; }
+
+  const SFrameError& error() const { return error_; }
+
+  bool is_ok() const { return is_ok_; }
+
+  bool is_err() const { return !is_ok_; }
+
+private:
+  bool is_ok_;
+  SFrameError error_;
 };
 
 } // namespace SFRAME_NAMESPACE

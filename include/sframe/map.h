@@ -11,15 +11,17 @@ class map : private vector<std::optional<std::pair<K, V>>, N>
 {
 public:
   template<class... Args>
-  void emplace(Args&&... args)
+  Result<void> emplace(Args&&... args)
   {
     const auto pos = std::find_if(
       this->begin(), this->end(), [&](const auto& pair) { return !pair; });
     if (pos == this->end()) {
-      throw std::out_of_range("map out of space");
+      return Result<void>::err(SFrameErrorType::buffer_too_small_error, "map out of space");
     }
 
     pos->emplace(args...);
+    
+    return Result<void>::ok();
   }
 
   auto find(const K& key)
@@ -38,21 +40,21 @@ public:
 
   bool contains(const K& key) const { return find(key) != this->end(); }
 
-  const V& at(const K& key) const
+  Result<const V&> at(const K& key) const
   {
     const auto pos = find(key);
     if (pos == this->end()) {
-      throw std::out_of_range("map key not found");
+      return Result<const V&>::err(SFrameErrorType::invalid_parameter_error, "map key not found");
     }
 
     return pos->value().second;
   }
 
-  V& at(const K& key)
+  Result<V&> at(const K& key)
   {
     auto pos = find(key);
     if (pos == this->end()) {
-      throw std::out_of_range("map key not found");
+      return Result<V&>::err(SFrameErrorType::invalid_parameter_error, "map key not found");
     }
 
     return pos->value().second;

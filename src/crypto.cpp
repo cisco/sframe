@@ -3,7 +3,7 @@
 
 namespace SFRAME_NAMESPACE {
 
-size_t
+Result<size_t>
 cipher_digest_size(CipherSuite suite)
 {
   switch (suite) {
@@ -17,11 +17,12 @@ cipher_digest_size(CipherSuite suite)
       return 64;
 
     default:
-      throw unsupported_ciphersuite_error();
+      return Result<size_t>::err(
+        SFrameErrorType::unsupported_ciphersuite_error);
   }
 }
 
-size_t
+Result<size_t>
 cipher_key_size(CipherSuite suite)
 {
   switch (suite) {
@@ -38,11 +39,12 @@ cipher_key_size(CipherSuite suite)
       return 32;
 
     default:
-      throw unsupported_ciphersuite_error();
+      return Result<size_t>::err(
+        SFrameErrorType::unsupported_ciphersuite_error);
   }
 }
 
-size_t
+Result<size_t>
 cipher_enc_key_size(CipherSuite suite)
 {
   switch (suite) {
@@ -52,11 +54,12 @@ cipher_enc_key_size(CipherSuite suite)
       return 16;
 
     default:
-      throw unsupported_ciphersuite_error();
+      return Result<size_t>::err(
+        SFrameErrorType::unsupported_ciphersuite_error);
   }
 }
 
-size_t
+Result<size_t>
 cipher_nonce_size(CipherSuite suite)
 {
   switch (suite) {
@@ -68,11 +71,12 @@ cipher_nonce_size(CipherSuite suite)
       return 12;
 
     default:
-      throw unsupported_ciphersuite_error();
+      return Result<size_t>::err(
+        SFrameErrorType::unsupported_ciphersuite_error);
   }
 }
 
-size_t
+Result<size_t>
 cipher_overhead(CipherSuite suite)
 {
   switch (suite) {
@@ -90,7 +94,8 @@ cipher_overhead(CipherSuite suite)
       return 16; // Full 128-bit AES-GCM tag
 
     default:
-      throw unsupported_ciphersuite_error();
+      return Result<size_t>::err(
+        SFrameErrorType::unsupported_ciphersuite_error);
   }
 }
 

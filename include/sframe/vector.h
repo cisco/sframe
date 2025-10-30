@@ -58,13 +58,17 @@ public:
 
   auto size() const { return _size; }
   auto capacity() const { return N; }
-  void resize(size_t size)
+
+  Result<void> resize(size_t size)
   {
     if (size > N) {
-      throw std::out_of_range("vector out of space");
+      return Result<void>::err(SFrameErrorType::buffer_too_small_error,
+                               "vector out of space");
     }
 
     _size = size;
+
+    return Result<void>::ok();
   }
 
   void push(T&& item)
