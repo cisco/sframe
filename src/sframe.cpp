@@ -119,14 +119,13 @@ Context::~Context() = default;
 Result<void>
 Context::add_key(KeyID key_id, KeyUsage usage, input_bytes base_key)
 {
-  auto from_base_key_result =
-    KeyRecord::from_base_key(suite, key_id, usage, base_key);
+  auto from_base_key_result = KeyRecord::from_base_key(suite, key_id, usage, base_key);
   if (!from_base_key_result.is_ok()) {
     return from_base_key_result.MoveError();
   }
-
+  
   auto key_record = from_base_key_result.MoveValue();
-
+  
   keys.emplace(key_id, std::move(key_record));
 
   return Result<void>::ok();

@@ -207,10 +207,10 @@ TEST_CASE("MLS Failure after Purge")
   member_a.add_epoch(epoch_id_1, sframe_epoch_secret_1);
   member_b.add_epoch(epoch_id_1, sframe_epoch_secret_1);
 
-  const auto protect_result_ab_1 =
+  auto protect_result_ab_1 =
     member_a.protect(epoch_id_1, sender_id_a, ct_out, plaintext, metadata);
   REQUIRE(protect_result_ab_1.is_ok());
-  const auto enc_ab_1 = protect_result_ab_1.value();
+  const auto enc_ab_1 = protect_result_ab_1.MoveValue();
   const auto enc_ab_1_data = to_bytes(enc_ab_1);
 
   // Install epoch 2
@@ -222,19 +222,19 @@ TEST_CASE("MLS Failure after Purge")
   member_a.purge_before(epoch_id_2);
   member_b.purge_before(epoch_id_2);
 
-  const auto protect_result_after_purge_1 =
+  auto protect_result_after_purge_1 =
     member_a.protect(epoch_id_1, sender_id_a, ct_out, plaintext, metadata);
   CHECK(!protect_result_after_purge_1.is_ok());
-  CHECK(protect_result_after_purge_1.error().type() == SFrameErrorType::invalid_parameter_error);
+  CHECK(protect_result_after_purge_1.MoveError().type() == SFrameErrorType::invalid_parameter_error);
   
   auto unprotect_result_after_purge = member_b.unprotect(pt_out, enc_ab_1_data, metadata);
   CHECK(!unprotect_result_after_purge.is_ok());
-  CHECK(unprotect_result_after_purge.error().type() == SFrameErrorType::invalid_parameter_error);
+  CHECK(unprotect_result_after_purge.MoveError().type() == SFrameErrorType::invalid_parameter_error);
 
-  const auto protect_result_ab_2 =
+  auto protect_result_ab_2 =
     member_a.protect(epoch_id_2, sender_id_a, ct_out, plaintext, metadata);
   REQUIRE(protect_result_ab_2.is_ok());
-  const auto enc_ab_2 = protect_result_ab_2.value();
+  const auto enc_ab_2 = protect_result_ab_2.MoveValue();
   auto unprotect_result_ab_2 = member_b.unprotect(pt_out, enc_ab_2, metadata);
   REQUIRE(unprotect_result_ab_2.is_ok());
   const auto dec_ab_2 = unprotect_result_ab_2.MoveValue();

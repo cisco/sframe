@@ -67,7 +67,7 @@ struct HeaderTestVector
     // Decode
     auto decode_result = Header::parse(encoded);
     REQUIRE(decode_result.is_ok());
-    const auto decoded = decode_result.value();
+    const auto decoded = decode_result.MoveValue();
     REQUIRE(decoded.key_id == kid);
     REQUIRE(decoded.counter == ctr);
     REQUIRE(decoded.size() == encoded.data.size());
@@ -104,15 +104,15 @@ struct AesCtrHmacTestVector
   {
     // Seal
     auto ciphertext = bytes(ct.data.size());
-    const auto ct_out = seal(cipher_suite, key, nonce, ciphertext, aad, pt);
+    auto ct_out = seal(cipher_suite, key, nonce, ciphertext, aad, pt);
     REQUIRE(ct_out.is_ok());
-    REQUIRE(ct_out.value() == ct);
+    REQUIRE(ct_out.MoveValue() == ct);
 
     // Open
     auto plaintext = bytes(pt.data.size());
-    const auto pt_out = open(cipher_suite, key, nonce, plaintext, aad, ct);
+    auto pt_out = open(cipher_suite, key, nonce, plaintext, aad, ct);
     REQUIRE(pt_out.is_ok());
-    REQUIRE(pt_out.value() == pt);
+    REQUIRE(pt_out.MoveValue() == pt);
   }
 };
 
@@ -159,9 +159,9 @@ struct SFrameTestVector
       next_ctr += 1;
     }
 
-    const auto protect_result_final = send_ctx.protect(kid, ct_data, pt, metadata);
+    auto protect_result_final = send_ctx.protect(kid, ct_data, pt, metadata);
     REQUIRE(protect_result_final.is_ok());
-    const auto ct_out = protect_result_final.value();
+    const auto ct_out = protect_result_final.MoveValue();
 
     const auto act_ct_hex = to_hex(ct_out);
     const auto exp_ct_hex = to_hex(ct);
@@ -176,7 +176,7 @@ struct SFrameTestVector
     auto pt_data = owned_bytes<128>();
     auto unprotect_result = recv_ctx.unprotect(pt_data, ct, metadata);
     REQUIRE(unprotect_result.is_ok());
-    auto pt_out = unprotect_result.value();
+    auto pt_out = unprotect_result.MoveValue();
     REQUIRE(pt_out == pt);
   }
 };
