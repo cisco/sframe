@@ -71,105 +71,89 @@ using scoped_evp_kdf_ctx =
 Result<owned_bytes<max_hkdf_extract_size>>
 hkdf_extract(CipherSuite suite, input_bytes salt, input_bytes ikm)
 {
-  try {
-    auto mode = EVP_KDF_HKDF_MODE_EXTRACT_ONLY;
-    auto digest_name_result = openssl_digest_name(suite);
-    if (!digest_name_result.is_ok()) {
-      return digest_name_result.MoveError();
-    }
-    auto digest_name = digest_name_result.MoveValue();
-
-    auto* salt_ptr =
-      const_cast<void*>(reinterpret_cast<const void*>(salt.data()));
-    auto* ikm_ptr =
-      const_cast<void*>(reinterpret_cast<const void*>(ikm.data()));
-
-    const auto params = std::array<OSSL_PARAM, 5>{
-      OSSL_PARAM_construct_int(OSSL_KDF_PARAM_MODE, &mode),
-      OSSL_PARAM_construct_utf8_string(
-        OSSL_KDF_PARAM_DIGEST, digest_name.data(), digest_name.size()),
-      OSSL_PARAM_construct_octet_string(
-        OSSL_KDF_PARAM_KEY, ikm_ptr, ikm.size()),
-      OSSL_PARAM_construct_octet_string(
-        OSSL_KDF_PARAM_SALT, salt_ptr, salt.size()),
-      OSSL_PARAM_construct_end(),
-    };
-
-    const auto kdf =
-      scoped_evp_kdf(EVP_KDF_fetch(NULL, "HKDF", NULL), EVP_KDF_free);
-    const auto ctx =
-      scoped_evp_kdf_ctx(EVP_KDF_CTX_new(kdf.get()), EVP_KDF_CTX_free);
-    if (1 != EVP_KDF_CTX_set_params(ctx.get(), params.data())) {
-      return Result<owned_bytes<max_hkdf_extract_size>>::err(
-        SFrameErrorType::crypto_error,
-        ERR_error_string(ERR_get_error(), nullptr));
-    }
-
-    const auto digest_size = EVP_KDF_CTX_get_kdf_size(ctx.get());
-    auto out = owned_bytes<max_hkdf_extract_size>(digest_size);
-    if (1 != EVP_KDF_derive(ctx.get(), out.data(), out.size(), nullptr)) {
-      return Result<owned_bytes<max_hkdf_extract_size>>::err(
-        SFrameErrorType::crypto_error,
-        ERR_error_string(ERR_get_error(), nullptr));
-    }
-
-    return Result<owned_bytes<max_hkdf_extract_size>>(out);
-  } catch (const unsupported_ciphersuite_error& e) {
-    return Result<owned_bytes<max_hkdf_extract_size>>::err(
-      SFrameErrorType::unsupported_ciphersuite_error, e.what());
-  } catch (const crypto_error& e) {
-    return Result<owned_bytes<max_hkdf_extract_size>>::err(
-      SFrameErrorType::crypto_error, e.what());
+  auto mode = EVP_KDF_HKDF_MODE_EXTRACT_ONLY;
+  auto digest_name_result = openssl_digest_name(suite);
+  if (!digest_name_result.is_ok()) {
+    return digest_name_result.MoveError();
   }
+  auto digest_name = digest_name_result.MoveValue();
+
+  auto* salt_ptr =
+    const_cast<void*>(reinterpret_cast<const void*>(salt.data()));
+  auto* ikm_ptr =
+    const_cast<void*>(reinterpret_cast<const void*>(ikm.data()));
+
+  const auto params = std::array<OSSL_PARAM, 5>{
+    OSSL_PARAM_construct_int(OSSL_KDF_PARAM_MODE, &mode),
+    OSSL_PARAM_construct_utf8_string(
+      OSSL_KDF_PARAM_DIGEST, digest_name.data(), digest_name.size()),
+    OSSL_PARAM_construct_octet_string(
+      OSSL_KDF_PARAM_KEY, ikm_ptr, ikm.size()),
+    OSSL_PARAM_construct_octet_string(
+      OSSL_KDF_PARAM_SALT, salt_ptr, salt.size()),
+    OSSL_PARAM_construct_end(),
+  };
+
+  const auto kdf =
+    scoped_evp_kdf(EVP_KDF_fetch(NULL, "HKDF", NULL), EVP_KDF_free);
+  const auto ctx =
+    scoped_evp_kdf_ctx(EVP_KDF_CTX_new(kdf.get()), EVP_KDF_CTX_free);
+  if (1 != EVP_KDF_CTX_set_params(ctx.get(), params.data())) {
+    return Result<owned_bytes<max_hkdf_extract_size>>::err(
+      SFrameErrorType::crypto_error,
+      ERR_error_string(ERR_get_error(), nullptr));
+  }
+
+  const auto digest_size = EVP_KDF_CTX_get_kdf_size(ctx.get());
+  auto out = owned_bytes<max_hkdf_extract_size>(digest_size);
+  if (1 != EVP_KDF_derive(ctx.get(), out.data(), out.size(), nullptr)) {
+    return Result<owned_bytes<max_hkdf_extract_size>>::err(
+      SFrameErrorType::crypto_error,
+      ERR_error_string(ERR_get_error(), nullptr));
+  }
+
+  return Result<owned_bytes<max_hkdf_extract_size>>(out);
 }
 
 Result<owned_bytes<max_hkdf_expand_size>>
 hkdf_expand(CipherSuite suite, input_bytes prk, input_bytes info, size_t size)
 {
-  try {
-    auto mode = EVP_KDF_HKDF_MODE_EXPAND_ONLY;
-    auto digest_name_result = openssl_digest_name(suite);
-    if (!digest_name_result.is_ok()) {
-      return digest_name_result.MoveError();
-    }
-    auto digest_name = digest_name_result.MoveValue();
-
-    auto* prk_ptr =
-      const_cast<void*>(reinterpret_cast<const void*>(prk.data()));
-    auto* info_ptr =
-      const_cast<void*>(reinterpret_cast<const void*>(info.data()));
-
-    const auto params = std::array<OSSL_PARAM, 5>{
-      OSSL_PARAM_construct_int(OSSL_KDF_PARAM_MODE, &mode),
-      OSSL_PARAM_construct_utf8_string(
-        OSSL_KDF_PARAM_DIGEST, digest_name.data(), digest_name.size()),
-      OSSL_PARAM_construct_octet_string(
-        OSSL_KDF_PARAM_KEY, prk_ptr, prk.size()),
-      OSSL_PARAM_construct_octet_string(
-        OSSL_KDF_PARAM_INFO, info_ptr, info.size()),
-      OSSL_PARAM_construct_end(),
-    };
-
-    const auto kdf =
-      scoped_evp_kdf(EVP_KDF_fetch(NULL, "HKDF", NULL), EVP_KDF_free);
-    const auto ctx =
-      scoped_evp_kdf_ctx(EVP_KDF_CTX_new(kdf.get()), EVP_KDF_CTX_free);
-
-    auto out = owned_bytes<max_hkdf_expand_size>(size);
-    if (1 != EVP_KDF_derive(ctx.get(), out.data(), out.size(), params.data())) {
-      return Result<owned_bytes<max_hkdf_expand_size>>::err(
-        SFrameErrorType::crypto_error,
-        ERR_error_string(ERR_get_error(), nullptr));
-    }
-
-    return Result<owned_bytes<max_hkdf_expand_size>>(out);
-  } catch (const unsupported_ciphersuite_error& e) {
-    return Result<owned_bytes<max_hkdf_expand_size>>::err(
-      SFrameErrorType::unsupported_ciphersuite_error, e.what());
-  } catch (const crypto_error& e) {
-    return Result<owned_bytes<max_hkdf_expand_size>>::err(
-      SFrameErrorType::crypto_error, e.what());
+  auto mode = EVP_KDF_HKDF_MODE_EXPAND_ONLY;
+  auto digest_name_result = openssl_digest_name(suite);
+  if (!digest_name_result.is_ok()) {
+    return digest_name_result.MoveError();
   }
+  auto digest_name = digest_name_result.MoveValue();
+
+  auto* prk_ptr =
+    const_cast<void*>(reinterpret_cast<const void*>(prk.data()));
+  auto* info_ptr =
+    const_cast<void*>(reinterpret_cast<const void*>(info.data()));
+
+  const auto params = std::array<OSSL_PARAM, 5>{
+    OSSL_PARAM_construct_int(OSSL_KDF_PARAM_MODE, &mode),
+    OSSL_PARAM_construct_utf8_string(
+      OSSL_KDF_PARAM_DIGEST, digest_name.data(), digest_name.size()),
+    OSSL_PARAM_construct_octet_string(
+      OSSL_KDF_PARAM_KEY, prk_ptr, prk.size()),
+    OSSL_PARAM_construct_octet_string(
+      OSSL_KDF_PARAM_INFO, info_ptr, info.size()),
+    OSSL_PARAM_construct_end(),
+  };
+
+  const auto kdf =
+    scoped_evp_kdf(EVP_KDF_fetch(NULL, "HKDF", NULL), EVP_KDF_free);
+  const auto ctx =
+    scoped_evp_kdf_ctx(EVP_KDF_CTX_new(kdf.get()), EVP_KDF_CTX_free);
+
+  auto out = owned_bytes<max_hkdf_expand_size>(size);
+  if (1 != EVP_KDF_derive(ctx.get(), out.data(), out.size(), params.data())) {
+    return Result<owned_bytes<max_hkdf_expand_size>>::err(
+      SFrameErrorType::crypto_error,
+      ERR_error_string(ERR_get_error(), nullptr));
+  }
+
+  return Result<owned_bytes<max_hkdf_expand_size>>(out);
 }
 
 ///
@@ -414,32 +398,22 @@ seal(CipherSuite suite,
      input_bytes aad,
      input_bytes pt)
 {
-  try {
-    switch (suite) {
-      case CipherSuite::AES_128_CTR_HMAC_SHA256_80:
-      case CipherSuite::AES_128_CTR_HMAC_SHA256_64:
-      case CipherSuite::AES_128_CTR_HMAC_SHA256_32: {
-        return seal_ctr(suite, key, nonce, ct, aad, pt);
-      }
-
-      case CipherSuite::AES_GCM_128_SHA256:
-      case CipherSuite::AES_GCM_256_SHA512: {
-        return seal_aead(suite, key, nonce, ct, aad, pt);
-      }
+  switch (suite) {
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_80:
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_64:
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_32: {
+      return seal_ctr(suite, key, nonce, ct, aad, pt);
     }
 
-    return Result<output_bytes>::err(
-      SFrameErrorType::unsupported_ciphersuite_error,
-      "Unsupported ciphersuite");
-  } catch (const buffer_too_small_error& e) {
-    return Result<output_bytes>::err(SFrameErrorType::buffer_too_small_error,
-                                     e.what());
-  } catch (const crypto_error& e) {
-    return Result<output_bytes>::err(SFrameErrorType::crypto_error, e.what());
-  } catch (const unsupported_ciphersuite_error& e) {
-    return Result<output_bytes>::err(
-      SFrameErrorType::unsupported_ciphersuite_error, e.what());
+    case CipherSuite::AES_GCM_128_SHA256:
+    case CipherSuite::AES_GCM_256_SHA512: {
+      return seal_aead(suite, key, nonce, ct, aad, pt);
+    }
   }
+
+  return Result<output_bytes>::err(
+    SFrameErrorType::unsupported_ciphersuite_error,
+    "Unsupported ciphersuite");
 }
 
 static Result<output_bytes>
@@ -579,35 +553,22 @@ open(CipherSuite suite,
      input_bytes aad,
      input_bytes ct)
 {
-  try {
-    switch (suite) {
-      case CipherSuite::AES_128_CTR_HMAC_SHA256_80:
-      case CipherSuite::AES_128_CTR_HMAC_SHA256_64:
-      case CipherSuite::AES_128_CTR_HMAC_SHA256_32: {
-        return open_ctr(suite, key, nonce, pt, aad, ct);
-      }
-
-      case CipherSuite::AES_GCM_128_SHA256:
-      case CipherSuite::AES_GCM_256_SHA512: {
-        return open_aead(suite, key, nonce, pt, aad, ct);
-      }
+  switch (suite) {
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_80:
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_64:
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_32: {
+      return open_ctr(suite, key, nonce, pt, aad, ct);
     }
 
-    return Result<output_bytes>::err(
-      SFrameErrorType::unsupported_ciphersuite_error,
-      "Unsupported ciphersuite");
-  } catch (const buffer_too_small_error& e) {
-    return Result<output_bytes>::err(SFrameErrorType::buffer_too_small_error,
-                                     e.what());
-  } catch (const crypto_error& e) {
-    return Result<output_bytes>::err(SFrameErrorType::crypto_error, e.what());
-  } catch (const unsupported_ciphersuite_error& e) {
-    return Result<output_bytes>::err(
-      SFrameErrorType::unsupported_ciphersuite_error, e.what());
-  } catch (const authentication_error& e) {
-    return Result<output_bytes>::err(SFrameErrorType::authentication_error,
-                                     e.what());
+    case CipherSuite::AES_GCM_128_SHA256:
+    case CipherSuite::AES_GCM_256_SHA512: {
+      return open_aead(suite, key, nonce, pt, aad, ct);
+    }
   }
+
+  return Result<output_bytes>::err(
+    SFrameErrorType::unsupported_ciphersuite_error,
+    "Unsupported ciphersuite");
 }
 
 } // namespace SFRAME_NAMESPACE

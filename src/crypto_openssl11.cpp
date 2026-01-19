@@ -537,37 +537,24 @@ open(CipherSuite suite,
      input_bytes aad,
      input_bytes ct)
 {
-  try {
-    switch (suite) {
-      case CipherSuite::AES_128_CTR_HMAC_SHA256_80:
-      case CipherSuite::AES_128_CTR_HMAC_SHA256_64:
-      case CipherSuite::AES_128_CTR_HMAC_SHA256_32: {
-        auto result = open_ctr(suite, key, nonce, pt, aad, ct);
-        return Result<output_bytes>(result);
-      }
-
-      case CipherSuite::AES_GCM_128_SHA256:
-      case CipherSuite::AES_GCM_256_SHA512: {
-        auto result = open_aead(suite, key, nonce, pt, aad, ct);
-        return Result<output_bytes>(result);
-      }
+  switch (suite) {
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_80:
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_64:
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_32: {
+      auto result = open_ctr(suite, key, nonce, pt, aad, ct);
+      return Result<output_bytes>(result);
     }
 
-    return Result<output_bytes>::err(
-      SFrameErrorType::unsupported_ciphersuite_error,
-      "Unsupported ciphersuite");
-  } catch (const buffer_too_small_error& e) {
-    return Result<output_bytes>::err(SFrameErrorType::buffer_too_small_error,
-                                     e.what());
-  } catch (const crypto_error& e) {
-    return Result<output_bytes>::err(SFrameErrorType::crypto_error, e.what());
-  } catch (const unsupported_ciphersuite_error& e) {
-    return Result<output_bytes>::err(
-      SFrameErrorType::unsupported_ciphersuite_error, e.what());
-  } catch (const authentication_error& e) {
-    return Result<output_bytes>::err(SFrameErrorType::authentication_error,
-                                     e.what());
+    case CipherSuite::AES_GCM_128_SHA256:
+    case CipherSuite::AES_GCM_256_SHA512: {
+      auto result = open_aead(suite, key, nonce, pt, aad, ct);
+      return Result<output_bytes>(result);
+    }
   }
+
+  return Result<output_bytes>::err(
+    SFrameErrorType::unsupported_ciphersuite_error,
+    "Unsupported ciphersuite");
 }
 
 } // namespace SFRAME_NAMESPACE
