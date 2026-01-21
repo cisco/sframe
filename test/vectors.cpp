@@ -65,7 +65,9 @@ struct HeaderTestVector
   void verify() const
   {
     // Decode
-    const auto decoded = Header::parse(encoded);
+    auto decode_result = Header::parse(encoded);
+    REQUIRE(decode_result.is_ok());
+    const auto decoded = decode_result.value();
     REQUIRE(decoded.key_id == kid);
     REQUIRE(decoded.counter == ctr);
     REQUIRE(decoded.size() == encoded.data.size());

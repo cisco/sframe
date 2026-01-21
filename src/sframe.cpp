@@ -155,7 +155,11 @@ Context::unprotect(output_bytes plaintext,
                    input_bytes ciphertext,
                    input_bytes metadata)
 {
-  const auto header = Header::parse(ciphertext);
+  auto header_result = Header::parse(ciphertext);
+  if (!header_result.is_ok()) {
+    throw_on_error(header_result.error());
+  }
+  const auto header = header_result.value();
   const auto inner_ciphertext = ciphertext.subspan(header.size());
   return Context::unprotect_inner(
     header, plaintext, inner_ciphertext, metadata);
@@ -271,7 +275,11 @@ MLSContext::unprotect(output_bytes plaintext,
                       input_bytes ciphertext,
                       input_bytes metadata)
 {
-  const auto header = Header::parse(ciphertext);
+  auto header_result = Header::parse(ciphertext);
+  if (!header_result.is_ok()) {
+    throw_on_error(header_result.error());
+  }
+  const auto header = header_result.value();
   const auto inner_ciphertext = ciphertext.subspan(header.size());
 
   ensure_key(header.key_id, KeyUsage::unprotect);
