@@ -7,8 +7,6 @@ void
 throw_on_error(const SFrameError& error)
 {
   switch (error.type()) {
-    case SFrameErrorType::none:
-      return;
     case SFrameErrorType::buffer_too_small_error:
       throw buffer_too_small_error(error.message());
     case SFrameErrorType::invalid_parameter_error:

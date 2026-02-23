@@ -3,6 +3,7 @@
 #include <utility>
 #include <variant>
 #include <string>
+#include <optional>
 
 #include <namespace.h>
 
@@ -11,8 +12,7 @@ namespace SFRAME_NAMESPACE {
 // Error types to replace exceptions
 enum class SFrameErrorType
 {
-  none = 0,
-  internal_error,
+  internal_error = 1,
   invalid_parameter_error,
   buffer_too_small_error,
   crypto_error,
@@ -24,68 +24,31 @@ enum class SFrameErrorType
 class SFrameError
 {
 public:
-  SFrameError()
-    : type_(SFrameErrorType::none)
-    , message_()
-  {
-  }
+  SFrameError() = default;
 
   explicit SFrameError(SFrameErrorType type)
     : type_(type)
-    , message_()
+    , message_(nullptr)
   {
   }
 
-  SFrameError(SFrameErrorType type, std::string message)
+  SFrameError(SFrameErrorType type, const char* message)
     : type_(type)
-    , message_(std::move(message))
+    , message_(message)
   {
   }
 
-  // Copy constructor
-  SFrameError(const SFrameError& other)
-    : type_(SFrameErrorType::none)
-    , message_(other.message_)
-  {
-    type_ = other.type_;
-  }
-
-  // Copy assignment
-  SFrameError& operator=(const SFrameError& other)
-  {
-    if (this != &other) {
-      type_ = other.type_;
-      message_ = other.message_;
-    }
-    return *this;
-  }
-
-  // Move constructor
-  SFrameError(SFrameError&& other) noexcept
-    : type_(other.type_)
-    , message_(std::move(other.message_))
-  {
-  }
-
-  // Move assignment
-  SFrameError& operator=(SFrameError&& other) noexcept
-  {
-    if (this != &other) {
-      type_ = other.type_;
-      message_ = std::move(other.message_);
-    }
-    return *this;
-  }
+  SFrameError(const SFrameError& other) = default;
+  SFrameError(SFrameError&& other) noexcept = default;
+  SFrameError& operator=(SFrameError&& other) noexcept = default;
 
   SFrameErrorType type() const { return type_; }
 
-  const char* message() const { return message_.c_str(); }
-
-  bool ok() const { return type_ == SFrameErrorType::none; }
+  const char* message() const { return message_; }
 
 private:
-  SFrameErrorType type_ = SFrameErrorType::none;
-  std::string message_;
+  SFrameErrorType type_;
+  const char* message_ = nullptr;
 };
 
 // Helper to convert SFrameError to appropriate exception type
@@ -98,16 +61,16 @@ class Result
 public:
   typedef T element_type;
 
-  static Result<T> ok(const T& value) { return Result<T>(value); }
+  static Result ok(const T& value) { return Result<T>(value); }
 
-  static Result<T> ok(T&& value) { return Result<T>(std::move(value)); }
+  static Result ok(T&& value) { return Result<T>(std::move(value)); }
 
-  static Result<T> err(SFrameErrorType error, const std::string& message = "")
+  static Result err(SFrameErrorType error, const char* message = nullptr)
   {
     return Result<T>(SFrameError(error, message));
   }
 
-  static Result<T> err(SFrameError&& error)
+  static Result err(SFrameError&& error)
   {
     return Result<T>(std::move(error));
   }
@@ -180,58 +143,39 @@ class Result<void>
 public:
   typedef void element_type;
 
-  static Result<void> ok() { return Result<void>(); }
+  static Result ok() { return Result<void>(); }
 
-  static Result<void> err(SFrameErrorType error,
-                          const std::string& message = "")
+  static Result err(SFrameErrorType error,
+                          const char* message = nullptr)
   {
     return Result<void>(SFrameError(error, message));
   }
 
-  static Result<void> err(SFrameError&& error)
+  static Result err(SFrameError&& error)
   {
     return Result<void>(std::move(error));
   }
 
-  Result()
-    : is_ok_(true)
-    , error_()
-  {
-  }
-
+  Result()  = default;
   Result(SFrameError error)
-    : is_ok_(false)
-    , error_(std::move(error))
+    : error_(std::move(error))
   {
   }
-
   Result(const Result& other) = delete;
   Result& operator=(const Result& other) = delete;
-
-  Result(Result&& other) noexcept
-    : is_ok_(other.is_ok_)
-    , error_(std::move(other.error_))
-  {
-  }
-
-  Result& operator=(Result&& other) noexcept
-  {
-    is_ok_ = other.is_ok_;
-    error_ = std::move(other.error_);
-    return *this;
-  }
+  Result(Result&& other) noexcept = default;
+  Result& operator=(Result&& other) noexcept = default;
 
   void value() { /* void has no value to move */ }
 
-  SFrameError error() { return error_; }
+  SFrameError error() { return error_.value(); }
 
-  bool is_ok() const { return is_ok_; }
-
-  bool is_err() const { return !is_ok_; }
+  bool is_ok() const { return !error_.has_value(); }
+  
+  bool is_err() const { return error_.has_value(); }
 
 private:
-  bool is_ok_;
-  SFrameError error_;
+  std::optional<SFrameError> error_;
 };
 
 } // namespace SFRAME_NAMESPACE
