@@ -87,11 +87,7 @@ struct ValueOrLength
     }
 
     const auto size = value_size();
-    auto value_result = decode_uint(data.subspan(0, size));
-    if (!value_result.is_ok()) {
-      return value_result.error();
-    }
-    const auto value = value_result.value();
+    SFRAME_VALUE_OR_RETURN(value, decode_uint(data.subspan(0, size)));
     const auto remaining = data.subspan(size);
     return Result<std::tuple<uint64_t, input_bytes>>::ok(
       std::make_tuple(value, remaining));
@@ -157,18 +153,10 @@ Header::parse(input_bytes buffer)
 
   const auto cfg = ConfigByte{ buffer[0] };
   const auto after_cfg = buffer.subspan(1);
-  
-  auto read_result = cfg.kid.read(after_cfg);
-  if (!read_result.is_ok()) {
-    return read_result.error();
-  }
-  auto [key_id, after_kid] = read_result.value();
-  
-  read_result = cfg.ctr.read(after_kid);
-  if (!read_result.is_ok()) {
-    return read_result.error();
-  }
-  auto [counter, _] = read_result.value();
+  SFRAME_VALUE_OR_RETURN(kid_result, cfg.kid.read(after_cfg));
+  const auto [key_id, after_kid] = kid_result;
+  SFRAME_VALUE_OR_RETURN(ctr_result, cfg.ctr.read(after_kid));
+  const auto [counter, _] = ctr_result;
   
   const auto encoded = buffer.subspan(0, cfg.encoded_size());
 

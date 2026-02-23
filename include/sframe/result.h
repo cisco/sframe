@@ -1,9 +1,9 @@
 #pragma once
 
+#include <optional>
+#include <string>
 #include <utility>
 #include <variant>
-#include <string>
-#include <optional>
 
 #include <namespace.h>
 
@@ -24,8 +24,6 @@ enum class SFrameErrorType
 class SFrameError
 {
 public:
-  SFrameError() = default;
-
   explicit SFrameError(SFrameErrorType type)
     : type_(type)
     , message_(nullptr)
@@ -70,10 +68,7 @@ public:
     return Result<T>(SFrameError(error, message));
   }
 
-  static Result err(SFrameError&& error)
-  {
-    return Result<T>(std::move(error));
-  }
+  static Result err(SFrameError&& error) { return Result<T>(std::move(error)); }
 
   Result(SFrameError error)
     : data_(std::move(error))
@@ -125,7 +120,8 @@ public:
       auto error = std::get<SFrameError>(data_);
       return error;
     }
-    return SFrameError(); // Default OK error
+
+    return SFrameError(SFrameErrorType::internal_error); // Default OK error
   }
 
   bool is_ok() const { return std::holds_alternative<T>(data_); }
@@ -145,8 +141,7 @@ public:
 
   static Result ok() { return Result<void>(); }
 
-  static Result err(SFrameErrorType error,
-                          const char* message = nullptr)
+  static Result err(SFrameErrorType error, const char* message = nullptr)
   {
     return Result<void>(SFrameError(error, message));
   }
@@ -156,7 +151,7 @@ public:
     return Result<void>(std::move(error));
   }
 
-  Result()  = default;
+  Result() = default;
   Result(SFrameError error)
     : error_(std::move(error))
   {
@@ -171,7 +166,7 @@ public:
   SFrameError error() { return error_.value(); }
 
   bool is_ok() const { return !error_.has_value(); }
-  
+
   bool is_err() const { return error_.has_value(); }
 
 private:
@@ -179,3 +174,25 @@ private:
 };
 
 } // namespace SFRAME_NAMESPACE
+
+// Unwrap a Result<T>, throwing the corresponding exception on error.
+// Use in functions that have NOT yet been migrated away from exceptions.
+// Usage: const auto val = SFRAME_VALUE_OR_THROW(some_result_expr);
+#define SFRAME_VALUE_OR_THROW(expr)                                            \
+  ([&]() {                                                                     \
+    auto _result = (expr);                                                     \
+    if (_result.is_err()) {                                                    \
+      SFRAME_NAMESPACE::throw_on_error(_result.error());                       \
+    }                                                                          \
+    return _result.value();                                                    \
+  }())
+
+// Unwrap a Result<T> into `var`, propagating the error by early return.
+// Use in functions that already return Result<U>.
+// Usage: SFRAME_VALUE_OR_RETURN(val, some_result_expr);
+#define SFRAME_VALUE_OR_RETURN(var, expr)                                      \
+  auto _sframe_r_##var = (expr);                                               \
+  if (_sframe_r_##var.is_err()) {                                              \
+    return _sframe_r_##var.error();                                            \
+  }                                                                            \
+  auto var = _sframe_r_##var.value()
