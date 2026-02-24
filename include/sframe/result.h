@@ -26,27 +26,33 @@ class SFrameError
 public:
   explicit SFrameError(SFrameErrorType type)
     : type_(type)
-    , message_(nullptr)
   {
   }
 
-  SFrameError(SFrameErrorType type, const char* message)
+  SFrameError(SFrameErrorType type, std::string message)
     : type_(type)
-    , message_(message)
+    , message_(std::move(message))
   {
   }
 
   SFrameError(const SFrameError& other) = default;
-  SFrameError(SFrameError&& other) noexcept = default;
+
+  SFrameError(SFrameError&& other) noexcept
+    : type_(SFrameErrorType::internal_error)
+    , message_(std::move(other.message_))
+  {
+    type_ = other.type_;
+  }
+
   SFrameError& operator=(SFrameError&& other) noexcept = default;
 
   SFrameErrorType type() const { return type_; }
 
-  const char* message() const { return message_; }
+  const char* message() const { return message_.c_str(); }
 
 private:
   SFrameErrorType type_;
-  const char* message_ = nullptr;
+  std::string message_;
 };
 
 // Helper to convert SFrameError to appropriate exception type
@@ -56,16 +62,17 @@ throw_on_error(const SFrameError& error);
 template<typename T>
 class Result
 {
+  static_assert(!std::is_same_v<T, SFrameError>,
+                "Result<SFrameError> is not supported");
+
 public:
   typedef T element_type;
 
-  static Result ok(const T& value) { return Result<T>(value); }
+  static Result ok(T value) { return Result<T>(std::move(value)); }
 
-  static Result ok(T&& value) { return Result<T>(std::move(value)); }
-
-  static Result err(SFrameErrorType error, const char* message = nullptr)
+  static Result err(SFrameErrorType error, std::string message = {})
   {
-    return Result<T>(SFrameError(error, message));
+    return Result<T>(SFrameError(error, std::move(message)));
   }
 
   static Result err(SFrameError&& error) { return Result<T>(std::move(error)); }
@@ -75,53 +82,25 @@ public:
   {
   }
 
-  Result(const T& value)
-    : data_(value)
-  {
-  }
-
-  Result(T&& value)
+  Result(T value)
     : data_(std::move(value))
   {
   }
 
   Result(const Result& other) = delete;
   Result& operator=(const Result& other) = delete;
-
-  Result(Result&& other) noexcept
-    : data_(std::move(other.data_))
-  {
-  }
-
-  Result& operator=(Result&& other) noexcept
-  {
-    data_ = std::move(other.data_);
-    return *this;
-  }
-
-  template<typename U>
-  Result(Result<U>&& other)
-    : data_(std::move(other.data_))
-  {
-  }
-
-  template<typename U>
-  Result& operator=(Result<U>&& other)
-  {
-    data_ = std::move(other.data_);
-    return *this;
-  }
+  Result(Result&& other) noexcept = default;
+  Result& operator=(Result&& other) noexcept = default;
 
   T value() { return std::move(std::get<T>(data_)); }
 
   SFrameError error()
   {
     if (std::holds_alternative<SFrameError>(data_)) {
-      auto error = std::get<SFrameError>(data_);
-      return error;
+      return std::move(std::get<SFrameError>(data_));
     }
 
-    return SFrameError(SFrameErrorType::internal_error); // Default OK error
+    return SFrameError(SFrameErrorType::internal_error);
   }
 
   bool is_ok() const { return std::holds_alternative<T>(data_); }
@@ -141,9 +120,9 @@ public:
 
   static Result ok() { return Result<void>(); }
 
-  static Result err(SFrameErrorType error, const char* message = nullptr)
+  static Result err(SFrameErrorType error, std::string message = {})
   {
-    return Result<void>(SFrameError(error, message));
+    return Result<void>(SFrameError(error, std::move(message)));
   }
 
   static Result err(SFrameError&& error)
@@ -151,11 +130,13 @@ public:
     return Result<void>(std::move(error));
   }
 
-  Result() = default;
   Result(SFrameError error)
     : error_(std::move(error))
   {
   }
+
+  Result() = default;
+
   Result(const Result& other) = delete;
   Result& operator=(const Result& other) = delete;
   Result(Result&& other) noexcept = default;
@@ -163,7 +144,7 @@ public:
 
   void value() { /* void has no value to move */ }
 
-  SFrameError error() { return error_.value(); }
+  SFrameError error() { return std::move(error_).value(); }
 
   bool is_ok() const { return !error_.has_value(); }
 
