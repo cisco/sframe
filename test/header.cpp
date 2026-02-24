@@ -3,6 +3,7 @@
 #include <openssl/err.h>
 
 #include <header.h>
+#include <sframe/result.h>
 
 #include "common.h"
 
@@ -37,9 +38,7 @@ TEST_CASE("Header Known-Answer")
 
   for (const auto& tc : cases) {
     // Decode
-    auto decode_result = Header::parse(tc.encoding);
-    REQUIRE(decode_result.is_ok());
-    const auto decoded = decode_result.value();
+    const auto decoded = SFRAME_VALUE_OR_THROW(Header::parse(tc.encoding));
     REQUIRE(decoded.key_id == tc.key_id);
     REQUIRE(decoded.counter == tc.counter);
     REQUIRE(decoded.size() == tc.encoding.size());

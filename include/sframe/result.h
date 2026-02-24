@@ -1,7 +1,6 @@
 #pragma once
 
 #include <optional>
-#include <string>
 #include <utility>
 #include <variant>
 
@@ -26,33 +25,27 @@ class SFrameError
 public:
   explicit SFrameError(SFrameErrorType type)
     : type_(type)
+    , message_(nullptr)
   {
   }
 
-  SFrameError(SFrameErrorType type, std::string message)
+  SFrameError(SFrameErrorType type, const char* message)
     : type_(type)
-    , message_(std::move(message))
+    , message_(message)
   {
   }
 
   SFrameError(const SFrameError& other) = default;
-
-  SFrameError(SFrameError&& other) noexcept
-    : type_(SFrameErrorType::internal_error)
-    , message_(std::move(other.message_))
-  {
-    type_ = other.type_;
-  }
-
+  SFrameError(SFrameError&& other) noexcept = default;
   SFrameError& operator=(SFrameError&& other) noexcept = default;
 
   SFrameErrorType type() const { return type_; }
 
-  const char* message() const { return message_.c_str(); }
+  const char* message() const { return message_; }
 
 private:
   SFrameErrorType type_;
-  std::string message_;
+  const char* message_ = nullptr;
 };
 
 // Helper to convert SFrameError to appropriate exception type
@@ -70,9 +63,9 @@ public:
 
   static Result ok(T value) { return Result<T>(std::move(value)); }
 
-  static Result err(SFrameErrorType error, std::string message = {})
+  static Result err(SFrameErrorType error, const char* message = nullptr)
   {
-    return Result<T>(SFrameError(error, std::move(message)));
+    return Result<T>(SFrameError(error, message));
   }
 
   static Result err(SFrameError&& error) { return Result<T>(std::move(error)); }
@@ -120,9 +113,9 @@ public:
 
   static Result ok() { return Result<void>(); }
 
-  static Result err(SFrameErrorType error, std::string message = {})
+  static Result err(SFrameErrorType error, const char* message = nullptr)
   {
-    return Result<void>(SFrameError(error, std::move(message)));
+    return Result<void>(SFrameError(error, message));
   }
 
   static Result err(SFrameError&& error)

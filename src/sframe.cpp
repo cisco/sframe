@@ -335,9 +335,7 @@ MLSContext::form_key_id(EpochID epoch_id,
   auto epoch_index = epoch_id & epoch_mask;
   auto& epoch = epoch_cache[epoch_index];
   if (!epoch) {
-    throw invalid_parameter_error(
-      "Unknown epoch. epoch_index: " + std::to_string(epoch_index) +
-      ", sender_id:" + std::to_string(sender_id));
+    throw invalid_parameter_error("Unknown epoch");
   }
 
   if (sender_id > epoch->max_sender_id) {
@@ -364,8 +362,7 @@ MLSContext::ensure_key(KeyID key_id, KeyUsage usage)
   const auto epoch_index = key_id & epoch_mask;
   auto& epoch = epoch_cache[epoch_index];
   if (!epoch) {
-    throw invalid_parameter_error("Unknown epoch: " +
-                                  std::to_string(epoch_index));
+    throw invalid_parameter_error("Unknown epoch");
   }
 
   if (keys.contains(key_id)) {
