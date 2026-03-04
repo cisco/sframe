@@ -1,8 +1,8 @@
 #pragma once
 
+#include <cstdint>
 #include <gsl/gsl-lite.hpp>
 #include <optional>
-#include <cstdint>
 
 #include <sframe/map.h>
 #include <sframe/vector.h>
