@@ -28,18 +28,19 @@ encode_uint(uint64_t val, output_bytes buffer)
   }
 }
 
-static uint64_t
+static Result<uint64_t>
 decode_uint(input_bytes data)
 {
   if (!data.empty() && data[0] == 0) {
-    throw invalid_parameter_error("Integer is not minimally encoded");
+    return Result<uint64_t>::err(SFrameErrorType::invalid_parameter_error,
+                                 "Integer is not minimally encoded");
   }
 
   uint64_t val = 0;
   for (size_t i = 0; i < data.size(); i++) {
     val = (val << 8) + static_cast<uint64_t>(data[i]);
   }
-  return val;
+  return Result<uint64_t>::ok(val);
 }
 
 struct ValueOrLength
@@ -77,17 +78,19 @@ struct ValueOrLength
     return value_or_length + 1;
   }
 
-  std::tuple<uint64_t, input_bytes> read(input_bytes data) const
+  Result<std::tuple<uint64_t, input_bytes>> read(input_bytes data) const
   {
     if (!is_length) {
       // Nothing to read; value is already in config byte
-      return { value_or_length, data };
+      return Result<std::tuple<uint64_t, input_bytes>>::ok(
+        std::make_tuple(value_or_length, data));
     }
 
     const auto size = value_size();
-    const auto value = decode_uint(data.subspan(0, size));
+    SFRAME_VALUE_OR_RETURN(value, decode_uint(data.subspan(0, size)));
     const auto remaining = data.subspan(size);
-    return { value, remaining };
+    return Result<std::tuple<uint64_t, input_bytes>>::ok(
+      std::make_tuple(value, remaining));
   }
 
 private:
@@ -140,20 +143,24 @@ Header::Header(KeyID key_id_in, Counter counter_in)
   encode_uint(counter, after_kid.subspan(0, cfg.ctr.value_size()));
 }
 
-Header
+Result<Header>
 Header::parse(input_bytes buffer)
 {
   if (buffer.size() < Header::min_size) {
-    throw buffer_too_small_error("Ciphertext too small to decode header");
+    return Result<Header>::err(SFrameErrorType::buffer_too_small_error,
+                               "Ciphertext too small to decode header");
   }
 
   const auto cfg = ConfigByte{ buffer[0] };
   const auto after_cfg = buffer.subspan(1);
-  const auto [key_id, after_kid] = cfg.kid.read(after_cfg);
-  const auto [counter, _] = cfg.ctr.read(after_kid);
+  SFRAME_VALUE_OR_RETURN(kid_result, cfg.kid.read(after_cfg));
+  const auto [key_id, after_kid] = kid_result;
+  SFRAME_VALUE_OR_RETURN(ctr_result, cfg.ctr.read(after_kid));
+  const auto [counter, _] = ctr_result;
+  
   const auto encoded = buffer.subspan(0, cfg.encoded_size());
 
-  return Header(key_id, counter, encoded);
+  return Result<Header>::ok(Header(key_id, counter, encoded));
 }
 
 Header::Header(KeyID key_id_in, Counter counter_in, input_bytes encoded_in)

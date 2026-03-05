@@ -1,5 +1,6 @@
 #pragma once
 
+#include <sframe/result.h>
 #include <sframe/sframe.h>
 
 namespace SFRAME_NAMESPACE {
@@ -14,7 +15,7 @@ public:
   const Counter counter;
 
   Header(KeyID key_id_in, Counter counter_in);
-  static Header parse(input_bytes buffer);
+  static Result<Header> parse(input_bytes buffer);
 
   input_bytes encoded() const { return _encoded; }
   size_t size() const { return _encoded.size(); }

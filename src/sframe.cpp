@@ -155,7 +155,7 @@ Context::unprotect(output_bytes plaintext,
                    input_bytes ciphertext,
                    input_bytes metadata)
 {
-  const auto header = Header::parse(ciphertext);
+  const auto header = SFRAME_VALUE_OR_THROW(Header::parse(ciphertext));
   const auto inner_ciphertext = ciphertext.subspan(header.size());
   return Context::unprotect_inner(
     header, plaintext, inner_ciphertext, metadata);
@@ -271,7 +271,7 @@ MLSContext::unprotect(output_bytes plaintext,
                       input_bytes ciphertext,
                       input_bytes metadata)
 {
-  const auto header = Header::parse(ciphertext);
+  const auto header = SFRAME_VALUE_OR_THROW(Header::parse(ciphertext));
   const auto inner_ciphertext = ciphertext.subspan(header.size());
 
   ensure_key(header.key_id, KeyUsage::unprotect);
@@ -335,9 +335,7 @@ MLSContext::form_key_id(EpochID epoch_id,
   auto epoch_index = epoch_id & epoch_mask;
   auto& epoch = epoch_cache[epoch_index];
   if (!epoch) {
-    throw invalid_parameter_error(
-      "Unknown epoch. epoch_index: " + std::to_string(epoch_index) +
-      ", sender_id:" + std::to_string(sender_id));
+    throw invalid_parameter_error("Unknown epoch");
   }
 
   if (sender_id > epoch->max_sender_id) {
@@ -364,8 +362,7 @@ MLSContext::ensure_key(KeyID key_id, KeyUsage usage)
   const auto epoch_index = key_id & epoch_mask;
   auto& epoch = epoch_cache[epoch_index];
   if (!epoch) {
-    throw invalid_parameter_error("Unknown epoch: " +
-                                  std::to_string(epoch_index));
+    throw invalid_parameter_error("Unknown epoch");
   }
 
   if (keys.contains(key_id)) {

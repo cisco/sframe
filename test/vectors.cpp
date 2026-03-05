@@ -5,6 +5,7 @@
 
 #include <crypto.h>
 #include <header.h>
+#include <sframe/result.h>
 
 #include "common.h"
 
@@ -65,7 +66,7 @@ struct HeaderTestVector
   void verify() const
   {
     // Decode
-    const auto decoded = Header::parse(encoded);
+    const auto decoded = SFRAME_VALUE_OR_THROW(Header::parse(encoded));
     REQUIRE(decoded.key_id == kid);
     REQUIRE(decoded.counter == ctr);
     REQUIRE(decoded.size() == encoded.data.size());
