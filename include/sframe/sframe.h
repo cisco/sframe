@@ -27,9 +27,6 @@
 
 namespace SFRAME_NAMESPACE {
 
-// Forward declaration for pre-warmed cipher state
-struct CipherState;
-
 struct crypto_error : std::runtime_error
 {
   crypto_error();
@@ -88,6 +85,41 @@ enum struct KeyUsage
   unprotect,
 };
 
+///
+/// CipherState - pre-warmed cipher state for efficient repeated operations
+///
+/// Holds a pre-initialized cipher context so that expensive key schedule
+/// computation happens once at construction, not on every seal/open call.
+///
+
+struct CipherHandle;
+
+struct CipherState
+{
+  static CipherState create_seal(CipherSuite suite, input_bytes key);
+  static CipherState create_open(CipherSuite suite, input_bytes key);
+
+  output_bytes seal(input_bytes nonce,
+                    output_bytes ct,
+                    input_bytes aad,
+                    input_bytes pt);
+
+  output_bytes open(input_bytes nonce,
+                    output_bytes pt,
+                    input_bytes aad,
+                    input_bytes ct);
+
+private:
+  struct Deleter
+  {
+    void operator()(CipherHandle* h) const;
+  };
+
+  std::unique_ptr<CipherHandle, Deleter> handle;
+
+  explicit CipherState(CipherHandle* h);
+};
+
 struct KeyRecord
 {
   static constexpr size_t max_key_size = 48;
@@ -102,7 +134,7 @@ struct KeyRecord
             owned_bytes<max_salt_size> salt,
             KeyUsage usage,
             Counter counter,
-            std::unique_ptr<CipherState> cipher);
+            CipherState cipher);
   ~KeyRecord();
 
   KeyRecord(KeyRecord&&) noexcept;
@@ -115,7 +147,7 @@ struct KeyRecord
   owned_bytes<max_salt_size> salt;
   KeyUsage usage;
   Counter counter;
-  std::unique_ptr<CipherState> cipher; // Pre-warmed cipher state (AEAD only)
+  CipherState cipher; // Pre-warmed cipher state
 };
 
 // Context applies the full SFrame transform.  It tracks a counter for each key
