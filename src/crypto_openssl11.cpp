@@ -557,13 +557,13 @@ open(CipherSuite suite,
 /// HMAC wrapper class for HKDF
 ///
 
-struct HMAC
+struct HMACForHKDF
 {
 private:
   scoped_hmac_ctx ctx;
 
 public:
-  HMAC(CipherSuite suite, input_bytes key)
+  HMACForHKDF(CipherSuite suite, input_bytes key)
     : ctx(HMAC_CTX_new(), HMAC_CTX_free)
   {
     const auto type = openssl_digest_type(suite);
@@ -617,7 +617,7 @@ public:
 owned_bytes<max_hkdf_expand_size>
 hkdf_extract(CipherSuite suite, input_bytes salt, input_bytes ikm)
 {
-  auto h = HMAC(suite, salt);
+  auto h = HMACForHKDF(suite, salt);
   h.write(ikm);
 
   auto out = owned_bytes<max_hkdf_expand_size>();
@@ -641,7 +641,7 @@ hkdf_expand(CipherSuite suite, input_bytes prk, input_bytes info, size_t size)
   auto counter = owned_bytes<1>();
   counter[0] = 0x01;
   while (out.size() < size) {
-    auto h = HMAC(suite, prk);
+    auto h = HMACForHKDF(suite, prk);
     h.write(block);
     h.write(info);
     h.write(counter);
