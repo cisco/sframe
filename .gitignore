@@ -36,3 +36,4 @@ build
 *.exe
 *.out
 *.app
+.claude/
