@@ -41,7 +41,7 @@ is_ctr_hmac_suite(CipherSuite suite)
 struct CipherHandle
 {
   EVP_CIPHER_CTX* ctx;
-  HMAC_CTX* hmac_ctx;  // For CTR+HMAC (null for GCM)
+  HMAC_CTX* hmac_ctx; // For CTR+HMAC (null for GCM)
   CipherSuite suite;
   bool is_seal;
 
@@ -64,7 +64,8 @@ struct CipherHandle
       auto auth_key = key.subspan(enc_key_size);
 
       // Initialize AES-CTR context (always encrypt for CTR mode)
-      if (1 != EVP_EncryptInit_ex(ctx, cipher, nullptr, enc_key.data(), nullptr)) {
+      if (1 !=
+          EVP_EncryptInit_ex(ctx, cipher, nullptr, enc_key.data(), nullptr)) {
         EVP_CIPHER_CTX_free(ctx);
         throw crypto_error();
       }
@@ -77,7 +78,8 @@ struct CipherHandle
       }
 
       const auto* md = openssl_digest_type(suite);
-      if (1 != HMAC_Init_ex(hmac_ctx, auth_key.data(), auth_key.size(), md, nullptr)) {
+      if (1 != HMAC_Init_ex(
+                 hmac_ctx, auth_key.data(), auth_key.size(), md, nullptr)) {
         HMAC_CTX_free(hmac_ctx);
         EVP_CIPHER_CTX_free(ctx);
         throw crypto_error();
@@ -85,12 +87,14 @@ struct CipherHandle
     } else {
       // GCM: use full key
       if (seal) {
-        if (1 != EVP_EncryptInit_ex(ctx, cipher, nullptr, key.data(), nullptr)) {
+        if (1 !=
+            EVP_EncryptInit_ex(ctx, cipher, nullptr, key.data(), nullptr)) {
           EVP_CIPHER_CTX_free(ctx);
           throw crypto_error();
         }
       } else {
-        if (1 != EVP_DecryptInit_ex(ctx, cipher, nullptr, key.data(), nullptr)) {
+        if (1 !=
+            EVP_DecryptInit_ex(ctx, cipher, nullptr, key.data(), nullptr)) {
           EVP_CIPHER_CTX_free(ctx);
           throw crypto_error();
         }
@@ -339,8 +343,9 @@ open_ctr_cached(CipherHandle* handle,
 
   int outlen = 0;
   auto inner_ct_size_int = static_cast<int>(inner_ct_size);
-  if (1 != EVP_EncryptUpdate(
-             handle->ctx, pt.data(), &outlen, inner_ct.data(), inner_ct_size_int)) {
+  if (1 !=
+      EVP_EncryptUpdate(
+        handle->ctx, pt.data(), &outlen, inner_ct.data(), inner_ct_size_int)) {
     throw crypto_error();
   }
 

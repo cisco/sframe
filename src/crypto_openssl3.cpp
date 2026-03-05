@@ -41,8 +41,8 @@ is_ctr_hmac_suite(CipherSuite suite)
 struct CipherHandle
 {
   EVP_CIPHER_CTX* ctx;
-  EVP_MAC* mac;           // For CTR+HMAC (null for GCM)
-  EVP_MAC_CTX* hmac_ctx;  // For CTR+HMAC (null for GCM)
+  EVP_MAC* mac;          // For CTR+HMAC (null for GCM)
+  EVP_MAC_CTX* hmac_ctx; // For CTR+HMAC (null for GCM)
   CipherSuite suite;
   bool is_seal;
 
@@ -66,7 +66,8 @@ struct CipherHandle
       auto auth_key = key.subspan(enc_key_size);
 
       // Initialize AES-CTR context (always encrypt for CTR mode)
-      if (1 != EVP_EncryptInit_ex(ctx, cipher, nullptr, enc_key.data(), nullptr)) {
+      if (1 !=
+          EVP_EncryptInit_ex(ctx, cipher, nullptr, enc_key.data(), nullptr)) {
         EVP_CIPHER_CTX_free(ctx);
         throw crypto_error();
       }
@@ -92,8 +93,8 @@ struct CipherHandle
         OSSL_PARAM_construct_end()
       };
 
-      if (1 !=
-          EVP_MAC_init(hmac_ctx, auth_key.data(), auth_key.size(), params.data())) {
+      if (1 != EVP_MAC_init(
+                 hmac_ctx, auth_key.data(), auth_key.size(), params.data())) {
         EVP_MAC_CTX_free(hmac_ctx);
         EVP_MAC_free(mac);
         EVP_CIPHER_CTX_free(ctx);
@@ -102,12 +103,14 @@ struct CipherHandle
     } else {
       // GCM: use full key
       if (seal) {
-        if (1 != EVP_EncryptInit_ex(ctx, cipher, nullptr, key.data(), nullptr)) {
+        if (1 !=
+            EVP_EncryptInit_ex(ctx, cipher, nullptr, key.data(), nullptr)) {
           EVP_CIPHER_CTX_free(ctx);
           throw crypto_error();
         }
       } else {
-        if (1 != EVP_DecryptInit_ex(ctx, cipher, nullptr, key.data(), nullptr)) {
+        if (1 !=
+            EVP_DecryptInit_ex(ctx, cipher, nullptr, key.data(), nullptr)) {
           EVP_CIPHER_CTX_free(ctx);
           throw crypto_error();
         }
@@ -204,7 +207,8 @@ seal_ctr_cached(CipherHandle* handle,
   encode_uint(inner_ct.size(), len_view.first(16).last(8));
   encode_uint(tag_size, len_view.last(8));
 
-  if (1 != EVP_MAC_update(handle->hmac_ctx, len_block.data(), len_block.size())) {
+  if (1 !=
+      EVP_MAC_update(handle->hmac_ctx, len_block.data(), len_block.size())) {
     throw crypto_error();
   }
   if (1 != EVP_MAC_update(handle->hmac_ctx, nonce.data(), nonce.size())) {
@@ -219,8 +223,8 @@ seal_ctr_cached(CipherHandle* handle,
 
   size_t mac_size = 0;
   auto mac_buf = owned_bytes<64>();
-  if (1 !=
-      EVP_MAC_final(handle->hmac_ctx, mac_buf.data(), &mac_size, mac_buf.size())) {
+  if (1 != EVP_MAC_final(
+             handle->hmac_ctx, mac_buf.data(), &mac_size, mac_buf.size())) {
     throw crypto_error();
   }
 
@@ -323,7 +327,8 @@ open_ctr_cached(CipherHandle* handle,
   encode_uint(inner_ct.size(), len_view.first(16).last(8));
   encode_uint(tag_size, len_view.last(8));
 
-  if (1 != EVP_MAC_update(handle->hmac_ctx, len_block.data(), len_block.size())) {
+  if (1 !=
+      EVP_MAC_update(handle->hmac_ctx, len_block.data(), len_block.size())) {
     throw crypto_error();
   }
   if (1 != EVP_MAC_update(handle->hmac_ctx, nonce.data(), nonce.size())) {
@@ -338,8 +343,8 @@ open_ctr_cached(CipherHandle* handle,
 
   size_t mac_size = 0;
   auto mac_buf = owned_bytes<64>();
-  if (1 !=
-      EVP_MAC_final(handle->hmac_ctx, mac_buf.data(), &mac_size, mac_buf.size())) {
+  if (1 != EVP_MAC_final(
+             handle->hmac_ctx, mac_buf.data(), &mac_size, mac_buf.size())) {
     throw crypto_error();
   }
 
@@ -361,8 +366,9 @@ open_ctr_cached(CipherHandle* handle,
 
   int outlen = 0;
   auto inner_ct_size_int = static_cast<int>(inner_ct_size);
-  if (1 != EVP_EncryptUpdate(
-             handle->ctx, pt.data(), &outlen, inner_ct.data(), inner_ct_size_int)) {
+  if (1 !=
+      EVP_EncryptUpdate(
+        handle->ctx, pt.data(), &outlen, inner_ct.data(), inner_ct_size_int)) {
     throw crypto_error();
   }
 
