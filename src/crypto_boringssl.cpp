@@ -35,118 +35,157 @@ is_ctr_hmac_suite(CipherSuite suite)
 }
 
 ///
-/// CipherState - pre-warmed cipher context
+/// CipherState - CipherHandle is EVP_CIPHER_CTX, HmacHandle holds HMAC state
 ///
 
-struct CipherHandle
+// HmacHandle for BoringSSL wraps HMAC_CTX
+struct HmacHandle
 {
-  EVP_CIPHER_CTX* ctx;
-  HMAC_CTX* hmac_ctx; // For CTR+HMAC (null for GCM)
-  CipherSuite suite;
-  bool is_seal;
-
-  CipherHandle(CipherSuite suite_in, input_bytes key, bool seal)
-    : ctx(EVP_CIPHER_CTX_new())
-    , hmac_ctx(nullptr)
-    , suite(suite_in)
-    , is_seal(seal)
-  {
-    if (ctx == nullptr) {
-      throw crypto_error();
-    }
-
-    auto cipher = openssl_cipher(suite);
-
-    if (is_ctr_hmac_suite(suite)) {
-      // CTR+HMAC: key is split into enc_key and auth_key
-      auto enc_key_size = cipher_enc_key_size(suite);
-      auto enc_key = key.first(enc_key_size);
-      auto auth_key = key.subspan(enc_key_size);
-
-      // Initialize AES-CTR context (always encrypt for CTR mode)
-      if (1 !=
-          EVP_EncryptInit_ex(ctx, cipher, nullptr, enc_key.data(), nullptr)) {
-        EVP_CIPHER_CTX_free(ctx);
-        throw crypto_error();
-      }
-
-      // Initialize HMAC context
-      hmac_ctx = HMAC_CTX_new();
-      if (hmac_ctx == nullptr) {
-        EVP_CIPHER_CTX_free(ctx);
-        throw crypto_error();
-      }
-
-      const auto* md = openssl_digest_type(suite);
-      if (1 != HMAC_Init_ex(
-                 hmac_ctx, auth_key.data(), auth_key.size(), md, nullptr)) {
-        HMAC_CTX_free(hmac_ctx);
-        EVP_CIPHER_CTX_free(ctx);
-        throw crypto_error();
-      }
-    } else {
-      // GCM: use full key
-      if (seal) {
-        if (1 !=
-            EVP_EncryptInit_ex(ctx, cipher, nullptr, key.data(), nullptr)) {
-          EVP_CIPHER_CTX_free(ctx);
-          throw crypto_error();
-        }
-      } else {
-        if (1 !=
-            EVP_DecryptInit_ex(ctx, cipher, nullptr, key.data(), nullptr)) {
-          EVP_CIPHER_CTX_free(ctx);
-          throw crypto_error();
-        }
-      }
-    }
-  }
-
-  ~CipherHandle()
-  {
-    if (hmac_ctx != nullptr) {
-      HMAC_CTX_free(hmac_ctx);
-    }
-    if (ctx != nullptr) {
-      EVP_CIPHER_CTX_free(ctx);
-    }
-  }
-
-  CipherHandle(const CipherHandle&) = delete;
-  CipherHandle& operator=(const CipherHandle&) = delete;
+  HMAC_CTX* ctx;
 };
 
-void
-CipherState::Deleter::operator()(CipherHandle* h) const
+// Cast helpers - CipherHandle is EVP_CIPHER_CTX
+static EVP_CIPHER_CTX*
+cipher_ctx(CipherHandle* h)
 {
-  delete h;
+  return reinterpret_cast<EVP_CIPHER_CTX*>(h);
 }
 
-CipherState::CipherState(CipherHandle* h)
-  : handle(h)
+static CipherHandle*
+to_cipher_handle(EVP_CIPHER_CTX* ctx)
+{
+  return reinterpret_cast<CipherHandle*>(ctx);
+}
+
+void
+CipherState::CipherDeleter::operator()(CipherHandle* h) const
+{
+  EVP_CIPHER_CTX_free(cipher_ctx(h));
+}
+
+void
+CipherState::HmacDeleter::operator()(HmacHandle* h) const
+{
+  if (h != nullptr) {
+    HMAC_CTX_free(h->ctx);
+    delete h;
+  }
+}
+
+CipherState::CipherState(CipherHandle* cipher,
+                         HmacHandle* hmac,
+                         CipherSuite suite_in)
+  : cipher_handle(cipher)
+  , hmac_handle(hmac)
+  , suite(suite_in)
 {
 }
 
 CipherState
 CipherState::create_seal(CipherSuite suite, input_bytes key)
 {
-  return CipherState(new CipherHandle(suite, key, true));
+  std::unique_ptr<EVP_CIPHER_CTX, decltype(&EVP_CIPHER_CTX_free)> ctx(
+    EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free);
+  if (ctx == nullptr) {
+    throw crypto_error();
+  }
+
+  auto cipher = openssl_cipher(suite);
+  std::unique_ptr<HmacHandle, HmacDeleter> hmac;
+
+  if (is_ctr_hmac_suite(suite)) {
+    // CTR+HMAC: key is split into enc_key and auth_key
+    auto enc_key_size = cipher_enc_key_size(suite);
+    auto enc_key = key.first(enc_key_size);
+    auto auth_key = key.subspan(enc_key_size);
+
+    // Initialize AES-CTR context (always encrypt for CTR mode)
+    if (1 != EVP_EncryptInit_ex(
+               ctx.get(), cipher, nullptr, enc_key.data(), nullptr)) {
+      throw crypto_error();
+    }
+
+    // Initialize HMAC
+    hmac.reset(new HmacHandle());
+    hmac->ctx = HMAC_CTX_new();
+    if (hmac->ctx == nullptr) {
+      throw crypto_error();
+    }
+
+    const auto* md = openssl_digest_type(suite);
+    if (1 != HMAC_Init_ex(
+               hmac->ctx, auth_key.data(), auth_key.size(), md, nullptr)) {
+      throw crypto_error();
+    }
+  } else {
+    // GCM: use full key
+    if (1 !=
+        EVP_EncryptInit_ex(ctx.get(), cipher, nullptr, key.data(), nullptr)) {
+      throw crypto_error();
+    }
+  }
+
+  return CipherState(to_cipher_handle(ctx.release()), hmac.release(), suite);
 }
 
 CipherState
 CipherState::create_open(CipherSuite suite, input_bytes key)
 {
-  return CipherState(new CipherHandle(suite, key, false));
+  std::unique_ptr<EVP_CIPHER_CTX, decltype(&EVP_CIPHER_CTX_free)> ctx(
+    EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free);
+  if (ctx == nullptr) {
+    throw crypto_error();
+  }
+
+  auto cipher = openssl_cipher(suite);
+  std::unique_ptr<HmacHandle, HmacDeleter> hmac;
+
+  if (is_ctr_hmac_suite(suite)) {
+    // CTR+HMAC: key is split into enc_key and auth_key
+    auto enc_key_size = cipher_enc_key_size(suite);
+    auto enc_key = key.first(enc_key_size);
+    auto auth_key = key.subspan(enc_key_size);
+
+    // Initialize AES-CTR context (always encrypt for CTR mode - CTR is
+    // symmetric)
+    if (1 != EVP_EncryptInit_ex(
+               ctx.get(), cipher, nullptr, enc_key.data(), nullptr)) {
+      throw crypto_error();
+    }
+
+    // Initialize HMAC
+    hmac.reset(new HmacHandle());
+    hmac->ctx = HMAC_CTX_new();
+    if (hmac->ctx == nullptr) {
+      throw crypto_error();
+    }
+
+    const auto* md = openssl_digest_type(suite);
+    if (1 != HMAC_Init_ex(
+               hmac->ctx, auth_key.data(), auth_key.size(), md, nullptr)) {
+      throw crypto_error();
+    }
+  } else {
+    // GCM: use full key
+    if (1 !=
+        EVP_DecryptInit_ex(ctx.get(), cipher, nullptr, key.data(), nullptr)) {
+      throw crypto_error();
+    }
+  }
+
+  return CipherState(to_cipher_handle(ctx.release()), hmac.release(), suite);
 }
 
 static output_bytes
-seal_ctr_cached(CipherHandle* handle,
+seal_ctr_cached(EVP_CIPHER_CTX* ctx,
+                HmacHandle* hmac,
+                CipherSuite suite,
                 input_bytes nonce,
                 output_bytes ct,
                 input_bytes aad,
                 input_bytes pt)
 {
-  auto tag_size = cipher_overhead(handle->suite);
+  auto tag_size = cipher_overhead(suite);
   if (ct.size() < pt.size() + tag_size) {
     throw buffer_too_small_error("Ciphertext buffer too small");
   }
@@ -157,8 +196,8 @@ seal_ctr_cached(CipherHandle* handle,
   padded_nonce.resize(16);
 
   // Reset AES-CTR context with new nonce (key is preserved)
-  if (1 != EVP_EncryptInit_ex(
-             handle->ctx, nullptr, nullptr, nullptr, padded_nonce.data())) {
+  if (1 !=
+      EVP_EncryptInit_ex(ctx, nullptr, nullptr, nullptr, padded_nonce.data())) {
     throw crypto_error();
   }
 
@@ -167,17 +206,17 @@ seal_ctr_cached(CipherHandle* handle,
   int outlen = 0;
   auto pt_size_int = static_cast<int>(pt.size());
   if (1 != EVP_EncryptUpdate(
-             handle->ctx, inner_ct.data(), &outlen, pt.data(), pt_size_int)) {
+             ctx, inner_ct.data(), &outlen, pt.data(), pt_size_int)) {
     throw crypto_error();
   }
 
-  if (1 != EVP_EncryptFinal(handle->ctx, nullptr, &outlen)) {
+  if (1 != EVP_EncryptFinal(ctx, nullptr, &outlen)) {
     throw crypto_error();
   }
 
   // Compute HMAC tag using cached context
   // Reset HMAC context (key is preserved from init)
-  if (1 != HMAC_Init_ex(handle->hmac_ctx, nullptr, 0, nullptr, nullptr)) {
+  if (1 != HMAC_Init_ex(hmac->ctx, nullptr, 0, nullptr, nullptr)) {
     throw crypto_error();
   }
 
@@ -188,22 +227,22 @@ seal_ctr_cached(CipherHandle* handle,
   encode_uint(inner_ct.size(), len_view.first(16).last(8));
   encode_uint(tag_size, len_view.last(8));
 
-  if (1 != HMAC_Update(handle->hmac_ctx, len_block.data(), len_block.size())) {
+  if (1 != HMAC_Update(hmac->ctx, len_block.data(), len_block.size())) {
     throw crypto_error();
   }
-  if (1 != HMAC_Update(handle->hmac_ctx, nonce.data(), nonce.size())) {
+  if (1 != HMAC_Update(hmac->ctx, nonce.data(), nonce.size())) {
     throw crypto_error();
   }
-  if (1 != HMAC_Update(handle->hmac_ctx, aad.data(), aad.size())) {
+  if (1 != HMAC_Update(hmac->ctx, aad.data(), aad.size())) {
     throw crypto_error();
   }
-  if (1 != HMAC_Update(handle->hmac_ctx, inner_ct.data(), inner_ct.size())) {
+  if (1 != HMAC_Update(hmac->ctx, inner_ct.data(), inner_ct.size())) {
     throw crypto_error();
   }
 
   auto mac_buf = owned_bytes<64>();
   unsigned int mac_size = mac_buf.size();
-  if (1 != HMAC_Final(handle->hmac_ctx, mac_buf.data(), &mac_size)) {
+  if (1 != HMAC_Final(hmac->ctx, mac_buf.data(), &mac_size)) {
     throw crypto_error();
   }
 
@@ -214,39 +253,38 @@ seal_ctr_cached(CipherHandle* handle,
 }
 
 static output_bytes
-seal_aead_cached(CipherHandle* handle,
+seal_aead_cached(EVP_CIPHER_CTX* ctx,
+                 CipherSuite suite,
                  input_bytes nonce,
                  output_bytes ct,
                  input_bytes aad,
                  input_bytes pt)
 {
-  auto tag_size = cipher_overhead(handle->suite);
+  auto tag_size = cipher_overhead(suite);
   if (ct.size() < pt.size() + tag_size) {
     throw buffer_too_small_error("Ciphertext buffer too small");
   }
 
   // Reset context and set new nonce (key is preserved)
-  if (1 != EVP_EncryptInit_ex(
-             handle->ctx, nullptr, nullptr, nullptr, nonce.data())) {
+  if (1 != EVP_EncryptInit_ex(ctx, nullptr, nullptr, nullptr, nonce.data())) {
     throw crypto_error();
   }
 
   int outlen = 0;
   auto aad_size_int = static_cast<int>(aad.size());
   if (aad.size() > 0) {
-    if (1 != EVP_EncryptUpdate(
-               handle->ctx, nullptr, &outlen, aad.data(), aad_size_int)) {
+    if (1 !=
+        EVP_EncryptUpdate(ctx, nullptr, &outlen, aad.data(), aad_size_int)) {
       throw crypto_error();
     }
   }
 
   auto pt_size_int = static_cast<int>(pt.size());
-  if (1 != EVP_EncryptUpdate(
-             handle->ctx, ct.data(), &outlen, pt.data(), pt_size_int)) {
+  if (1 != EVP_EncryptUpdate(ctx, ct.data(), &outlen, pt.data(), pt_size_int)) {
     throw crypto_error();
   }
 
-  if (1 != EVP_EncryptFinal(handle->ctx, nullptr, &outlen)) {
+  if (1 != EVP_EncryptFinal(ctx, nullptr, &outlen)) {
     throw crypto_error();
   }
 
@@ -254,7 +292,7 @@ seal_aead_cached(CipherHandle* handle,
   auto tag_ptr = const_cast<void*>(static_cast<const void*>(tag.data()));
   auto tag_size_downcast = static_cast<int>(tag.size());
   if (1 != EVP_CIPHER_CTX_ctrl(
-             handle->ctx, EVP_CTRL_GCM_GET_TAG, tag_size_downcast, tag_ptr)) {
+             ctx, EVP_CTRL_GCM_GET_TAG, tag_size_downcast, tag_ptr)) {
     throw crypto_error();
   }
 
@@ -267,20 +305,23 @@ CipherState::seal(input_bytes nonce,
                   input_bytes aad,
                   input_bytes pt)
 {
-  if (is_ctr_hmac_suite(handle->suite)) {
-    return seal_ctr_cached(handle.get(), nonce, ct, aad, pt);
+  auto* ctx = cipher_ctx(cipher_handle.get());
+  if (is_ctr_hmac_suite(suite)) {
+    return seal_ctr_cached(ctx, hmac_handle.get(), suite, nonce, ct, aad, pt);
   }
-  return seal_aead_cached(handle.get(), nonce, ct, aad, pt);
+  return seal_aead_cached(ctx, suite, nonce, ct, aad, pt);
 }
 
 static output_bytes
-open_ctr_cached(CipherHandle* handle,
+open_ctr_cached(EVP_CIPHER_CTX* ctx,
+                HmacHandle* hmac,
+                CipherSuite suite,
                 input_bytes nonce,
                 output_bytes pt,
                 input_bytes aad,
                 input_bytes ct)
 {
-  auto tag_size = cipher_overhead(handle->suite);
+  auto tag_size = cipher_overhead(suite);
   if (ct.size() < tag_size) {
     throw buffer_too_small_error("Ciphertext buffer too small");
   }
@@ -295,7 +336,7 @@ open_ctr_cached(CipherHandle* handle,
 
   // Verify HMAC tag using cached context
   // Reset HMAC context (key is preserved from init)
-  if (1 != HMAC_Init_ex(handle->hmac_ctx, nullptr, 0, nullptr, nullptr)) {
+  if (1 != HMAC_Init_ex(hmac->ctx, nullptr, 0, nullptr, nullptr)) {
     throw crypto_error();
   }
 
@@ -306,22 +347,22 @@ open_ctr_cached(CipherHandle* handle,
   encode_uint(inner_ct.size(), len_view.first(16).last(8));
   encode_uint(tag_size, len_view.last(8));
 
-  if (1 != HMAC_Update(handle->hmac_ctx, len_block.data(), len_block.size())) {
+  if (1 != HMAC_Update(hmac->ctx, len_block.data(), len_block.size())) {
     throw crypto_error();
   }
-  if (1 != HMAC_Update(handle->hmac_ctx, nonce.data(), nonce.size())) {
+  if (1 != HMAC_Update(hmac->ctx, nonce.data(), nonce.size())) {
     throw crypto_error();
   }
-  if (1 != HMAC_Update(handle->hmac_ctx, aad.data(), aad.size())) {
+  if (1 != HMAC_Update(hmac->ctx, aad.data(), aad.size())) {
     throw crypto_error();
   }
-  if (1 != HMAC_Update(handle->hmac_ctx, inner_ct.data(), inner_ct.size())) {
+  if (1 != HMAC_Update(hmac->ctx, inner_ct.data(), inner_ct.size())) {
     throw crypto_error();
   }
 
   auto mac_buf = owned_bytes<64>();
   unsigned int mac_size = mac_buf.size();
-  if (1 != HMAC_Final(handle->hmac_ctx, mac_buf.data(), &mac_size)) {
+  if (1 != HMAC_Final(hmac->ctx, mac_buf.data(), &mac_size)) {
     throw crypto_error();
   }
 
@@ -336,20 +377,19 @@ open_ctr_cached(CipherHandle* handle,
   padded_nonce.resize(16);
 
   // Reset AES-CTR context with new nonce (key is preserved)
-  if (1 != EVP_EncryptInit_ex(
-             handle->ctx, nullptr, nullptr, nullptr, padded_nonce.data())) {
+  if (1 !=
+      EVP_EncryptInit_ex(ctx, nullptr, nullptr, nullptr, padded_nonce.data())) {
     throw crypto_error();
   }
 
   int outlen = 0;
   auto inner_ct_size_int = static_cast<int>(inner_ct_size);
-  if (1 !=
-      EVP_EncryptUpdate(
-        handle->ctx, pt.data(), &outlen, inner_ct.data(), inner_ct_size_int)) {
+  if (1 != EVP_EncryptUpdate(
+             ctx, pt.data(), &outlen, inner_ct.data(), inner_ct_size_int)) {
     throw crypto_error();
   }
 
-  if (1 != EVP_EncryptFinal(handle->ctx, nullptr, &outlen)) {
+  if (1 != EVP_EncryptFinal(ctx, nullptr, &outlen)) {
     throw crypto_error();
   }
 
@@ -357,13 +397,14 @@ open_ctr_cached(CipherHandle* handle,
 }
 
 static output_bytes
-open_aead_cached(CipherHandle* handle,
+open_aead_cached(EVP_CIPHER_CTX* ctx,
+                 CipherSuite suite,
                  input_bytes nonce,
                  output_bytes pt,
                  input_bytes aad,
                  input_bytes ct)
 {
-  auto tag_size = cipher_overhead(handle->suite);
+  auto tag_size = cipher_overhead(suite);
   if (ct.size() < tag_size) {
     throw buffer_too_small_error("Ciphertext buffer too small");
   }
@@ -374,8 +415,7 @@ open_aead_cached(CipherHandle* handle,
   }
 
   // Reset context and set new nonce (key is preserved)
-  if (1 != EVP_DecryptInit_ex(
-             handle->ctx, nullptr, nullptr, nullptr, nonce.data())) {
+  if (1 != EVP_DecryptInit_ex(ctx, nullptr, nullptr, nullptr, nonce.data())) {
     throw crypto_error();
   }
 
@@ -383,26 +423,26 @@ open_aead_cached(CipherHandle* handle,
   auto tag_ptr = const_cast<void*>(static_cast<const void*>(tag.data()));
   auto tag_size_downcast = static_cast<int>(tag.size());
   if (1 != EVP_CIPHER_CTX_ctrl(
-             handle->ctx, EVP_CTRL_GCM_SET_TAG, tag_size_downcast, tag_ptr)) {
+             ctx, EVP_CTRL_GCM_SET_TAG, tag_size_downcast, tag_ptr)) {
     throw crypto_error();
   }
 
   int out_size;
   auto aad_size_int = static_cast<int>(aad.size());
   if (aad.size() > 0) {
-    if (1 != EVP_DecryptUpdate(
-               handle->ctx, nullptr, &out_size, aad.data(), aad_size_int)) {
+    if (1 !=
+        EVP_DecryptUpdate(ctx, nullptr, &out_size, aad.data(), aad_size_int)) {
       throw crypto_error();
     }
   }
 
   auto inner_ct_size_int = static_cast<int>(inner_ct_size);
   if (1 != EVP_DecryptUpdate(
-             handle->ctx, pt.data(), &out_size, ct.data(), inner_ct_size_int)) {
+             ctx, pt.data(), &out_size, ct.data(), inner_ct_size_int)) {
     throw crypto_error();
   }
 
-  if (1 != EVP_DecryptFinal(handle->ctx, nullptr, &out_size)) {
+  if (1 != EVP_DecryptFinal(ctx, nullptr, &out_size)) {
     throw authentication_error();
   }
 
@@ -415,10 +455,11 @@ CipherState::open(input_bytes nonce,
                   input_bytes aad,
                   input_bytes ct)
 {
-  if (is_ctr_hmac_suite(handle->suite)) {
-    return open_ctr_cached(handle.get(), nonce, pt, aad, ct);
+  auto* ctx = cipher_ctx(cipher_handle.get());
+  if (is_ctr_hmac_suite(suite)) {
+    return open_ctr_cached(ctx, hmac_handle.get(), suite, nonce, pt, aad, ct);
   }
-  return open_aead_cached(handle.get(), nonce, pt, aad, ct);
+  return open_aead_cached(ctx, suite, nonce, pt, aad, ct);
 }
 
 ///
@@ -840,4 +881,4 @@ open(CipherSuite suite,
 
 } // namespace SFRAME_NAMESPACE
 
-#endif // defined(OPENSSL_3)
+#endif // defined(BORINGSSL)

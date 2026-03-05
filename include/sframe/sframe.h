@@ -92,7 +92,9 @@ enum struct KeyUsage
 /// computation happens once at construction, not on every seal/open call.
 ///
 
+// Opaque handles - defined by each crypto backend
 struct CipherHandle;
+struct HmacHandle;
 
 struct CipherState
 {
@@ -110,14 +112,21 @@ struct CipherState
                     input_bytes ct);
 
 private:
-  struct Deleter
+  struct CipherDeleter
   {
     void operator()(CipherHandle* h) const;
   };
 
-  std::unique_ptr<CipherHandle, Deleter> handle;
+  struct HmacDeleter
+  {
+    void operator()(HmacHandle* h) const;
+  };
 
-  explicit CipherState(CipherHandle* h);
+  std::unique_ptr<CipherHandle, CipherDeleter> cipher_handle;
+  std::unique_ptr<HmacHandle, HmacDeleter> hmac_handle; // null for GCM
+  CipherSuite suite;
+
+  CipherState(CipherHandle* cipher, HmacHandle* hmac, CipherSuite suite);
 };
 
 struct KeyRecord
