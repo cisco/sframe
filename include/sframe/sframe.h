@@ -1,6 +1,7 @@
 #pragma once
 
 #include <gsl/gsl-lite.hpp>
+#include <memory>
 #include <optional>
 
 #include <sframe/map.h>
@@ -25,6 +26,9 @@
 #endif
 
 namespace SFRAME_NAMESPACE {
+
+// Forward declaration for pre-warmed cipher state
+struct CipherState;
 
 struct crypto_error : std::runtime_error
 {
@@ -86,18 +90,32 @@ enum struct KeyUsage
 
 struct KeyRecord
 {
+  static constexpr size_t max_key_size = 48;
+  static constexpr size_t max_salt_size = 12;
+
   static KeyRecord from_base_key(CipherSuite suite,
                                  KeyID key_id,
                                  KeyUsage usage,
                                  input_bytes base_key);
 
-  static constexpr size_t max_key_size = 48;
-  static constexpr size_t max_salt_size = 12;
+  KeyRecord(owned_bytes<max_key_size> key,
+            owned_bytes<max_salt_size> salt,
+            KeyUsage usage,
+            Counter counter,
+            std::unique_ptr<CipherState> cipher);
+  ~KeyRecord();
+
+  KeyRecord(KeyRecord&&) noexcept;
+  KeyRecord& operator=(KeyRecord&&) noexcept;
+
+  KeyRecord(const KeyRecord&) = delete;
+  KeyRecord& operator=(const KeyRecord&) = delete;
 
   owned_bytes<max_key_size> key;
   owned_bytes<max_salt_size> salt;
   KeyUsage usage;
   Counter counter;
+  std::unique_ptr<CipherState> cipher; // Pre-warmed cipher state (AEAD only)
 };
 
 // Context applies the full SFrame transform.  It tracks a counter for each key

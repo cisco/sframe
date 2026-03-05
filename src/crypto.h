@@ -2,7 +2,44 @@
 
 #include <sframe/sframe.h>
 
+#include <memory>
+
 namespace SFRAME_NAMESPACE {
+
+///
+/// CipherState - pre-warmed cipher state for efficient repeated operations
+///
+/// Holds a pre-initialized cipher context so that expensive key schedule
+/// computation happens once at construction, not on every seal/open call.
+///
+
+struct CipherHandle;
+
+struct CipherState
+{
+  static CipherState create_seal(CipherSuite suite, input_bytes key);
+  static CipherState create_open(CipherSuite suite, input_bytes key);
+
+  output_bytes seal(input_bytes nonce,
+                    output_bytes ct,
+                    input_bytes aad,
+                    input_bytes pt);
+
+  output_bytes open(input_bytes nonce,
+                    output_bytes pt,
+                    input_bytes aad,
+                    input_bytes ct);
+
+private:
+  struct Deleter
+  {
+    void operator()(CipherHandle* h) const;
+  };
+
+  std::unique_ptr<CipherHandle, Deleter> handle;
+
+  explicit CipherState(CipherHandle* h);
+};
 
 size_t
 cipher_digest_size(CipherSuite suite);

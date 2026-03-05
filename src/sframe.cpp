@@ -23,6 +23,25 @@ authentication_error::authentication_error()
 /// KeyRecord
 ///
 
+KeyRecord::KeyRecord(owned_bytes<max_key_size> key_in,
+                     owned_bytes<max_salt_size> salt_in,
+                     KeyUsage usage_in,
+                     Counter counter_in,
+                     std::unique_ptr<CipherState> cipher_in)
+  : key(std::move(key_in))
+  , salt(std::move(salt_in))
+  , usage(usage_in)
+  , counter(counter_in)
+  , cipher(std::move(cipher_in))
+{
+}
+
+KeyRecord::~KeyRecord() = default;
+
+KeyRecord::KeyRecord(KeyRecord&&) noexcept = default;
+KeyRecord&
+KeyRecord::operator=(KeyRecord&&) noexcept = default;
+
 static auto
 from_ascii(const char* str, size_t len)
 {
@@ -79,7 +98,18 @@ KeyRecord::from_base_key(CipherSuite suite,
   auto key = hkdf_expand(suite, secret, key_label, key_size);
   auto salt = hkdf_expand(suite, secret, salt_label, nonce_size);
 
-  return KeyRecord{ key, salt, usage, 0 };
+  // Create pre-warmed cipher state
+  std::unique_ptr<CipherState> cipher_state;
+  if (usage == KeyUsage::protect) {
+    cipher_state =
+      std::make_unique<CipherState>(CipherState::create_seal(suite, key));
+  } else {
+    cipher_state =
+      std::make_unique<CipherState>(CipherState::create_open(suite, key));
+  }
+
+  return KeyRecord(
+    std::move(key), std::move(salt), usage, 0, std::move(cipher_state));
 }
 
 ///
@@ -171,10 +201,16 @@ Context::protect_inner(const Header& header,
     throw buffer_too_small_error("Ciphertext too small for cipher overhead");
   }
 
-  const auto& key_and_salt = keys.at(header.key_id);
+  auto& key_and_salt = keys.at(header.key_id);
 
   const auto aad = form_aad(header, metadata);
   const auto nonce = form_nonce(header.counter, key_and_salt.salt);
+
+  // Use pre-warmed cipher state if available (AEAD suites)
+  if (key_and_salt.cipher) {
+    return key_and_salt.cipher->seal(nonce, ciphertext, aad, plaintext);
+  }
+
   return seal(suite, key_and_salt.key, nonce, ciphertext, aad, plaintext);
 }
 
@@ -192,10 +228,16 @@ Context::unprotect_inner(const Header& header,
     throw buffer_too_small_error("Plaintext too small for decrypted value");
   }
 
-  const auto& key_and_salt = keys.at(header.key_id);
+  auto& key_and_salt = keys.at(header.key_id);
 
   const auto aad = form_aad(header, metadata);
   const auto nonce = form_nonce(header.counter, key_and_salt.salt);
+
+  // Use pre-warmed cipher state if available (AEAD suites)
+  if (key_and_salt.cipher) {
+    return key_and_salt.cipher->open(nonce, plaintext, aad, ciphertext);
+  }
+
   return open(suite, key_and_salt.key, nonce, plaintext, aad, ciphertext);
 }
 
