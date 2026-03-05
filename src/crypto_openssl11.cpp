@@ -33,16 +33,18 @@ is_ctr_hmac_suite(CipherSuite suite)
 }
 
 ///
-/// CipherState - CipherHandle is EVP_CIPHER_CTX, HmacHandle holds HMAC state
+/// Scoped pointers for OpenSSL objects
 ///
 
-// HmacHandle for OpenSSL 1.1 wraps HMAC_CTX
-struct HmacHandle
-{
-  HMAC_CTX* ctx;
-};
+using scoped_evp_ctx =
+  std::unique_ptr<EVP_CIPHER_CTX, decltype(&EVP_CIPHER_CTX_free)>;
+using scoped_hmac_ctx = std::unique_ptr<HMAC_CTX, decltype(&HMAC_CTX_free)>;
 
-// Cast helpers - CipherHandle is EVP_CIPHER_CTX
+///
+/// CipherState - CipherHandle is EVP_CIPHER_CTX, HmacHandle is HMAC_CTX
+///
+
+// Cast helpers
 static EVP_CIPHER_CTX*
 cipher_ctx(CipherHandle* h)
 {
@@ -55,19 +57,28 @@ to_cipher_handle(EVP_CIPHER_CTX* ctx)
   return reinterpret_cast<CipherHandle*>(ctx);
 }
 
+static HMAC_CTX*
+hmac_ctx(HmacHandle* h)
+{
+  return reinterpret_cast<HMAC_CTX*>(h);
+}
+
+static HmacHandle*
+to_hmac_handle(HMAC_CTX* ctx)
+{
+  return reinterpret_cast<HmacHandle*>(ctx);
+}
+
 void
-CipherState::CipherDeleter::operator()(CipherHandle* h) const
+CipherState::Deleter::operator()(CipherHandle* h) const
 {
   EVP_CIPHER_CTX_free(cipher_ctx(h));
 }
 
 void
-CipherState::HmacDeleter::operator()(HmacHandle* h) const
+CipherState::Deleter::operator()(HmacHandle* h) const
 {
-  if (h != nullptr) {
-    HMAC_CTX_free(h->ctx);
-    delete h;
-  }
+  HMAC_CTX_free(hmac_ctx(h));
 }
 
 CipherState::CipherState(CipherHandle* cipher,
@@ -82,14 +93,13 @@ CipherState::CipherState(CipherHandle* cipher,
 CipherState
 CipherState::create_seal(CipherSuite suite, input_bytes key)
 {
-  std::unique_ptr<EVP_CIPHER_CTX, decltype(&EVP_CIPHER_CTX_free)> ctx(
-    EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free);
+  scoped_evp_ctx ctx(EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free);
   if (ctx == nullptr) {
     throw crypto_error();
   }
 
   auto cipher = openssl_cipher(suite);
-  std::unique_ptr<HmacHandle, HmacDeleter> hmac;
+  scoped_hmac_ctx hmac(nullptr, HMAC_CTX_free);
 
   if (is_ctr_hmac_suite(suite)) {
     // CTR+HMAC: key is split into enc_key and auth_key
@@ -104,15 +114,14 @@ CipherState::create_seal(CipherSuite suite, input_bytes key)
     }
 
     // Initialize HMAC
-    hmac.reset(new HmacHandle());
-    hmac->ctx = HMAC_CTX_new();
-    if (hmac->ctx == nullptr) {
+    hmac.reset(HMAC_CTX_new());
+    if (hmac == nullptr) {
       throw crypto_error();
     }
 
     const auto* md = openssl_digest_type(suite);
     auto key_size = static_cast<int>(auth_key.size());
-    if (1 != HMAC_Init_ex(hmac->ctx, auth_key.data(), key_size, md, nullptr)) {
+    if (1 != HMAC_Init_ex(hmac.get(), auth_key.data(), key_size, md, nullptr)) {
       throw crypto_error();
     }
   } else {
@@ -123,20 +132,20 @@ CipherState::create_seal(CipherSuite suite, input_bytes key)
     }
   }
 
-  return CipherState(to_cipher_handle(ctx.release()), hmac.release(), suite);
+  return CipherState(
+    to_cipher_handle(ctx.release()), to_hmac_handle(hmac.release()), suite);
 }
 
 CipherState
 CipherState::create_open(CipherSuite suite, input_bytes key)
 {
-  std::unique_ptr<EVP_CIPHER_CTX, decltype(&EVP_CIPHER_CTX_free)> ctx(
-    EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free);
+  scoped_evp_ctx ctx(EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free);
   if (ctx == nullptr) {
     throw crypto_error();
   }
 
   auto cipher = openssl_cipher(suite);
-  std::unique_ptr<HmacHandle, HmacDeleter> hmac;
+  scoped_hmac_ctx hmac(nullptr, HMAC_CTX_free);
 
   if (is_ctr_hmac_suite(suite)) {
     // CTR+HMAC: key is split into enc_key and auth_key
@@ -152,15 +161,14 @@ CipherState::create_open(CipherSuite suite, input_bytes key)
     }
 
     // Initialize HMAC
-    hmac.reset(new HmacHandle());
-    hmac->ctx = HMAC_CTX_new();
-    if (hmac->ctx == nullptr) {
+    hmac.reset(HMAC_CTX_new());
+    if (hmac == nullptr) {
       throw crypto_error();
     }
 
     const auto* md = openssl_digest_type(suite);
     auto key_size = static_cast<int>(auth_key.size());
-    if (1 != HMAC_Init_ex(hmac->ctx, auth_key.data(), key_size, md, nullptr)) {
+    if (1 != HMAC_Init_ex(hmac.get(), auth_key.data(), key_size, md, nullptr)) {
       throw crypto_error();
     }
   } else {
@@ -171,7 +179,8 @@ CipherState::create_open(CipherSuite suite, input_bytes key)
     }
   }
 
-  return CipherState(to_cipher_handle(ctx.release()), hmac.release(), suite);
+  return CipherState(
+    to_cipher_handle(ctx.release()), to_hmac_handle(hmac.release()), suite);
 }
 
 static output_bytes
@@ -214,7 +223,7 @@ seal_ctr_cached(EVP_CIPHER_CTX* ctx,
 
   // Compute HMAC tag using cached context
   // Reset HMAC context (key is preserved from init)
-  if (1 != HMAC_Init_ex(hmac->ctx, nullptr, 0, nullptr, nullptr)) {
+  if (1 != HMAC_Init_ex(hmac_ctx(hmac), nullptr, 0, nullptr, nullptr)) {
     throw crypto_error();
   }
 
@@ -225,22 +234,22 @@ seal_ctr_cached(EVP_CIPHER_CTX* ctx,
   encode_uint(inner_ct.size(), len_view.first(16).last(8));
   encode_uint(tag_size, len_view.last(8));
 
-  if (1 != HMAC_Update(hmac->ctx, len_block.data(), len_block.size())) {
+  if (1 != HMAC_Update(hmac_ctx(hmac), len_block.data(), len_block.size())) {
     throw crypto_error();
   }
-  if (1 != HMAC_Update(hmac->ctx, nonce.data(), nonce.size())) {
+  if (1 != HMAC_Update(hmac_ctx(hmac), nonce.data(), nonce.size())) {
     throw crypto_error();
   }
-  if (1 != HMAC_Update(hmac->ctx, aad.data(), aad.size())) {
+  if (1 != HMAC_Update(hmac_ctx(hmac), aad.data(), aad.size())) {
     throw crypto_error();
   }
-  if (1 != HMAC_Update(hmac->ctx, inner_ct.data(), inner_ct.size())) {
+  if (1 != HMAC_Update(hmac_ctx(hmac), inner_ct.data(), inner_ct.size())) {
     throw crypto_error();
   }
 
   auto mac_buf = owned_bytes<64>();
   unsigned int mac_size = mac_buf.size();
-  if (1 != HMAC_Final(hmac->ctx, mac_buf.data(), &mac_size)) {
+  if (1 != HMAC_Final(hmac_ctx(hmac), mac_buf.data(), &mac_size)) {
     throw crypto_error();
   }
 
@@ -334,7 +343,7 @@ open_ctr_cached(EVP_CIPHER_CTX* ctx,
 
   // Verify HMAC tag using cached context
   // Reset HMAC context (key is preserved from init)
-  if (1 != HMAC_Init_ex(hmac->ctx, nullptr, 0, nullptr, nullptr)) {
+  if (1 != HMAC_Init_ex(hmac_ctx(hmac), nullptr, 0, nullptr, nullptr)) {
     throw crypto_error();
   }
 
@@ -345,22 +354,22 @@ open_ctr_cached(EVP_CIPHER_CTX* ctx,
   encode_uint(inner_ct.size(), len_view.first(16).last(8));
   encode_uint(tag_size, len_view.last(8));
 
-  if (1 != HMAC_Update(hmac->ctx, len_block.data(), len_block.size())) {
+  if (1 != HMAC_Update(hmac_ctx(hmac), len_block.data(), len_block.size())) {
     throw crypto_error();
   }
-  if (1 != HMAC_Update(hmac->ctx, nonce.data(), nonce.size())) {
+  if (1 != HMAC_Update(hmac_ctx(hmac), nonce.data(), nonce.size())) {
     throw crypto_error();
   }
-  if (1 != HMAC_Update(hmac->ctx, aad.data(), aad.size())) {
+  if (1 != HMAC_Update(hmac_ctx(hmac), aad.data(), aad.size())) {
     throw crypto_error();
   }
-  if (1 != HMAC_Update(hmac->ctx, inner_ct.data(), inner_ct.size())) {
+  if (1 != HMAC_Update(hmac_ctx(hmac), inner_ct.data(), inner_ct.size())) {
     throw crypto_error();
   }
 
   auto mac_buf = owned_bytes<64>();
   unsigned int mac_size = mac_buf.size();
-  if (1 != HMAC_Final(hmac->ctx, mac_buf.data(), &mac_size)) {
+  if (1 != HMAC_Final(hmac_ctx(hmac), mac_buf.data(), &mac_size)) {
     throw crypto_error();
   }
 
@@ -459,14 +468,6 @@ CipherState::open(input_bytes nonce,
   }
   return open_aead_cached(ctx, suite, nonce, pt, aad, ct);
 }
-
-///
-/// Scoped pointers for OpenSSL objects
-///
-
-using scoped_evp_ctx =
-  std::unique_ptr<EVP_CIPHER_CTX, decltype(&EVP_CIPHER_CTX_free)>;
-using scoped_hmac_ctx = std::unique_ptr<HMAC_CTX, decltype(&HMAC_CTX_free)>;
 
 ///
 /// Convert between native identifiers / errors and OpenSSL ones

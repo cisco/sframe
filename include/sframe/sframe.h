@@ -112,18 +112,14 @@ struct CipherState
                     input_bytes ct);
 
 private:
-  struct CipherDeleter
+  struct Deleter
   {
     void operator()(CipherHandle* h) const;
-  };
-
-  struct HmacDeleter
-  {
     void operator()(HmacHandle* h) const;
   };
 
-  std::unique_ptr<CipherHandle, CipherDeleter> cipher_handle;
-  std::unique_ptr<HmacHandle, HmacDeleter> hmac_handle; // null for GCM
+  std::unique_ptr<CipherHandle, Deleter> cipher_handle;
+  std::unique_ptr<HmacHandle, Deleter> hmac_handle; // null for GCM
   CipherSuite suite;
 
   CipherState(CipherHandle* cipher, HmacHandle* hmac, CipherSuite suite);

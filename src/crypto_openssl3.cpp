@@ -41,8 +41,14 @@ is_ctr_hmac_suite(CipherSuite suite)
 // HmacHandle for OpenSSL 3.x holds both the MAC algorithm and context
 struct HmacHandle
 {
-  EVP_MAC* mac;
-  EVP_MAC_CTX* ctx;
+  std::unique_ptr<EVP_MAC, decltype(&EVP_MAC_free)> mac;
+  std::unique_ptr<EVP_MAC_CTX, decltype(&EVP_MAC_CTX_free)> ctx;
+
+  HmacHandle()
+    : mac(nullptr, EVP_MAC_free)
+    , ctx(nullptr, EVP_MAC_CTX_free)
+  {
+  }
 };
 
 // Cast helpers - CipherHandle is EVP_CIPHER_CTX
@@ -59,19 +65,15 @@ to_cipher_handle(EVP_CIPHER_CTX* ctx)
 }
 
 void
-CipherState::CipherDeleter::operator()(CipherHandle* h) const
+CipherState::Deleter::operator()(CipherHandle* h) const
 {
   EVP_CIPHER_CTX_free(cipher_ctx(h));
 }
 
 void
-CipherState::HmacDeleter::operator()(HmacHandle* h) const
+CipherState::Deleter::operator()(HmacHandle* h) const
 {
-  if (h != nullptr) {
-    EVP_MAC_CTX_free(h->ctx);
-    EVP_MAC_free(h->mac);
-    delete h;
-  }
+  delete h; // unique_ptr members clean up automatically
 }
 
 CipherState::CipherState(CipherHandle* cipher,
@@ -93,7 +95,7 @@ CipherState::create_seal(CipherSuite suite, input_bytes key)
   }
 
   auto cipher = openssl_cipher(suite);
-  std::unique_ptr<HmacHandle, HmacDeleter> hmac;
+  std::unique_ptr<HmacHandle, Deleter> hmac;
 
   if (is_ctr_hmac_suite(suite)) {
     // CTR+HMAC: key is split into enc_key and auth_key
@@ -109,12 +111,12 @@ CipherState::create_seal(CipherSuite suite, input_bytes key)
 
     // Initialize HMAC
     hmac.reset(new HmacHandle());
-    hmac->mac = EVP_MAC_fetch(nullptr, OSSL_MAC_NAME_HMAC, nullptr);
+    hmac->mac.reset(EVP_MAC_fetch(nullptr, OSSL_MAC_NAME_HMAC, nullptr));
     if (hmac->mac == nullptr) {
       throw crypto_error();
     }
 
-    hmac->ctx = EVP_MAC_CTX_new(hmac->mac);
+    hmac->ctx.reset(EVP_MAC_CTX_new(hmac->mac.get()));
     if (hmac->ctx == nullptr) {
       throw crypto_error();
     }
@@ -126,8 +128,9 @@ CipherState::create_seal(CipherSuite suite, input_bytes key)
       OSSL_PARAM_construct_end()
     };
 
-    if (1 != EVP_MAC_init(
-               hmac->ctx, auth_key.data(), auth_key.size(), params.data())) {
+    if (1 !=
+        EVP_MAC_init(
+          hmac->ctx.get(), auth_key.data(), auth_key.size(), params.data())) {
       throw crypto_error();
     }
   } else {
@@ -151,7 +154,7 @@ CipherState::create_open(CipherSuite suite, input_bytes key)
   }
 
   auto cipher = openssl_cipher(suite);
-  std::unique_ptr<HmacHandle, HmacDeleter> hmac;
+  std::unique_ptr<HmacHandle, Deleter> hmac;
 
   if (is_ctr_hmac_suite(suite)) {
     // CTR+HMAC: key is split into enc_key and auth_key
@@ -168,12 +171,12 @@ CipherState::create_open(CipherSuite suite, input_bytes key)
 
     // Initialize HMAC
     hmac.reset(new HmacHandle());
-    hmac->mac = EVP_MAC_fetch(nullptr, OSSL_MAC_NAME_HMAC, nullptr);
+    hmac->mac.reset(EVP_MAC_fetch(nullptr, OSSL_MAC_NAME_HMAC, nullptr));
     if (hmac->mac == nullptr) {
       throw crypto_error();
     }
 
-    hmac->ctx = EVP_MAC_CTX_new(hmac->mac);
+    hmac->ctx.reset(EVP_MAC_CTX_new(hmac->mac.get()));
     if (hmac->ctx == nullptr) {
       throw crypto_error();
     }
@@ -185,8 +188,9 @@ CipherState::create_open(CipherSuite suite, input_bytes key)
       OSSL_PARAM_construct_end()
     };
 
-    if (1 != EVP_MAC_init(
-               hmac->ctx, auth_key.data(), auth_key.size(), params.data())) {
+    if (1 !=
+        EVP_MAC_init(
+          hmac->ctx.get(), auth_key.data(), auth_key.size(), params.data())) {
       throw crypto_error();
     }
   } else {
@@ -240,7 +244,7 @@ seal_ctr_cached(EVP_CIPHER_CTX* ctx,
 
   // Compute HMAC tag using cached context
   // Reset HMAC context (key is preserved from init)
-  if (1 != EVP_MAC_init(hmac->ctx, nullptr, 0, nullptr)) {
+  if (1 != EVP_MAC_init(hmac->ctx.get(), nullptr, 0, nullptr)) {
     throw crypto_error();
   }
 
@@ -251,23 +255,24 @@ seal_ctr_cached(EVP_CIPHER_CTX* ctx,
   encode_uint(inner_ct.size(), len_view.first(16).last(8));
   encode_uint(tag_size, len_view.last(8));
 
-  if (1 != EVP_MAC_update(hmac->ctx, len_block.data(), len_block.size())) {
+  if (1 !=
+      EVP_MAC_update(hmac->ctx.get(), len_block.data(), len_block.size())) {
     throw crypto_error();
   }
-  if (1 != EVP_MAC_update(hmac->ctx, nonce.data(), nonce.size())) {
+  if (1 != EVP_MAC_update(hmac->ctx.get(), nonce.data(), nonce.size())) {
     throw crypto_error();
   }
-  if (1 != EVP_MAC_update(hmac->ctx, aad.data(), aad.size())) {
+  if (1 != EVP_MAC_update(hmac->ctx.get(), aad.data(), aad.size())) {
     throw crypto_error();
   }
-  if (1 != EVP_MAC_update(hmac->ctx, inner_ct.data(), inner_ct.size())) {
+  if (1 != EVP_MAC_update(hmac->ctx.get(), inner_ct.data(), inner_ct.size())) {
     throw crypto_error();
   }
 
   size_t mac_size = 0;
   auto mac_buf = owned_bytes<64>();
-  if (1 !=
-      EVP_MAC_final(hmac->ctx, mac_buf.data(), &mac_size, mac_buf.size())) {
+  if (1 != EVP_MAC_final(
+             hmac->ctx.get(), mac_buf.data(), &mac_size, mac_buf.size())) {
     throw crypto_error();
   }
 
@@ -361,7 +366,7 @@ open_ctr_cached(EVP_CIPHER_CTX* ctx,
 
   // Verify HMAC tag using cached context
   // Reset HMAC context (key is preserved from init)
-  if (1 != EVP_MAC_init(hmac->ctx, nullptr, 0, nullptr)) {
+  if (1 != EVP_MAC_init(hmac->ctx.get(), nullptr, 0, nullptr)) {
     throw crypto_error();
   }
 
@@ -372,23 +377,24 @@ open_ctr_cached(EVP_CIPHER_CTX* ctx,
   encode_uint(inner_ct.size(), len_view.first(16).last(8));
   encode_uint(tag_size, len_view.last(8));
 
-  if (1 != EVP_MAC_update(hmac->ctx, len_block.data(), len_block.size())) {
+  if (1 !=
+      EVP_MAC_update(hmac->ctx.get(), len_block.data(), len_block.size())) {
     throw crypto_error();
   }
-  if (1 != EVP_MAC_update(hmac->ctx, nonce.data(), nonce.size())) {
+  if (1 != EVP_MAC_update(hmac->ctx.get(), nonce.data(), nonce.size())) {
     throw crypto_error();
   }
-  if (1 != EVP_MAC_update(hmac->ctx, aad.data(), aad.size())) {
+  if (1 != EVP_MAC_update(hmac->ctx.get(), aad.data(), aad.size())) {
     throw crypto_error();
   }
-  if (1 != EVP_MAC_update(hmac->ctx, inner_ct.data(), inner_ct.size())) {
+  if (1 != EVP_MAC_update(hmac->ctx.get(), inner_ct.data(), inner_ct.size())) {
     throw crypto_error();
   }
 
   size_t mac_size = 0;
   auto mac_buf = owned_bytes<64>();
-  if (1 !=
-      EVP_MAC_final(hmac->ctx, mac_buf.data(), &mac_size, mac_buf.size())) {
+  if (1 != EVP_MAC_final(
+             hmac->ctx.get(), mac_buf.data(), &mac_size, mac_buf.size())) {
     throw crypto_error();
   }
 
