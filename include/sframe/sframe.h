@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <gsl/gsl-lite.hpp>
+#include <memory>
 #include <optional>
 
 #include <sframe/map.h>
@@ -85,20 +86,74 @@ enum struct KeyUsage
   unprotect,
 };
 
+///
+/// CipherState - pre-warmed cipher state for efficient repeated operations
+///
+/// Holds a pre-initialized cipher context so that expensive key schedule
+/// computation happens once at construction, not on every seal/open call.
+///
+
+// Opaque handles - defined by each crypto backend
+struct CipherHandle;
+struct HmacHandle;
+
+struct CipherState
+{
+  static CipherState create_seal(CipherSuite suite, input_bytes key);
+  static CipherState create_open(CipherSuite suite, input_bytes key);
+
+  output_bytes seal(input_bytes nonce,
+                    output_bytes ct,
+                    input_bytes aad,
+                    input_bytes pt);
+
+  output_bytes open(input_bytes nonce,
+                    output_bytes pt,
+                    input_bytes aad,
+                    input_bytes ct);
+
+private:
+  struct Deleter
+  {
+    void operator()(CipherHandle* h) const;
+    void operator()(HmacHandle* h) const;
+  };
+
+  std::unique_ptr<CipherHandle, Deleter> cipher_handle;
+  std::unique_ptr<HmacHandle, Deleter> hmac_handle; // null for GCM
+  CipherSuite suite;
+
+  CipherState(CipherHandle* cipher, HmacHandle* hmac, CipherSuite suite);
+};
+
 struct KeyRecord
 {
+  static constexpr size_t max_key_size = 48;
+  static constexpr size_t max_salt_size = 12;
+
   static KeyRecord from_base_key(CipherSuite suite,
                                  KeyID key_id,
                                  KeyUsage usage,
                                  input_bytes base_key);
 
-  static constexpr size_t max_key_size = 48;
-  static constexpr size_t max_salt_size = 12;
+  KeyRecord(owned_bytes<max_key_size> key,
+            owned_bytes<max_salt_size> salt,
+            KeyUsage usage,
+            Counter counter,
+            CipherState cipher);
+  ~KeyRecord();
+
+  KeyRecord(KeyRecord&&) noexcept;
+  KeyRecord& operator=(KeyRecord&&) noexcept;
+
+  KeyRecord(const KeyRecord&) = delete;
+  KeyRecord& operator=(const KeyRecord&) = delete;
 
   owned_bytes<max_key_size> key;
   owned_bytes<max_salt_size> salt;
   KeyUsage usage;
   Counter counter;
+  CipherState cipher; // Pre-warmed cipher state
 };
 
 // Context applies the full SFrame transform.  It tracks a counter for each key

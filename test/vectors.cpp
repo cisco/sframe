@@ -49,7 +49,7 @@ from_json(const json& j, HexBytes& b)
   }
 }
 
-static void
+[[maybe_unused]] static void
 to_json(json& /* j */, const HexBytes& /* p */)
 {
   // Included just so that macros work
