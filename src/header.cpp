@@ -157,7 +157,7 @@ Header::parse(input_bytes buffer)
   const auto [key_id, after_kid] = kid_result;
   SFRAME_VALUE_OR_RETURN(ctr_result, cfg.ctr.read(after_kid));
   const auto [counter, _] = ctr_result;
-  
+
   const auto encoded = buffer.subspan(0, cfg.encoded_size());
 
   return Result<Header>::ok(Header(key_id, counter, encoded));
