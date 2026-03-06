@@ -135,7 +135,8 @@ public:
   Result(Result&& other) noexcept = default;
   Result& operator=(Result&& other) noexcept = default;
 
-  void value() { /* void has no value to move */ }
+  // void has no value to move
+  void value() {}
 
   SFrameError error() { return std::move(error_).value(); }
 
