@@ -171,3 +171,14 @@ private:
     return _sframe_r_##var.error();                                            \
   }                                                                            \
   auto var = _sframe_r_##var.value()
+
+// Propagate a Result<void> error by early return, discarding the void value.
+// Use in functions that already return Result<U>.
+// Usage: SFRAME_VOID_OR_RETURN(some_void_result_expr);
+#define SFRAME_VOID_OR_RETURN(expr)                                            \
+  do {                                                                         \
+    auto _sframe_vr = (expr);                                                  \
+    if (_sframe_vr.is_err()) {                                                 \
+      return _sframe_vr.error();                                               \
+    }                                                                          \
+  } while (0)
