@@ -3,6 +3,8 @@
 #include "crypto.h"
 #include "header.h"
 
+#include <sframe/result.h>
+
 #include <openssl/core_names.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
@@ -20,7 +22,7 @@ crypto_error::crypto_error()
 {
 }
 
-static const EVP_CIPHER*
+static Result<const EVP_CIPHER*>
 openssl_cipher(CipherSuite suite)
 {
   switch (suite) {
@@ -36,11 +38,12 @@ openssl_cipher(CipherSuite suite)
       return EVP_aes_256_gcm();
 
     default:
-      throw unsupported_ciphersuite_error();
+      return Result<const EVP_CIPHER*>::err(
+        SFrameErrorType::unsupported_ciphersuite_error);
   }
 }
 
-static std::string
+static Result<std::string>
 openssl_digest_name(CipherSuite suite)
 {
   switch (suite) {
@@ -48,13 +51,14 @@ openssl_digest_name(CipherSuite suite)
     case CipherSuite::AES_128_CTR_HMAC_SHA256_64:
     case CipherSuite::AES_128_CTR_HMAC_SHA256_32:
     case CipherSuite::AES_GCM_128_SHA256:
-      return OSSL_DIGEST_NAME_SHA2_256;
+      return std::string(OSSL_DIGEST_NAME_SHA2_256);
 
     case CipherSuite::AES_GCM_256_SHA512:
-      return OSSL_DIGEST_NAME_SHA2_512;
+      return std::string(OSSL_DIGEST_NAME_SHA2_512);
 
     default:
-      throw unsupported_ciphersuite_error();
+      return Result<std::string>::err(
+        SFrameErrorType::unsupported_ciphersuite_error);
   }
 }
 
@@ -70,7 +74,7 @@ owned_bytes<max_hkdf_expand_size>
 hkdf_extract(CipherSuite suite, input_bytes salt, input_bytes ikm)
 {
   auto mode = EVP_KDF_HKDF_MODE_EXTRACT_ONLY;
-  auto digest_name = openssl_digest_name(suite);
+  auto digest_name = SFRAME_VALUE_OR_THROW(openssl_digest_name(suite));
   auto* salt_ptr =
     const_cast<void*>(reinterpret_cast<const void*>(salt.data()));
   auto* ikm_ptr = const_cast<void*>(reinterpret_cast<const void*>(ikm.data()));
@@ -106,7 +110,7 @@ owned_bytes<max_hkdf_extract_size>
 hkdf_expand(CipherSuite suite, input_bytes prk, input_bytes info, size_t size)
 {
   auto mode = EVP_KDF_HKDF_MODE_EXPAND_ONLY;
-  auto digest_name = openssl_digest_name(suite);
+  auto digest_name = SFRAME_VALUE_OR_THROW(openssl_digest_name(suite));
   auto* prk_ptr = const_cast<void*>(reinterpret_cast<const void*>(prk.data()));
   auto* info_ptr =
     const_cast<void*>(reinterpret_cast<const void*>(info.data()));
@@ -138,7 +142,7 @@ hkdf_expand(CipherSuite suite, input_bytes prk, input_bytes info, size_t size)
 /// AEAD Algorithms
 ///
 
-static owned_bytes<64>
+static Result<owned_bytes<64>>
 compute_tag(CipherSuite suite,
             input_bytes auth_key,
             input_bytes nonce,
@@ -156,7 +160,7 @@ compute_tag(CipherSuite suite,
   encode_uint(ct.size(), len_view.first(16).last(8));
   encode_uint(tag_size, len_view.last(8));
 
-  auto digest_name = openssl_digest_name(suite);
+  SFRAME_VALUE_OR_RETURN(digest_name, openssl_digest_name(suite));
   std::array<OSSL_PARAM, 2> params = {
     OSSL_PARAM_construct_utf8_string(
       OSSL_ALG_PARAM_DIGEST, digest_name.data(), 0),
@@ -170,29 +174,29 @@ compute_tag(CipherSuite suite,
 
   if (1 != EVP_MAC_init(
              ctx.get(), auth_key.data(), auth_key.size(), params.data())) {
-    throw crypto_error();
+    return Result<owned_bytes<64>>::err(SFrameErrorType::crypto_error);
   }
 
   if (1 != EVP_MAC_update(ctx.get(), len_block.data(), len_block.size())) {
-    throw crypto_error();
+    return Result<owned_bytes<64>>::err(SFrameErrorType::crypto_error);
   }
 
   if (1 != EVP_MAC_update(ctx.get(), nonce.data(), nonce.size())) {
-    throw crypto_error();
+    return Result<owned_bytes<64>>::err(SFrameErrorType::crypto_error);
   }
 
   if (1 != EVP_MAC_update(ctx.get(), aad.data(), aad.size())) {
-    throw crypto_error();
+    return Result<owned_bytes<64>>::err(SFrameErrorType::crypto_error);
   }
 
   if (1 != EVP_MAC_update(ctx.get(), ct.data(), ct.size())) {
-    throw crypto_error();
+    return Result<owned_bytes<64>>::err(SFrameErrorType::crypto_error);
   }
 
   size_t size = 0;
   auto tag = owned_bytes<64>();
   if (1 != EVP_MAC_final(ctx.get(), tag.data(), &size, tag.size())) {
-    throw crypto_error();
+    return Result<owned_bytes<64>>::err(SFrameErrorType::crypto_error);
   }
 
   tag.resize(tag_size);
@@ -202,7 +206,7 @@ compute_tag(CipherSuite suite,
 using scoped_evp_cipher_ctx =
   std::unique_ptr<EVP_CIPHER_CTX, decltype(&EVP_CIPHER_CTX_free)>;
 
-static void
+static Result<void>
 ctr_crypt(CipherSuite suite,
           input_bytes key,
           input_bytes nonce,
@@ -210,37 +214,40 @@ ctr_crypt(CipherSuite suite,
           input_bytes in)
 {
   if (out.size() != in.size()) {
-    throw buffer_too_small_error("CTR size mismatch");
+    return Result<void>::err(SFrameErrorType::buffer_too_small_error,
+                             "CTR size mismatch");
   }
 
   auto ctx = scoped_evp_cipher_ctx(EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free);
   if (ctx.get() == nullptr) {
-    throw crypto_error();
+    return Result<void>::err(SFrameErrorType::crypto_error);
   }
 
   auto padded_nonce = owned_bytes<16>(0);
   padded_nonce.append(nonce);
   padded_nonce.resize(16);
 
-  auto cipher = openssl_cipher(suite);
+  SFRAME_VALUE_OR_RETURN(cipher, openssl_cipher(suite));
   if (1 !=
       EVP_EncryptInit(ctx.get(), cipher, key.data(), padded_nonce.data())) {
-    throw crypto_error();
+    return Result<void>::err(SFrameErrorType::crypto_error);
   }
 
   int outlen = 0;
   auto in_size_int = static_cast<int>(in.size());
   if (1 != EVP_EncryptUpdate(
              ctx.get(), out.data(), &outlen, in.data(), in_size_int)) {
-    throw crypto_error();
+    return Result<void>::err(SFrameErrorType::crypto_error);
   }
 
   if (1 != EVP_EncryptFinal(ctx.get(), nullptr, &outlen)) {
-    throw crypto_error();
+    return Result<void>::err(SFrameErrorType::crypto_error);
   }
+
+  return Result<void>::ok();
 }
 
-static output_bytes
+static Result<output_bytes>
 seal_ctr(CipherSuite suite,
          input_bytes key,
          input_bytes nonce,
@@ -250,7 +257,8 @@ seal_ctr(CipherSuite suite,
 {
   auto tag_size = cipher_overhead(suite);
   if (ct.size() < pt.size() + tag_size) {
-    throw buffer_too_small_error("Ciphertext buffer too small");
+    return Result<output_bytes>::err(SFrameErrorType::buffer_too_small_error,
+                                     "Ciphertext buffer too small");
   }
 
   // Split the key into enc and auth subkeys
@@ -260,17 +268,18 @@ seal_ctr(CipherSuite suite,
 
   // Encrypt with AES-CM
   auto inner_ct = ct.subspan(0, pt.size());
-  ctr_crypt(suite, enc_key, nonce, inner_ct, pt);
+  SFRAME_VOID_OR_RETURN(ctr_crypt(suite, enc_key, nonce, inner_ct, pt));
 
   // Authenticate with truncated HMAC
-  auto mac = compute_tag(suite, auth_key, nonce, aad, inner_ct, tag_size);
+  SFRAME_VALUE_OR_RETURN(
+    mac, compute_tag(suite, auth_key, nonce, aad, inner_ct, tag_size));
   auto tag = ct.subspan(pt.size(), tag_size);
   std::copy(mac.begin(), mac.begin() + tag_size, tag.begin());
 
   return ct.subspan(0, pt.size() + tag_size);
 }
 
-static output_bytes
+static Result<output_bytes>
 seal_aead(CipherSuite suite,
           input_bytes key,
           input_bytes nonce,
@@ -280,17 +289,18 @@ seal_aead(CipherSuite suite,
 {
   auto tag_size = cipher_overhead(suite);
   if (ct.size() < pt.size() + tag_size) {
-    throw buffer_too_small_error("Ciphertext buffer too small");
+    return Result<output_bytes>::err(SFrameErrorType::buffer_too_small_error,
+                                     "Ciphertext buffer too small");
   }
 
   auto ctx = scoped_evp_cipher_ctx(EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free);
   if (ctx.get() == nullptr) {
-    throw crypto_error();
+    return Result<output_bytes>::err(SFrameErrorType::crypto_error);
   }
 
-  auto cipher = openssl_cipher(suite);
+  SFRAME_VALUE_OR_RETURN(cipher, openssl_cipher(suite));
   if (1 != EVP_EncryptInit(ctx.get(), cipher, key.data(), nonce.data())) {
-    throw crypto_error();
+    return Result<output_bytes>::err(SFrameErrorType::crypto_error);
   }
 
   int outlen = 0;
@@ -298,20 +308,20 @@ seal_aead(CipherSuite suite,
   if (aad.size() > 0) {
     if (1 != EVP_EncryptUpdate(
                ctx.get(), nullptr, &outlen, aad.data(), aad_size_int)) {
-      throw crypto_error();
+      return Result<output_bytes>::err(SFrameErrorType::crypto_error);
     }
   }
 
   auto pt_size_int = static_cast<int>(pt.size());
   if (1 != EVP_EncryptUpdate(
              ctx.get(), ct.data(), &outlen, pt.data(), pt_size_int)) {
-    throw crypto_error();
+    return Result<output_bytes>::err(SFrameErrorType::crypto_error);
   }
 
   // Providing nullptr as an argument is safe here because this
   // function never writes with GCM; it only computes the tag
   if (1 != EVP_EncryptFinal(ctx.get(), nullptr, &outlen)) {
-    throw crypto_error();
+    return Result<output_bytes>::err(SFrameErrorType::crypto_error);
   }
 
   auto tag = ct.subspan(pt.size(), tag_size);
@@ -319,7 +329,7 @@ seal_aead(CipherSuite suite,
   auto tag_size_downcast = static_cast<int>(tag.size());
   if (1 != EVP_CIPHER_CTX_ctrl(
              ctx.get(), EVP_CTRL_GCM_GET_TAG, tag_size_downcast, tag_ptr)) {
-    throw crypto_error();
+    return Result<output_bytes>::err(SFrameErrorType::crypto_error);
   }
 
   return ct.subspan(0, pt.size() + tag_size);
@@ -337,19 +347,19 @@ seal(CipherSuite suite,
     case CipherSuite::AES_128_CTR_HMAC_SHA256_80:
     case CipherSuite::AES_128_CTR_HMAC_SHA256_64:
     case CipherSuite::AES_128_CTR_HMAC_SHA256_32: {
-      return seal_ctr(suite, key, nonce, ct, aad, pt);
+      return SFRAME_VALUE_OR_THROW(seal_ctr(suite, key, nonce, ct, aad, pt));
     }
 
     case CipherSuite::AES_GCM_128_SHA256:
     case CipherSuite::AES_GCM_256_SHA512: {
-      return seal_aead(suite, key, nonce, ct, aad, pt);
+      return SFRAME_VALUE_OR_THROW(seal_aead(suite, key, nonce, ct, aad, pt));
     }
   }
 
   throw unsupported_ciphersuite_error();
 }
 
-static output_bytes
+static Result<output_bytes>
 open_ctr(CipherSuite suite,
          input_bytes key,
          input_bytes nonce,
@@ -359,7 +369,8 @@ open_ctr(CipherSuite suite,
 {
   auto tag_size = cipher_overhead(suite);
   if (ct.size() < tag_size) {
-    throw buffer_too_small_error("Ciphertext buffer too small");
+    return Result<output_bytes>::err(SFrameErrorType::buffer_too_small_error,
+                                     "Ciphertext buffer too small");
   }
 
   auto inner_ct_size = ct.size() - tag_size;
@@ -372,19 +383,21 @@ open_ctr(CipherSuite suite,
   auto auth_key = key.subspan(enc_key_size);
 
   // Authenticate with truncated HMAC
-  auto mac = compute_tag(suite, auth_key, nonce, aad, inner_ct, tag_size);
+  SFRAME_VALUE_OR_RETURN(
+    mac, compute_tag(suite, auth_key, nonce, aad, inner_ct, tag_size));
   if (CRYPTO_memcmp(mac.data(), tag.data(), tag.size()) != 0) {
-    throw authentication_error();
+    return Result<output_bytes>::err(SFrameErrorType::authentication_error);
   }
 
   // Decrypt with AES-CTR
   const auto pt_out = pt.first(inner_ct_size);
-  ctr_crypt(suite, enc_key, nonce, pt_out, ct.first(inner_ct_size));
+  SFRAME_VOID_OR_RETURN(
+    ctr_crypt(suite, enc_key, nonce, pt_out, ct.first(inner_ct_size)));
 
   return pt_out;
 }
 
-static output_bytes
+static Result<output_bytes>
 open_aead(CipherSuite suite,
           input_bytes key,
           input_bytes nonce,
@@ -394,22 +407,24 @@ open_aead(CipherSuite suite,
 {
   auto tag_size = cipher_overhead(suite);
   if (ct.size() < tag_size) {
-    throw buffer_too_small_error("Ciphertext buffer too small");
+    return Result<output_bytes>::err(SFrameErrorType::buffer_too_small_error,
+                                     "Ciphertext buffer too small");
   }
 
   auto inner_ct_size = ct.size() - tag_size;
   if (pt.size() < inner_ct_size) {
-    throw buffer_too_small_error("Plaintext buffer too small");
+    return Result<output_bytes>::err(SFrameErrorType::buffer_too_small_error,
+                                     "Plaintext buffer too small");
   }
 
   auto ctx = scoped_evp_cipher_ctx(EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free);
   if (ctx.get() == nullptr) {
-    throw crypto_error();
+    return Result<output_bytes>::err(SFrameErrorType::crypto_error);
   }
 
-  auto cipher = openssl_cipher(suite);
+  SFRAME_VALUE_OR_RETURN(cipher, openssl_cipher(suite));
   if (1 != EVP_DecryptInit(ctx.get(), cipher, key.data(), nonce.data())) {
-    throw crypto_error();
+    return Result<output_bytes>::err(SFrameErrorType::crypto_error);
   }
 
   auto tag = ct.subspan(inner_ct_size, tag_size);
@@ -417,7 +432,7 @@ open_aead(CipherSuite suite,
   auto tag_size_downcast = static_cast<int>(tag.size());
   if (1 != EVP_CIPHER_CTX_ctrl(
              ctx.get(), EVP_CTRL_GCM_SET_TAG, tag_size_downcast, tag_ptr)) {
-    throw crypto_error();
+    return Result<output_bytes>::err(SFrameErrorType::crypto_error);
   }
 
   int out_size;
@@ -425,20 +440,20 @@ open_aead(CipherSuite suite,
   if (aad.size() > 0) {
     if (1 != EVP_DecryptUpdate(
                ctx.get(), nullptr, &out_size, aad.data(), aad_size_int)) {
-      throw crypto_error();
+      return Result<output_bytes>::err(SFrameErrorType::crypto_error);
     }
   }
 
   auto inner_ct_size_int = static_cast<int>(inner_ct_size);
   if (1 != EVP_DecryptUpdate(
              ctx.get(), pt.data(), &out_size, ct.data(), inner_ct_size_int)) {
-    throw crypto_error();
+    return Result<output_bytes>::err(SFrameErrorType::crypto_error);
   }
 
   // Providing nullptr as an argument is safe here because this
   // function never writes with GCM; it only verifies the tag
   if (1 != EVP_DecryptFinal(ctx.get(), nullptr, &out_size)) {
-    throw authentication_error();
+    return Result<output_bytes>::err(SFrameErrorType::authentication_error);
   }
 
   return pt.subspan(0, inner_ct_size);
@@ -456,12 +471,12 @@ open(CipherSuite suite,
     case CipherSuite::AES_128_CTR_HMAC_SHA256_80:
     case CipherSuite::AES_128_CTR_HMAC_SHA256_64:
     case CipherSuite::AES_128_CTR_HMAC_SHA256_32: {
-      return open_ctr(suite, key, nonce, pt, aad, ct);
+      return SFRAME_VALUE_OR_THROW(open_ctr(suite, key, nonce, pt, aad, ct));
     }
 
     case CipherSuite::AES_GCM_128_SHA256:
     case CipherSuite::AES_GCM_256_SHA512: {
-      return open_aead(suite, key, nonce, pt, aad, ct);
+      return SFRAME_VALUE_OR_THROW(open_aead(suite, key, nonce, pt, aad, ct));
     }
   }
 
