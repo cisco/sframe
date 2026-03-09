@@ -66,6 +66,11 @@ public:
   {
   }
 
+  Result(SFrameErrorType error)
+    : data_(SFrameError(error))
+  {
+  }
+
   Result(T value)
     : data_(std::move(value))
   {
@@ -106,6 +111,11 @@ public:
 
   Result(SFrameError error)
     : error_(std::move(error))
+  {
+  }
+
+  Result(SFrameErrorType error)
+    : error_(SFrameError(error))
   {
   }
 
