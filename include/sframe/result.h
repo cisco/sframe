@@ -23,7 +23,7 @@ enum class SFrameErrorType
 class SFrameError
 {
 public:
-  explicit SFrameError(SFrameErrorType type)
+  SFrameError(SFrameErrorType type)
     : type_(type)
     , message_(nullptr)
   {
@@ -60,15 +60,6 @@ class Result
 
 public:
   typedef T element_type;
-
-  static Result ok(T value) { return Result<T>(std::move(value)); }
-
-  static Result err(SFrameErrorType error, const char* message = nullptr)
-  {
-    return Result<T>(SFrameError(error, message));
-  }
-
-  static Result err(SFrameError&& error) { return Result<T>(std::move(error)); }
 
   Result(SFrameError error)
     : data_(std::move(error))
@@ -112,16 +103,6 @@ public:
   typedef void element_type;
 
   static Result ok() { return Result<void>(); }
-
-  static Result err(SFrameErrorType error, const char* message = nullptr)
-  {
-    return Result<void>(SFrameError(error, message));
-  }
-
-  static Result err(SFrameError&& error)
-  {
-    return Result<void>(std::move(error));
-  }
 
   Result(SFrameError error)
     : error_(std::move(error))
@@ -171,3 +152,14 @@ private:
     return _sframe_r_##var.error();                                            \
   }                                                                            \
   auto var = _sframe_r_##var.value()
+
+// Propagate a Result<void> error by early return, discarding the void value.
+// Use in functions that already return Result<U>.
+// Usage: SFRAME_VOID_OR_RETURN(some_void_result_expr);
+#define SFRAME_VOID_OR_RETURN(expr)                                            \
+  do {                                                                         \
+    auto _sframe_vr = (expr);                                                  \
+    if (_sframe_vr.is_err()) {                                                 \
+      return _sframe_vr.error();                                               \
+    }                                                                          \
+  } while (0)
