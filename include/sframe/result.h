@@ -23,7 +23,7 @@ enum class SFrameErrorType
 class SFrameError
 {
 public:
-  explicit SFrameError(SFrameErrorType type)
+  SFrameError(SFrameErrorType type)
     : type_(type)
     , message_(nullptr)
   {
@@ -60,15 +60,6 @@ class Result
 
 public:
   typedef T element_type;
-
-  static Result ok(T value) { return Result<T>(std::move(value)); }
-
-  static Result err(SFrameErrorType error, const char* message = nullptr)
-  {
-    return Result<T>(SFrameError(error, message));
-  }
-
-  static Result err(SFrameError&& error) { return Result<T>(std::move(error)); }
 
   Result(SFrameError error)
     : data_(std::move(error))
@@ -112,16 +103,6 @@ public:
   typedef void element_type;
 
   static Result ok() { return Result<void>(); }
-
-  static Result err(SFrameErrorType error, const char* message = nullptr)
-  {
-    return Result<void>(SFrameError(error, message));
-  }
-
-  static Result err(SFrameError&& error)
-  {
-    return Result<void>(std::move(error));
-  }
 
   Result(SFrameError error)
     : error_(std::move(error))

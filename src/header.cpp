@@ -32,15 +32,15 @@ static Result<uint64_t>
 decode_uint(input_bytes data)
 {
   if (!data.empty() && data[0] == 0) {
-    return Result<uint64_t>::err(SFrameErrorType::invalid_parameter_error,
-                                 "Integer is not minimally encoded");
+    return SFrameError(SFrameErrorType::invalid_parameter_error,
+                       "Integer is not minimally encoded");
   }
 
   uint64_t val = 0;
   for (size_t i = 0; i < data.size(); i++) {
     val = (val << 8) + static_cast<uint64_t>(data[i]);
   }
-  return Result<uint64_t>::ok(val);
+  return val;
 }
 
 struct ValueOrLength
@@ -82,15 +82,13 @@ struct ValueOrLength
   {
     if (!is_length) {
       // Nothing to read; value is already in config byte
-      return Result<std::tuple<uint64_t, input_bytes>>::ok(
-        std::make_tuple(value_or_length, data));
+      return std::make_tuple(uint64_t(value_or_length), data);
     }
 
     const auto size = value_size();
     SFRAME_VALUE_OR_RETURN(value, decode_uint(data.subspan(0, size)));
     const auto remaining = data.subspan(size);
-    return Result<std::tuple<uint64_t, input_bytes>>::ok(
-      std::make_tuple(value, remaining));
+    return std::make_tuple(value, remaining);
   }
 
 private:
@@ -147,8 +145,8 @@ Result<Header>
 Header::parse(input_bytes buffer)
 {
   if (buffer.size() < Header::min_size) {
-    return Result<Header>::err(SFrameErrorType::buffer_too_small_error,
-                               "Ciphertext too small to decode header");
+    return SFrameError(SFrameErrorType::buffer_too_small_error,
+                       "Ciphertext too small to decode header");
   }
 
   const auto cfg = ConfigByte{ buffer[0] };
@@ -160,7 +158,7 @@ Header::parse(input_bytes buffer)
 
   const auto encoded = buffer.subspan(0, cfg.encoded_size());
 
-  return Result<Header>::ok(Header(key_id, counter, encoded));
+  return Header(key_id, counter, encoded);
 }
 
 Header::Header(KeyID key_id_in, Counter counter_in, input_bytes encoded_in)
