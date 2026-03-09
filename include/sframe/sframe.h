@@ -5,6 +5,7 @@
 #include <optional>
 
 #include <sframe/map.h>
+#include <sframe/result.h>
 #include <sframe/vector.h>
 
 #include <namespace.h>
@@ -87,10 +88,10 @@ enum struct KeyUsage
 
 struct KeyRecord
 {
-  static KeyRecord from_base_key(CipherSuite suite,
-                                 KeyID key_id,
-                                 KeyUsage usage,
-                                 input_bytes base_key);
+  static Result<KeyRecord> from_base_key(CipherSuite suite,
+                                         KeyID key_id,
+                                         KeyUsage usage,
+                                         input_bytes base_key);
 
   static constexpr size_t max_key_size = 48;
   static constexpr size_t max_salt_size = 12;
@@ -127,14 +128,14 @@ protected:
   CipherSuite suite;
   map<KeyID, KeyRecord, SFRAME_MAX_KEYS> keys;
 
-  output_bytes protect_inner(const Header& header,
-                             output_bytes ciphertext,
-                             input_bytes plaintext,
-                             input_bytes metadata);
-  output_bytes unprotect_inner(const Header& header,
-                               output_bytes ciphertext,
-                               input_bytes plaintext,
-                               input_bytes metadata);
+  Result<output_bytes> protect_inner(const Header& header,
+                                     output_bytes ciphertext,
+                                     input_bytes plaintext,
+                                     input_bytes metadata);
+  Result<output_bytes> unprotect_inner(const Header& header,
+                                       output_bytes ciphertext,
+                                       input_bytes plaintext,
+                                       input_bytes metadata);
 };
 
 // MLSContext augments Context with logic for deriving keys from MLS.  Instead
@@ -187,8 +188,8 @@ private:
               input_bytes sframe_epoch_secret_in,
               size_t epoch_bits,
               size_t sender_bits_in);
-    owned_bytes<max_secret_size> base_key(CipherSuite suite,
-                                          SenderID sender_id) const;
+    Result<owned_bytes<max_secret_size>> base_key(CipherSuite suite,
+                                                  SenderID sender_id) const;
   };
 
   void purge_epoch(EpochID epoch_id);

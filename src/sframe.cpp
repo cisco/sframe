@@ -62,25 +62,24 @@ sframe_salt_label(CipherSuite suite, KeyID key_id)
   return label;
 }
 
-KeyRecord
+Result<KeyRecord>
 KeyRecord::from_base_key(CipherSuite suite,
                          KeyID key_id,
                          KeyUsage usage,
                          input_bytes base_key)
 {
-  auto key_size = cipher_key_size(suite);
-  auto nonce_size = cipher_nonce_size(suite);
+  SFRAME_VALUE_OR_RETURN(key_size, cipher_key_size(suite));
+  SFRAME_VALUE_OR_RETURN(nonce_size, cipher_nonce_size(suite));
 
   const auto empty_byte_string = owned_bytes<1>();
   const auto key_label = sframe_key_label(suite, key_id);
   const auto salt_label = sframe_salt_label(suite, key_id);
 
-  auto secret =
-    SFRAME_VALUE_OR_THROW(hkdf_extract(suite, empty_byte_string, base_key));
-  auto key =
-    SFRAME_VALUE_OR_THROW(hkdf_expand(suite, secret, key_label, key_size));
-  auto salt =
-    SFRAME_VALUE_OR_THROW(hkdf_expand(suite, secret, salt_label, nonce_size));
+  SFRAME_VALUE_OR_RETURN(secret,
+                         hkdf_extract(suite, empty_byte_string, base_key));
+  SFRAME_VALUE_OR_RETURN(key, hkdf_expand(suite, secret, key_label, key_size));
+  SFRAME_VALUE_OR_RETURN(salt,
+                         hkdf_expand(suite, secret, salt_label, nonce_size));
 
   return KeyRecord{ key, salt, usage, 0 };
 }
@@ -100,7 +99,8 @@ void
 Context::add_key(KeyID key_id, KeyUsage usage, input_bytes base_key)
 {
   keys.emplace(key_id,
-               KeyRecord::from_base_key(suite, key_id, usage, base_key));
+               SFRAME_VALUE_OR_THROW(
+                 KeyRecord::from_base_key(suite, key_id, usage, base_key)));
 }
 
 static owned_bytes<KeyRecord::max_salt_size>
@@ -117,11 +117,12 @@ form_nonce(Counter ctr, input_bytes salt)
 static constexpr auto max_aad_size =
   Header::max_size + Context::max_metadata_size;
 
-static owned_bytes<max_aad_size>
+static Result<owned_bytes<max_aad_size>>
 form_aad(const Header& header, input_bytes metadata)
 {
   if (metadata.size() > Context::max_metadata_size) {
-    throw buffer_too_small_error("Metadata too large");
+    return SFrameError(SFrameErrorType::buffer_too_small_error,
+                       "Metadata too large");
   }
 
   auto aad = owned_bytes<max_aad_size>(0);
@@ -148,8 +149,8 @@ Context::protect(KeyID key_id,
 
   std::copy(header_data.begin(), header_data.end(), ciphertext.begin());
   auto inner_ciphertext = ciphertext.subspan(header_data.size());
-  auto final_ciphertext =
-    Context::protect_inner(header, inner_ciphertext, plaintext, metadata);
+  auto final_ciphertext = SFRAME_VALUE_OR_THROW(
+    Context::protect_inner(header, inner_ciphertext, plaintext, metadata));
   return ciphertext.first(header_data.size() + final_ciphertext.size());
 }
 
@@ -160,48 +161,51 @@ Context::unprotect(output_bytes plaintext,
 {
   const auto header = SFRAME_VALUE_OR_THROW(Header::parse(ciphertext));
   const auto inner_ciphertext = ciphertext.subspan(header.size());
-  return Context::unprotect_inner(
-    header, plaintext, inner_ciphertext, metadata);
+  return SFRAME_VALUE_OR_THROW(
+    Context::unprotect_inner(header, plaintext, inner_ciphertext, metadata));
 }
 
-output_bytes
+Result<output_bytes>
 Context::protect_inner(const Header& header,
                        output_bytes ciphertext,
                        input_bytes plaintext,
                        input_bytes metadata)
 {
-  if (ciphertext.size() < plaintext.size() + cipher_overhead(suite)) {
-    throw buffer_too_small_error("Ciphertext too small for cipher overhead");
+  SFRAME_VALUE_OR_RETURN(overhead, cipher_overhead(suite));
+  if (ciphertext.size() < plaintext.size() + overhead) {
+    return SFrameError(SFrameErrorType::buffer_too_small_error,
+                       "Ciphertext too small for cipher overhead");
   }
 
   const auto& key_and_salt = keys.at(header.key_id);
 
-  const auto aad = form_aad(header, metadata);
+  SFRAME_VALUE_OR_RETURN(aad, form_aad(header, metadata));
   const auto nonce = form_nonce(header.counter, key_and_salt.salt);
-  return SFRAME_VALUE_OR_THROW(
-    seal(suite, key_and_salt.key, nonce, ciphertext, aad, plaintext));
+  return seal(suite, key_and_salt.key, nonce, ciphertext, aad, plaintext);
 }
 
-output_bytes
+Result<output_bytes>
 Context::unprotect_inner(const Header& header,
                          output_bytes plaintext,
                          input_bytes ciphertext,
                          input_bytes metadata)
 {
-  if (ciphertext.size() < cipher_overhead(suite)) {
-    throw buffer_too_small_error("Ciphertext too small for cipher overhead");
+  SFRAME_VALUE_OR_RETURN(overhead, cipher_overhead(suite));
+  if (ciphertext.size() < overhead) {
+    return SFrameError(SFrameErrorType::buffer_too_small_error,
+                       "Ciphertext too small for cipher overhead");
   }
 
-  if (plaintext.size() < ciphertext.size() - cipher_overhead(suite)) {
-    throw buffer_too_small_error("Plaintext too small for decrypted value");
+  if (plaintext.size() < ciphertext.size() - overhead) {
+    return SFrameError(SFrameErrorType::buffer_too_small_error,
+                       "Plaintext too small for decrypted value");
   }
 
   const auto& key_and_salt = keys.at(header.key_id);
 
-  const auto aad = form_aad(header, metadata);
+  SFRAME_VALUE_OR_RETURN(aad, form_aad(header, metadata));
   const auto nonce = form_nonce(header.counter, key_and_salt.salt);
-  return SFRAME_VALUE_OR_THROW(
-    open(suite, key_and_salt.key, nonce, plaintext, aad, ciphertext));
+  return open(suite, key_and_salt.key, nonce, plaintext, aad, ciphertext);
 }
 
 ///
@@ -280,8 +284,8 @@ MLSContext::unprotect(output_bytes plaintext,
   const auto inner_ciphertext = ciphertext.subspan(header.size());
 
   ensure_key(header.key_id, KeyUsage::unprotect);
-  return Context::unprotect_inner(
-    header, plaintext, inner_ciphertext, metadata);
+  return SFRAME_VALUE_OR_THROW(
+    Context::unprotect_inner(header, plaintext, inner_ciphertext, metadata));
 }
 
 MLSContext::EpochKeys::EpochKeys(MLSContext::EpochID full_epoch_in,
@@ -311,16 +315,16 @@ MLSContext::EpochKeys::EpochKeys(MLSContext::EpochID full_epoch_in,
   max_context_id = (one << context_bits) - 1;
 }
 
-owned_bytes<MLSContext::EpochKeys::max_secret_size>
+Result<owned_bytes<MLSContext::EpochKeys::max_secret_size>>
 MLSContext::EpochKeys::base_key(CipherSuite ciphersuite,
                                 SenderID sender_id) const
 {
-  const auto hash_size = cipher_digest_size(ciphersuite);
+  SFRAME_VALUE_OR_RETURN(hash_size, cipher_digest_size(ciphersuite));
   auto enc_sender_id = owned_bytes<8>();
   encode_uint(sender_id, enc_sender_id);
 
-  return SFRAME_VALUE_OR_THROW(
-    hkdf_expand(ciphersuite, sframe_epoch_secret, enc_sender_id, hash_size));
+  return hkdf_expand(
+    ciphersuite, sframe_epoch_secret, enc_sender_id, hash_size);
 }
 
 void
@@ -376,7 +380,8 @@ MLSContext::ensure_key(KeyID key_id, KeyUsage usage)
 
   // Otherwise, derive a key and implant it
   const auto sender_id = key_id >> epoch_bits;
-  Context::add_key(key_id, usage, epoch->base_key(suite, sender_id));
+  Context::add_key(
+    key_id, usage, SFRAME_VALUE_OR_THROW(epoch->base_key(suite, sender_id)));
   return;
 }
 

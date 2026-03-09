@@ -163,7 +163,7 @@ hkdf_expand(CipherSuite suite, input_bytes prk, input_bytes info, size_t size)
   auto out = owned_bytes<max_hkdf_extract_size>(0);
 
   auto block = owned_bytes<max_hkdf_extract_size>(0);
-  const auto block_size = cipher_digest_size(suite);
+  SFRAME_VALUE_OR_RETURN(block_size, cipher_digest_size(suite));
   auto counter = owned_bytes<1>();
   counter[0] = 0x01;
   while (out.size() < size) {
@@ -264,14 +264,14 @@ seal_ctr(CipherSuite suite,
          input_bytes aad,
          input_bytes pt)
 {
-  auto tag_size = cipher_overhead(suite);
+  SFRAME_VALUE_OR_RETURN(tag_size, cipher_overhead(suite));
   if (ct.size() < pt.size() + tag_size) {
     return SFrameError(SFrameErrorType::buffer_too_small_error,
                        "Ciphertext buffer too small");
   }
 
   // Split the key into enc and auth subkeys
-  auto enc_key_size = cipher_enc_key_size(suite);
+  SFRAME_VALUE_OR_RETURN(enc_key_size, cipher_enc_key_size(suite));
   auto enc_key = key.first(enc_key_size);
   auto auth_key = key.subspan(enc_key_size);
 
@@ -296,7 +296,7 @@ seal_aead(CipherSuite suite,
           input_bytes aad,
           input_bytes pt)
 {
-  auto tag_size = cipher_overhead(suite);
+  SFRAME_VALUE_OR_RETURN(tag_size, cipher_overhead(suite));
   if (ct.size() < pt.size() + tag_size) {
     return SFrameError(SFrameErrorType::buffer_too_small_error,
                        "Ciphertext buffer too small");
@@ -376,7 +376,7 @@ open_ctr(CipherSuite suite,
          input_bytes aad,
          input_bytes ct)
 {
-  auto tag_size = cipher_overhead(suite);
+  SFRAME_VALUE_OR_RETURN(tag_size, cipher_overhead(suite));
   if (ct.size() < tag_size) {
     return SFrameError(SFrameErrorType::buffer_too_small_error,
                        "Ciphertext buffer too small");
@@ -387,7 +387,7 @@ open_ctr(CipherSuite suite,
   auto tag = ct.subspan(inner_ct_size, tag_size);
 
   // Split the key into enc and auth subkeys
-  auto enc_key_size = cipher_enc_key_size(suite);
+  SFRAME_VALUE_OR_RETURN(enc_key_size, cipher_enc_key_size(suite));
   auto enc_key = key.first(enc_key_size);
   auto auth_key = key.subspan(enc_key_size);
 
@@ -414,7 +414,7 @@ open_aead(CipherSuite suite,
           input_bytes aad,
           input_bytes ct)
 {
-  auto tag_size = cipher_overhead(suite);
+  SFRAME_VALUE_OR_RETURN(tag_size, cipher_overhead(suite));
   if (ct.size() < tag_size) {
     return SFrameError(SFrameErrorType::buffer_too_small_error,
                        "Ciphertext buffer too small");
