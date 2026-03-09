@@ -64,10 +64,10 @@ openssl_cipher(CipherSuite suite)
 /// HKDF
 ///
 
-owned_bytes<max_hkdf_expand_size>
+Result<owned_bytes<max_hkdf_expand_size>>
 hkdf_extract(CipherSuite suite, input_bytes salt, input_bytes ikm)
 {
-  const auto* md = SFRAME_VALUE_OR_THROW(openssl_digest_type(suite));
+  SFRAME_VALUE_OR_RETURN(md, openssl_digest_type(suite));
   auto out = owned_bytes<max_hkdf_expand_size>(EVP_MD_size(md));
   auto out_len = size_t(out.size());
   if (1 != HKDF_extract(out.data(),
@@ -77,16 +77,16 @@ hkdf_extract(CipherSuite suite, input_bytes salt, input_bytes ikm)
                         ikm.size(),
                         salt.data(),
                         salt.size())) {
-    throw crypto_error();
+    return SFrameErrorType::crypto_error;
   }
 
   return out;
 }
 
-owned_bytes<max_hkdf_extract_size>
+Result<owned_bytes<max_hkdf_extract_size>>
 hkdf_expand(CipherSuite suite, input_bytes prk, input_bytes info, size_t size)
 {
-  const auto* md = SFRAME_VALUE_OR_THROW(openssl_digest_type(suite));
+  SFRAME_VALUE_OR_RETURN(md, openssl_digest_type(suite));
   auto out = owned_bytes<max_hkdf_expand_size>(size);
   if (1 != HKDF_expand(out.data(),
                        out.size(),
@@ -95,7 +95,7 @@ hkdf_expand(CipherSuite suite, input_bytes prk, input_bytes info, size_t size)
                        prk.size(),
                        info.data(),
                        info.size())) {
-    throw crypto_error();
+    return SFrameErrorType::crypto_error;
   }
 
   return out;
@@ -293,7 +293,7 @@ seal_aead(CipherSuite suite,
   return ct.subspan(0, pt.size() + tag_size);
 }
 
-output_bytes
+Result<output_bytes>
 seal(CipherSuite suite,
      input_bytes key,
      input_bytes nonce,
@@ -305,16 +305,16 @@ seal(CipherSuite suite,
     case CipherSuite::AES_128_CTR_HMAC_SHA256_80:
     case CipherSuite::AES_128_CTR_HMAC_SHA256_64:
     case CipherSuite::AES_128_CTR_HMAC_SHA256_32: {
-      return SFRAME_VALUE_OR_THROW(seal_ctr(suite, key, nonce, ct, aad, pt));
+      return seal_ctr(suite, key, nonce, ct, aad, pt);
     }
 
     case CipherSuite::AES_GCM_128_SHA256:
     case CipherSuite::AES_GCM_256_SHA512: {
-      return SFRAME_VALUE_OR_THROW(seal_aead(suite, key, nonce, ct, aad, pt));
+      return seal_aead(suite, key, nonce, ct, aad, pt);
     }
   }
 
-  throw unsupported_ciphersuite_error();
+  return SFrameErrorType::unsupported_ciphersuite_error;
 }
 
 static Result<output_bytes>
@@ -417,7 +417,7 @@ open_aead(CipherSuite suite,
   return pt.subspan(0, inner_ct_size);
 }
 
-output_bytes
+Result<output_bytes>
 open(CipherSuite suite,
      input_bytes key,
      input_bytes nonce,
@@ -429,16 +429,16 @@ open(CipherSuite suite,
     case CipherSuite::AES_128_CTR_HMAC_SHA256_80:
     case CipherSuite::AES_128_CTR_HMAC_SHA256_64:
     case CipherSuite::AES_128_CTR_HMAC_SHA256_32: {
-      return SFRAME_VALUE_OR_THROW(open_ctr(suite, key, nonce, pt, aad, ct));
+      return open_ctr(suite, key, nonce, pt, aad, ct);
     }
 
     case CipherSuite::AES_GCM_128_SHA256:
     case CipherSuite::AES_GCM_256_SHA512: {
-      return SFRAME_VALUE_OR_THROW(open_aead(suite, key, nonce, pt, aad, ct));
+      return open_aead(suite, key, nonce, pt, aad, ct);
     }
   }
 
-  throw unsupported_ciphersuite_error();
+  return SFrameErrorType::unsupported_ciphersuite_error;
 }
 
 } // namespace SFRAME_NAMESPACE
