@@ -75,9 +75,12 @@ KeyRecord::from_base_key(CipherSuite suite,
   const auto key_label = sframe_key_label(suite, key_id);
   const auto salt_label = sframe_salt_label(suite, key_id);
 
-  auto secret = hkdf_extract(suite, empty_byte_string, base_key);
-  auto key = hkdf_expand(suite, secret, key_label, key_size);
-  auto salt = hkdf_expand(suite, secret, salt_label, nonce_size);
+  auto secret =
+    SFRAME_VALUE_OR_THROW(hkdf_extract(suite, empty_byte_string, base_key));
+  auto key =
+    SFRAME_VALUE_OR_THROW(hkdf_expand(suite, secret, key_label, key_size));
+  auto salt =
+    SFRAME_VALUE_OR_THROW(hkdf_expand(suite, secret, salt_label, nonce_size));
 
   return KeyRecord{ key, salt, usage, 0 };
 }
@@ -175,7 +178,8 @@ Context::protect_inner(const Header& header,
 
   const auto aad = form_aad(header, metadata);
   const auto nonce = form_nonce(header.counter, key_and_salt.salt);
-  return seal(suite, key_and_salt.key, nonce, ciphertext, aad, plaintext);
+  return SFRAME_VALUE_OR_THROW(
+    seal(suite, key_and_salt.key, nonce, ciphertext, aad, plaintext));
 }
 
 output_bytes
@@ -196,7 +200,8 @@ Context::unprotect_inner(const Header& header,
 
   const auto aad = form_aad(header, metadata);
   const auto nonce = form_nonce(header.counter, key_and_salt.salt);
-  return open(suite, key_and_salt.key, nonce, plaintext, aad, ciphertext);
+  return SFRAME_VALUE_OR_THROW(
+    open(suite, key_and_salt.key, nonce, plaintext, aad, ciphertext));
 }
 
 ///
@@ -314,8 +319,8 @@ MLSContext::EpochKeys::base_key(CipherSuite ciphersuite,
   auto enc_sender_id = owned_bytes<8>();
   encode_uint(sender_id, enc_sender_id);
 
-  return hkdf_expand(
-    ciphersuite, sframe_epoch_secret, enc_sender_id, hash_size);
+  return SFRAME_VALUE_OR_THROW(
+    hkdf_expand(ciphersuite, sframe_epoch_secret, enc_sender_id, hash_size));
 }
 
 void

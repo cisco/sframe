@@ -103,12 +103,14 @@ struct AesCtrHmacTestVector
   {
     // Seal
     auto ciphertext = bytes(ct.data.size());
-    const auto ct_out = seal(cipher_suite, key, nonce, ciphertext, aad, pt);
+    const auto ct_out = SFRAME_VALUE_OR_THROW(
+      seal(cipher_suite, key, nonce, ciphertext, aad, pt));
     REQUIRE(ct_out == ct);
 
     // Open
     auto plaintext = bytes(pt.data.size());
-    const auto pt_out = open(cipher_suite, key, nonce, plaintext, aad, ct);
+    const auto pt_out =
+      SFRAME_VALUE_OR_THROW(open(cipher_suite, key, nonce, plaintext, aad, ct));
     REQUIRE(pt_out == pt);
   }
 };
