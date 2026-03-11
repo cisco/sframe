@@ -5,15 +5,15 @@
 
 namespace SFRAME_NAMESPACE {
 
-size_t
+Result<size_t>
 cipher_digest_size(CipherSuite suite);
-size_t
+Result<size_t>
 cipher_key_size(CipherSuite suite);
-size_t
+Result<size_t>
 cipher_enc_key_size(CipherSuite suite);
-size_t
+Result<size_t>
 cipher_nonce_size(CipherSuite suite);
-size_t
+Result<size_t>
 cipher_overhead(CipherSuite suite);
 
 ///
