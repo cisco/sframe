@@ -9,6 +9,7 @@ option(TESTING    "Build tests" OFF)
 option(CLANG_TIDY "Perform linting with clang-tidy" OFF)
 option(SANITIZERS "Enable sanitizers" OFF)
 option(NO_ALLOC   "Build without needing an allocator" OFF)
+option(SFRAME_NO_EXCEPTIONS "Build with Result-based API instead of exceptions" OFF)
 option(NAMESPACE_SUFFIX "Namespace Suffix for CXX and CMake Export")
 
 if(NAMESPACE_SUFFIX)
@@ -70,6 +71,11 @@ endif()
 if(NO_ALLOC)
   message(STATUS "Configuring no-allocator version")
   add_definitions(-DNO_ALLOC)
+endif()
+
+if(SFRAME_NO_EXCEPTIONS)
+  message(STATUS "Configuring no-exceptions version (Result-based API)")
+  add_definitions(-DSFRAME_NO_EXCEPTIONS)
 endif()
 
 ###

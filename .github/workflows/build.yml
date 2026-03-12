@@ -20,6 +20,7 @@ jobs:
         os: [windows-latest, ubuntu-latest, macos-latest]
         crypto: [OPENSSL_1_1, OPENSSL_3, BORINGSSL]
         no_alloc: [OFF, ON]
+        no_exceptions: [OFF, ON]
         include:
             - os: windows-latest
               vcpkg-cmake-file: "$env:VCPKG_INSTALLATION_ROOT\\scripts\\buildsystems\\vcpkg.cmake"
@@ -65,6 +66,7 @@ jobs:
                  -DCRYPTO="${{ matrix.crypto }}"
                  -DVCPKG_MANIFEST_DIR="alternatives/${{ matrix.crypto }}"
                  -DNO_ALLOC="${{ matrix.no_alloc }}"
+                 -DSFRAME_NO_EXCEPTIONS="${{ matrix.no_exceptions }}"
 
     - name: build
       run: |
