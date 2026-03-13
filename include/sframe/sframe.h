@@ -28,39 +28,6 @@
 
 namespace SFRAME_NAMESPACE {
 
-struct crypto_error : std::runtime_error
-{
-  crypto_error();
-};
-
-struct unsupported_ciphersuite_error : std::runtime_error
-{
-  unsupported_ciphersuite_error();
-};
-
-struct authentication_error : std::runtime_error
-{
-  authentication_error();
-};
-
-struct buffer_too_small_error : std::runtime_error
-{
-  using parent = std::runtime_error;
-  using parent::parent;
-};
-
-struct invalid_parameter_error : std::runtime_error
-{
-  using parent = std::runtime_error;
-  using parent::parent;
-};
-
-struct invalid_key_usage_error : std::runtime_error
-{
-  using parent = std::runtime_error;
-  using parent::parent;
-};
-
 enum class CipherSuite : uint16_t
 {
   AES_128_CTR_HMAC_SHA256_80 = 1,
@@ -111,15 +78,15 @@ public:
   Context(CipherSuite suite);
   virtual ~Context();
 
-  void add_key(KeyID kid, KeyUsage usage, input_bytes key);
+  Result<void> add_key(KeyID kid, KeyUsage usage, input_bytes key);
 
-  output_bytes protect(KeyID key_id,
-                       output_bytes ciphertext,
-                       input_bytes plaintext,
-                       input_bytes metadata);
-  output_bytes unprotect(output_bytes plaintext,
-                         input_bytes ciphertext,
-                         input_bytes metadata);
+  Result<output_bytes> protect(KeyID key_id,
+                               output_bytes ciphertext,
+                               input_bytes plaintext,
+                               input_bytes metadata);
+  Result<output_bytes> unprotect(output_bytes plaintext,
+                                 input_bytes ciphertext,
+                                 input_bytes metadata);
 
   static constexpr size_t max_overhead = 17 + 16;
   static constexpr size_t max_metadata_size = 512;
@@ -150,54 +117,55 @@ public:
 
   MLSContext(CipherSuite suite_in, size_t epoch_bits_in);
 
-  void add_epoch(EpochID epoch_id, input_bytes sframe_epoch_secret);
-  void add_epoch(EpochID epoch_id,
-                 input_bytes sframe_epoch_secret,
-                 size_t sender_bits);
+  Result<void> add_epoch(EpochID epoch_id, input_bytes sframe_epoch_secret);
+  Result<void> add_epoch(EpochID epoch_id,
+                         input_bytes sframe_epoch_secret,
+                         size_t sender_bits);
   void purge_before(EpochID keeper);
 
-  output_bytes protect(EpochID epoch_id,
-                       SenderID sender_id,
-                       output_bytes ciphertext,
-                       input_bytes plaintext,
-                       input_bytes metadata);
-  output_bytes protect(EpochID epoch_id,
-                       SenderID sender_id,
-                       ContextID context_id,
-                       output_bytes ciphertext,
-                       input_bytes plaintext,
-                       input_bytes metadata);
+  Result<output_bytes> protect(EpochID epoch_id,
+                               SenderID sender_id,
+                               output_bytes ciphertext,
+                               input_bytes plaintext,
+                               input_bytes metadata);
+  Result<output_bytes> protect(EpochID epoch_id,
+                               SenderID sender_id,
+                               ContextID context_id,
+                               output_bytes ciphertext,
+                               input_bytes plaintext,
+                               input_bytes metadata);
 
-  output_bytes unprotect(output_bytes plaintext,
-                         input_bytes ciphertext,
-                         input_bytes metadata);
+  Result<output_bytes> unprotect(output_bytes plaintext,
+                                 input_bytes ciphertext,
+                                 input_bytes metadata);
 
 private:
   struct EpochKeys
   {
     static constexpr size_t max_secret_size = 64;
 
-    EpochID full_epoch;
+    EpochID full_epoch = 0;
     owned_bytes<max_secret_size> sframe_epoch_secret;
-    size_t sender_bits;
-    size_t context_bits;
-    uint64_t max_sender_id;
-    uint64_t max_context_id;
+    size_t sender_bits = 0;
+    size_t context_bits = 0;
+    uint64_t max_sender_id = 0;
+    uint64_t max_context_id = 0;
 
-    EpochKeys(EpochID full_epoch_in,
-              input_bytes sframe_epoch_secret_in,
-              size_t epoch_bits,
-              size_t sender_bits_in);
+    EpochKeys() = default;
+    static Result<EpochKeys> create(EpochID full_epoch_in,
+                                    input_bytes sframe_epoch_secret_in,
+                                    size_t epoch_bits,
+                                    size_t sender_bits_in);
     Result<owned_bytes<max_secret_size>> base_key(CipherSuite suite,
                                                   SenderID sender_id) const;
   };
 
   void purge_epoch(EpochID epoch_id);
 
-  KeyID form_key_id(EpochID epoch_id,
-                    SenderID sender_id,
-                    ContextID context_id) const;
-  void ensure_key(KeyID key_id, KeyUsage usage);
+  Result<KeyID> form_key_id(EpochID epoch_id,
+                            SenderID sender_id,
+                            ContextID context_id) const;
+  Result<void> ensure_key(KeyID key_id, KeyUsage usage);
 
   const size_t epoch_bits;
   const size_t epoch_mask;
