@@ -48,10 +48,6 @@ private:
   const char* message_ = nullptr;
 };
 
-// Helper to convert SFrameError to appropriate exception type
-void
-throw_on_error(const SFrameError& error);
-
 template<typename T>
 class Result
 {
@@ -140,18 +136,6 @@ private:
 };
 
 } // namespace SFRAME_NAMESPACE
-
-// Unwrap a Result<T>, throwing the corresponding exception on error.
-// Use in functions that have NOT yet been migrated away from exceptions.
-// Usage: const auto val = SFRAME_VALUE_OR_THROW(some_result_expr);
-#define SFRAME_VALUE_OR_THROW(expr)                                            \
-  ([&]() {                                                                     \
-    auto _result = (expr);                                                     \
-    if (_result.is_err()) {                                                    \
-      SFRAME_NAMESPACE::throw_on_error(_result.error());                       \
-    }                                                                          \
-    return _result.value();                                                    \
-  }())
 
 // Unwrap a Result<T> into `var`, propagating the error by early return.
 // Use in functions that already return Result<U>.
