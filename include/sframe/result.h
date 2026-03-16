@@ -48,6 +48,11 @@ private:
   const char* message_ = nullptr;
 };
 
+#ifdef __cpp_exceptions
+void
+throw_sframe_error(const SFrameError& error);
+#endif
+
 template<typename T>
 class Result
 {
@@ -92,6 +97,17 @@ public:
 
   bool is_err() const { return std::holds_alternative<SFrameError>(data_); }
 
+#ifdef __cpp_exceptions
+  T unwrap()
+  {
+    if (std::holds_alternative<SFrameError>(data_)) {
+      throw_sframe_error(std::get<SFrameError>(data_));
+    }
+
+    return std::move(std::get<T>(data_));
+  }
+#endif
+
 private:
   std::variant<T, SFrameError> data_;
 };
@@ -130,6 +146,15 @@ public:
   bool is_ok() const { return !error_.has_value(); }
 
   bool is_err() const { return error_.has_value(); }
+
+#ifdef __cpp_exceptions
+  void unwrap()
+  {
+    if (error_.has_value()) {
+      throw_sframe_error(error_.value());
+    }
+  }
+#endif
 
 private:
   std::optional<SFrameError> error_;

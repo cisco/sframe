@@ -8,6 +8,10 @@
 #include <sframe/result.h>
 #include <sframe/vector.h>
 
+#ifdef __cpp_exceptions
+#include <stdexcept>
+#endif
+
 #include <namespace.h>
 
 // These constants define the size of certain internal data structures if
@@ -27,6 +31,41 @@
 #endif
 
 namespace SFRAME_NAMESPACE {
+
+#ifdef __cpp_exceptions
+struct crypto_error : std::runtime_error
+{
+  crypto_error();
+};
+
+struct unsupported_ciphersuite_error : std::runtime_error
+{
+  unsupported_ciphersuite_error();
+};
+
+struct authentication_error : std::runtime_error
+{
+  authentication_error();
+};
+
+struct buffer_too_small_error : std::runtime_error
+{
+  using parent = std::runtime_error;
+  using parent::parent;
+};
+
+struct invalid_parameter_error : std::runtime_error
+{
+  using parent = std::runtime_error;
+  using parent::parent;
+};
+
+struct invalid_key_usage_error : std::runtime_error
+{
+  using parent = std::runtime_error;
+  using parent::parent;
+};
+#endif
 
 enum class CipherSuite : uint16_t
 {
@@ -140,16 +179,17 @@ public:
                                  input_bytes metadata);
 
 private:
+  // NOLINTBEGIN(clang-analyzer-core.uninitialized.Assign)
   struct EpochKeys
   {
     static constexpr size_t max_secret_size = 64;
 
-    EpochID full_epoch = 0;
+    EpochID full_epoch;
     owned_bytes<max_secret_size> sframe_epoch_secret;
-    size_t sender_bits = 0;
-    size_t context_bits = 0;
-    uint64_t max_sender_id = 0;
-    uint64_t max_context_id = 0;
+    size_t sender_bits;
+    size_t context_bits;
+    uint64_t max_sender_id;
+    uint64_t max_context_id;
 
     EpochKeys() = default;
     static Result<EpochKeys> create(EpochID full_epoch_in,
@@ -159,6 +199,7 @@ private:
     Result<owned_bytes<max_secret_size>> base_key(CipherSuite suite,
                                                   SenderID sender_id) const;
   };
+  // NOLINTEND(clang-analyzer-core.uninitialized.Assign)
 
   void purge_epoch(EpochID epoch_id);
 

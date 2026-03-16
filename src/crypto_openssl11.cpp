@@ -23,6 +23,11 @@ using scoped_hmac_ctx = std::unique_ptr<HMAC_CTX, decltype(&HMAC_CTX_free)>;
 /// Convert between native identifiers / errors and OpenSSL ones
 ///
 
+crypto_error::crypto_error()
+  : std::runtime_error(ERR_error_string(ERR_get_error(), nullptr))
+{
+}
+
 static Result<const EVP_MD*>
 openssl_digest_type(CipherSuite suite)
 {

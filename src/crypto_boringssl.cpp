@@ -17,6 +17,11 @@ namespace SFRAME_NAMESPACE {
 /// Convert between native identifiers / errors and OpenSSL ones
 ///
 
+crypto_error::crypto_error()
+  : std::runtime_error(ERR_error_string(ERR_get_error(), nullptr))
+{
+}
+
 static Result<const EVP_MD*>
 openssl_digest_type(CipherSuite suite)
 {
