@@ -13,7 +13,7 @@
     auto _r = (expr);                                                          \
     if (_r.is_err()) {                                                         \
       const auto* _msg = _r.error().message();                                 \
-      throw std::runtime_error(_msg ? _msg : "UNWRAP: Result error");          \
+      throw std::runtime_error(_msg ? _msg : "unwrap() on an error result");          \
     }                                                                          \
     return _r.value();                                                         \
   }())
