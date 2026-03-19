@@ -39,14 +39,15 @@ TEST_CASE("SFrame Round-Trip")
     auto& key = pair.second;
 
     auto send = Context(suite);
-    send.add_key(kid, KeyUsage::protect, key);
+    send.add_key(kid, KeyUsage::protect, key).unwrap();
 
     auto recv = Context(suite);
-    recv.add_key(kid, KeyUsage::unprotect, key);
+    recv.add_key(kid, KeyUsage::unprotect, key).unwrap();
 
     for (int i = 0; i < rounds; i++) {
-      auto encrypted = to_bytes(send.protect(kid, ct_out, plaintext, {}));
-      auto decrypted = to_bytes(recv.unprotect(pt_out, encrypted, {}));
+      auto encrypted =
+        to_bytes(send.protect(kid, ct_out, plaintext, {}).unwrap());
+      auto decrypted = to_bytes(recv.unprotect(pt_out, encrypted, {}).unwrap());
       CHECK(decrypted == plaintext);
     }
   }
@@ -81,18 +82,22 @@ TEST_CASE("MLS Round-Trip")
     for (MLSContext::EpochID epoch_id = 0; epoch_id < test_epochs; epoch_id++) {
       const auto sframe_epoch_secret = bytes(8, uint8_t(epoch_id));
 
-      member_a.add_epoch(epoch_id, sframe_epoch_secret);
-      member_b.add_epoch(epoch_id, sframe_epoch_secret);
+      member_a.add_epoch(epoch_id, sframe_epoch_secret).unwrap();
+      member_b.add_epoch(epoch_id, sframe_epoch_secret).unwrap();
 
       for (int i = 0; i < epoch_rounds; i++) {
         auto encrypted_ab =
-          member_a.protect(epoch_id, sender_id_a, ct_out, plaintext, metadata);
-        auto decrypted_ab = member_b.unprotect(pt_out, encrypted_ab, metadata);
+          member_a.protect(epoch_id, sender_id_a, ct_out, plaintext, metadata)
+            .unwrap();
+        auto decrypted_ab =
+          member_b.unprotect(pt_out, encrypted_ab, metadata).unwrap();
         CHECK(plaintext == to_bytes(decrypted_ab));
 
         auto encrypted_ba =
-          member_b.protect(epoch_id, sender_id_b, ct_out, plaintext, metadata);
-        auto decrypted_ba = member_a.unprotect(pt_out, encrypted_ba, metadata);
+          member_b.protect(epoch_id, sender_id_b, ct_out, plaintext, metadata)
+            .unwrap();
+        auto decrypted_ba =
+          member_a.unprotect(pt_out, encrypted_ba, metadata).unwrap();
         CHECK(plaintext == to_bytes(decrypted_ba));
       }
     }
@@ -132,31 +137,46 @@ TEST_CASE("MLS Round-Trip with context")
     for (MLSContext::EpochID epoch_id = 0; epoch_id < test_epochs; epoch_id++) {
       const auto sframe_epoch_secret = bytes(8, uint8_t(epoch_id));
 
-      member_a_0.add_epoch(epoch_id, sframe_epoch_secret, sender_id_bits);
-      member_a_1.add_epoch(epoch_id, sframe_epoch_secret, sender_id_bits);
-      member_b.add_epoch(epoch_id, sframe_epoch_secret);
+      member_a_0.add_epoch(epoch_id, sframe_epoch_secret, sender_id_bits)
+        .unwrap();
+      member_a_1.add_epoch(epoch_id, sframe_epoch_secret, sender_id_bits)
+        .unwrap();
+      member_b.add_epoch(epoch_id, sframe_epoch_secret).unwrap();
 
       for (int i = 0; i < epoch_rounds; i++) {
-        auto encrypted_ab_0 = member_a_0.protect(
-          epoch_id, sender_id_a, context_id_0, ct_out_0, plaintext, metadata);
-        auto decrypted_ab_0 =
-          to_bytes(member_b.unprotect(pt_out, encrypted_ab_0, metadata));
+        auto encrypted_ab_0 = member_a_0
+                                .protect(epoch_id,
+                                         sender_id_a,
+                                         context_id_0,
+                                         ct_out_0,
+                                         plaintext,
+                                         metadata)
+                                .unwrap();
+        auto decrypted_ab_0 = to_bytes(
+          member_b.unprotect(pt_out, encrypted_ab_0, metadata).unwrap());
         CHECK(plaintext == decrypted_ab_0);
 
-        auto encrypted_ab_1 = member_a_1.protect(
-          epoch_id, sender_id_a, context_id_1, ct_out_1, plaintext, metadata);
-        auto decrypted_ab_1 =
-          to_bytes(member_b.unprotect(pt_out, encrypted_ab_1, metadata));
+        auto encrypted_ab_1 = member_a_1
+                                .protect(epoch_id,
+                                         sender_id_a,
+                                         context_id_1,
+                                         ct_out_1,
+                                         plaintext,
+                                         metadata)
+                                .unwrap();
+        auto decrypted_ab_1 = to_bytes(
+          member_b.unprotect(pt_out, encrypted_ab_1, metadata).unwrap());
         CHECK(plaintext == decrypted_ab_1);
 
         CHECK(to_bytes(encrypted_ab_0) != to_bytes(encrypted_ab_1));
 
-        auto encrypted_ba = member_b.protect(
-          epoch_id, sender_id_b, ct_out_0, plaintext, metadata);
-        auto decrypted_ba_0 =
-          to_bytes(member_a_0.unprotect(pt_out, encrypted_ba, metadata));
-        auto decrypted_ba_1 =
-          to_bytes(member_a_1.unprotect(pt_out, encrypted_ba, metadata));
+        auto encrypted_ba =
+          member_b.protect(epoch_id, sender_id_b, ct_out_0, plaintext, metadata)
+            .unwrap();
+        auto decrypted_ba_0 = to_bytes(
+          member_a_0.unprotect(pt_out, encrypted_ba, metadata).unwrap());
+        auto decrypted_ba_1 = to_bytes(
+          member_a_1.unprotect(pt_out, encrypted_ba, metadata).unwrap());
         CHECK(plaintext == decrypted_ba_0);
         CHECK(plaintext == decrypted_ba_1);
       }
@@ -182,30 +202,32 @@ TEST_CASE("MLS Failure after Purge")
 
   // Install epoch 1 and create a cipihertext
   const auto epoch_id_1 = MLSContext::EpochID(1);
-  member_a.add_epoch(epoch_id_1, sframe_epoch_secret_1);
-  member_b.add_epoch(epoch_id_1, sframe_epoch_secret_1);
+  member_a.add_epoch(epoch_id_1, sframe_epoch_secret_1).unwrap();
+  member_b.add_epoch(epoch_id_1, sframe_epoch_secret_1).unwrap();
 
   const auto enc_ab_1 =
-    member_a.protect(epoch_id_1, sender_id_a, ct_out, plaintext, metadata);
+    member_a.protect(epoch_id_1, sender_id_a, ct_out, plaintext, metadata)
+      .unwrap();
   const auto enc_ab_1_data = to_bytes(enc_ab_1);
 
   // Install epoch 2
   const auto epoch_id_2 = MLSContext::EpochID(2);
-  member_a.add_epoch(epoch_id_2, sframe_epoch_secret_2);
-  member_b.add_epoch(epoch_id_2, sframe_epoch_secret_2);
+  member_a.add_epoch(epoch_id_2, sframe_epoch_secret_2).unwrap();
+  member_b.add_epoch(epoch_id_2, sframe_epoch_secret_2).unwrap();
 
   // Purge epoch 1 and verify failure
   member_a.purge_before(epoch_id_2);
   member_b.purge_before(epoch_id_2);
 
-  CHECK_THROWS_AS(
-    member_a.protect(epoch_id_1, sender_id_a, ct_out, plaintext, metadata),
-    invalid_parameter_error);
-  CHECK_THROWS_AS(member_b.unprotect(pt_out, enc_ab_1_data, metadata),
-                  invalid_parameter_error);
+  CHECK(member_a.protect(epoch_id_1, sender_id_a, ct_out, plaintext, metadata)
+          .error()
+          .type() == SFrameErrorType::invalid_parameter_error);
+  CHECK(member_b.unprotect(pt_out, enc_ab_1_data, metadata).error().type() ==
+        SFrameErrorType::invalid_parameter_error);
 
   const auto enc_ab_2 =
-    member_a.protect(epoch_id_2, sender_id_a, ct_out, plaintext, metadata);
-  const auto dec_ab_2 = member_b.unprotect(pt_out, enc_ab_2, metadata);
+    member_a.protect(epoch_id_2, sender_id_a, ct_out, plaintext, metadata)
+      .unwrap();
+  const auto dec_ab_2 = member_b.unprotect(pt_out, enc_ab_2, metadata).unwrap();
   CHECK(plaintext == to_bytes(dec_ab_2));
 }

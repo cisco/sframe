@@ -1,4 +1,5 @@
 #include <namespace.h>
+#include <sframe/result.h>
 #include <sframe/sframe.h>
 
 #include <string>

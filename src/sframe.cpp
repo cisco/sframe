@@ -6,20 +6,6 @@
 namespace SFRAME_NAMESPACE {
 
 ///
-/// Errors
-///
-
-unsupported_ciphersuite_error::unsupported_ciphersuite_error()
-  : std::runtime_error("Unsupported ciphersuite")
-{
-}
-
-authentication_error::authentication_error()
-  : std::runtime_error("AEAD authentication failure")
-{
-}
-
-///
 /// KeyRecord
 ///
 
@@ -95,12 +81,13 @@ Context::Context(CipherSuite suite_in)
 
 Context::~Context() = default;
 
-void
+Result<void>
 Context::add_key(KeyID key_id, KeyUsage usage, input_bytes base_key)
 {
-  keys.emplace(key_id,
-               SFRAME_VALUE_OR_THROW(
-                 KeyRecord::from_base_key(suite, key_id, usage, base_key)));
+  SFRAME_VALUE_OR_RETURN(
+    record, KeyRecord::from_base_key(suite, key_id, usage, base_key));
+  keys.emplace(key_id, record);
+  return Result<void>::ok();
 }
 
 static owned_bytes<KeyRecord::max_salt_size>
@@ -131,7 +118,7 @@ form_aad(const Header& header, input_bytes metadata)
   return aad;
 }
 
-output_bytes
+Result<output_bytes>
 Context::protect(KeyID key_id,
                  output_bytes ciphertext,
                  input_bytes plaintext,
@@ -144,25 +131,27 @@ Context::protect(KeyID key_id,
   const auto header = Header{ key_id, counter };
   const auto header_data = header.encoded();
   if (ciphertext.size() < header_data.size()) {
-    throw buffer_too_small_error("Ciphertext too small for SFrame header");
+    return SFrameError(SFrameErrorType::buffer_too_small_error,
+                       "Ciphertext too small for SFrame header");
   }
 
   std::copy(header_data.begin(), header_data.end(), ciphertext.begin());
   auto inner_ciphertext = ciphertext.subspan(header_data.size());
-  auto final_ciphertext = SFRAME_VALUE_OR_THROW(
+  SFRAME_VALUE_OR_RETURN(
+    final_ciphertext,
     Context::protect_inner(header, inner_ciphertext, plaintext, metadata));
   return ciphertext.first(header_data.size() + final_ciphertext.size());
 }
 
-output_bytes
+Result<output_bytes>
 Context::unprotect(output_bytes plaintext,
                    input_bytes ciphertext,
                    input_bytes metadata)
 {
-  const auto header = SFRAME_VALUE_OR_THROW(Header::parse(ciphertext));
+  SFRAME_VALUE_OR_RETURN(header, Header::parse(ciphertext));
   const auto inner_ciphertext = ciphertext.subspan(header.size());
-  return SFRAME_VALUE_OR_THROW(
-    Context::unprotect_inner(header, plaintext, inner_ciphertext, metadata));
+  return Context::unprotect_inner(
+    header, plaintext, inner_ciphertext, metadata);
 }
 
 Result<output_bytes>
@@ -220,13 +209,13 @@ MLSContext::MLSContext(CipherSuite suite_in, size_t epoch_bits_in)
   epoch_cache.resize(1 << epoch_bits_in);
 }
 
-void
+Result<void>
 MLSContext::add_epoch(EpochID epoch_id, input_bytes sframe_epoch_secret)
 {
-  add_epoch(epoch_id, sframe_epoch_secret, 0);
+  return add_epoch(epoch_id, sframe_epoch_secret, 0);
 }
 
-void
+Result<void>
 MLSContext::add_epoch(EpochID epoch_id,
                       input_bytes sframe_epoch_secret,
                       size_t sender_bits)
@@ -238,7 +227,11 @@ MLSContext::add_epoch(EpochID epoch_id,
     purge_epoch(epoch->full_epoch);
   }
 
-  epoch.emplace(epoch_id, sframe_epoch_secret, epoch_bits, sender_bits);
+  SFRAME_VALUE_OR_RETURN(
+    new_epoch,
+    EpochKeys::create(epoch_id, sframe_epoch_secret, epoch_bits, sender_bits));
+  epoch.emplace(std::move(new_epoch));
+  return Result<void>::ok();
 }
 
 void
@@ -252,7 +245,7 @@ MLSContext::purge_before(EpochID keeper)
   }
 }
 
-output_bytes
+Result<output_bytes>
 MLSContext::protect(EpochID epoch_id,
                     SenderID sender_id,
                     output_bytes ciphertext,
@@ -262,7 +255,7 @@ MLSContext::protect(EpochID epoch_id,
   return protect(epoch_id, sender_id, 0, ciphertext, plaintext, metadata);
 }
 
-output_bytes
+Result<output_bytes>
 MLSContext::protect(EpochID epoch_id,
                     SenderID sender_id,
                     ContextID context_id,
@@ -270,49 +263,55 @@ MLSContext::protect(EpochID epoch_id,
                     input_bytes plaintext,
                     input_bytes metadata)
 {
-  auto key_id = form_key_id(epoch_id, sender_id, context_id);
-  ensure_key(key_id, KeyUsage::protect);
+  SFRAME_VALUE_OR_RETURN(key_id, form_key_id(epoch_id, sender_id, context_id));
+  SFRAME_VOID_OR_RETURN(ensure_key(key_id, KeyUsage::protect));
   return Context::protect(key_id, ciphertext, plaintext, metadata);
 }
 
-output_bytes
+Result<output_bytes>
 MLSContext::unprotect(output_bytes plaintext,
                       input_bytes ciphertext,
                       input_bytes metadata)
 {
-  const auto header = SFRAME_VALUE_OR_THROW(Header::parse(ciphertext));
+  SFRAME_VALUE_OR_RETURN(header, Header::parse(ciphertext));
   const auto inner_ciphertext = ciphertext.subspan(header.size());
 
-  ensure_key(header.key_id, KeyUsage::unprotect);
-  return SFRAME_VALUE_OR_THROW(
-    Context::unprotect_inner(header, plaintext, inner_ciphertext, metadata));
+  SFRAME_VOID_OR_RETURN(ensure_key(header.key_id, KeyUsage::unprotect));
+  return Context::unprotect_inner(
+    header, plaintext, inner_ciphertext, metadata);
 }
 
-MLSContext::EpochKeys::EpochKeys(MLSContext::EpochID full_epoch_in,
-                                 input_bytes sframe_epoch_secret_in,
-                                 size_t epoch_bits,
-                                 size_t sender_bits_in)
-  : full_epoch(full_epoch_in)
-  , sframe_epoch_secret(sframe_epoch_secret_in)
-  , sender_bits(sender_bits_in)
+Result<MLSContext::EpochKeys>
+MLSContext::EpochKeys::create(MLSContext::EpochID full_epoch_in,
+                              input_bytes sframe_epoch_secret_in,
+                              size_t epoch_bits,
+                              size_t sender_bits_in)
 {
   static constexpr uint64_t one = 1;
   static constexpr size_t key_id_bits = 64;
 
-  if (sender_bits > key_id_bits - epoch_bits) {
-    throw invalid_parameter_error("Sender ID field too large");
+  EpochKeys epoch_keys;
+  epoch_keys.full_epoch = full_epoch_in;
+  epoch_keys.sframe_epoch_secret = sframe_epoch_secret_in;
+  epoch_keys.sender_bits = sender_bits_in;
+
+  if (epoch_keys.sender_bits > key_id_bits - epoch_bits) {
+    return SFrameError(SFrameErrorType::invalid_parameter_error,
+                       "Sender ID field too large");
   }
 
   // XXX(RLB) We use 0 as a signifier that the sender takes the rest of the key
   // ID, and context IDs are not allowed.  This would be more explicit if we
   // used std::optional, but would require more modern C++.
-  if (sender_bits == 0) {
-    sender_bits = key_id_bits - epoch_bits;
+  if (epoch_keys.sender_bits == 0) {
+    epoch_keys.sender_bits = key_id_bits - epoch_bits;
   }
 
-  context_bits = key_id_bits - sender_bits - epoch_bits;
-  max_sender_id = (one << sender_bits) - 1;
-  max_context_id = (one << context_bits) - 1;
+  epoch_keys.context_bits = key_id_bits - epoch_keys.sender_bits - epoch_bits;
+  epoch_keys.max_sender_id = (one << epoch_keys.sender_bits) - 1;
+  epoch_keys.max_context_id = (one << epoch_keys.context_bits) - 1;
+
+  return epoch_keys;
 }
 
 Result<owned_bytes<MLSContext::EpochKeys::max_secret_size>>
@@ -336,7 +335,7 @@ MLSContext::purge_epoch(EpochID epoch_id)
     [&](const auto& epoch) { return (epoch & epoch_bits) == drop_bits; });
 }
 
-KeyID
+Result<KeyID>
 MLSContext::form_key_id(EpochID epoch_id,
                         SenderID sender_id,
                         ContextID context_id) const
@@ -344,15 +343,18 @@ MLSContext::form_key_id(EpochID epoch_id,
   auto epoch_index = epoch_id & epoch_mask;
   auto& epoch = epoch_cache[epoch_index];
   if (!epoch) {
-    throw invalid_parameter_error("Unknown epoch");
+    return SFrameError(SFrameErrorType::invalid_parameter_error,
+                       "Unknown epoch");
   }
 
   if (sender_id > epoch->max_sender_id) {
-    throw invalid_parameter_error("Sender ID overflow");
+    return SFrameError(SFrameErrorType::invalid_parameter_error,
+                       "Sender ID overflow");
   }
 
   if (context_id > epoch->max_context_id) {
-    throw invalid_parameter_error("Context ID overflow");
+    return SFrameError(SFrameErrorType::invalid_parameter_error,
+                       "Context ID overflow");
   }
 
   auto sender_part = uint64_t(sender_id) << epoch_bits;
@@ -364,25 +366,25 @@ MLSContext::form_key_id(EpochID epoch_id,
   return KeyID(context_part | sender_part | epoch_index);
 }
 
-void
+Result<void>
 MLSContext::ensure_key(KeyID key_id, KeyUsage usage)
 {
   // If the required key already exists, we are done
   const auto epoch_index = key_id & epoch_mask;
   auto& epoch = epoch_cache[epoch_index];
   if (!epoch) {
-    throw invalid_parameter_error("Unknown epoch");
+    return SFrameError(SFrameErrorType::invalid_parameter_error,
+                       "Unknown epoch");
   }
 
   if (keys.contains(key_id)) {
-    return;
+    return Result<void>::ok();
   }
 
   // Otherwise, derive a key and implant it
   const auto sender_id = key_id >> epoch_bits;
-  Context::add_key(
-    key_id, usage, SFRAME_VALUE_OR_THROW(epoch->base_key(suite, sender_id)));
-  return;
+  SFRAME_VALUE_OR_RETURN(base, epoch->base_key(suite, sender_id));
+  return Context::add_key(key_id, usage, base);
 }
 
 } // namespace SFRAME_NAMESPACE
