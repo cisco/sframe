@@ -38,7 +38,7 @@ TEST_CASE("Header Known-Answer")
 
   for (const auto& tc : cases) {
     // Decode
-    const auto decoded = SFRAME_VALUE_OR_THROW(Header::parse(tc.encoding));
+    const auto decoded = Header::parse(tc.encoding).unwrap();
     REQUIRE(decoded.key_id == tc.key_id);
     REQUIRE(decoded.counter == tc.counter);
     REQUIRE(decoded.size() == tc.encoding.size());

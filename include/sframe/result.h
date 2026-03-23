@@ -48,9 +48,10 @@ private:
   const char* message_ = nullptr;
 };
 
-// Helper to convert SFrameError to appropriate exception type
+#ifdef __cpp_exceptions
 void
-throw_on_error(const SFrameError& error);
+throw_sframe_error(const SFrameError& error);
+#endif
 
 template<typename T>
 class Result
@@ -96,6 +97,17 @@ public:
 
   bool is_err() const { return std::holds_alternative<SFrameError>(data_); }
 
+#ifdef __cpp_exceptions
+  T unwrap()
+  {
+    if (std::holds_alternative<SFrameError>(data_)) {
+      throw_sframe_error(std::get<SFrameError>(data_));
+    }
+
+    return std::move(std::get<T>(data_));
+  }
+#endif
+
 private:
   std::variant<T, SFrameError> data_;
 };
@@ -135,23 +147,20 @@ public:
 
   bool is_err() const { return error_.has_value(); }
 
+#ifdef __cpp_exceptions
+  void unwrap()
+  {
+    if (error_.has_value()) {
+      throw_sframe_error(error_.value());
+    }
+  }
+#endif
+
 private:
   std::optional<SFrameError> error_;
 };
 
 } // namespace SFRAME_NAMESPACE
-
-// Unwrap a Result<T>, throwing the corresponding exception on error.
-// Use in functions that have NOT yet been migrated away from exceptions.
-// Usage: const auto val = SFRAME_VALUE_OR_THROW(some_result_expr);
-#define SFRAME_VALUE_OR_THROW(expr)                                            \
-  ([&]() {                                                                     \
-    auto _result = (expr);                                                     \
-    if (_result.is_err()) {                                                    \
-      SFRAME_NAMESPACE::throw_on_error(_result.error());                       \
-    }                                                                          \
-    return _result.value();                                                    \
-  }())
 
 // Unwrap a Result<T> into `var`, propagating the error by early return.
 // Use in functions that already return Result<U>.

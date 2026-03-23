@@ -66,7 +66,7 @@ struct HeaderTestVector
   void verify() const
   {
     // Decode
-    const auto decoded = SFRAME_VALUE_OR_THROW(Header::parse(encoded));
+    const auto decoded = Header::parse(encoded).unwrap();
     REQUIRE(decoded.key_id == kid);
     REQUIRE(decoded.counter == ctr);
     REQUIRE(decoded.size() == encoded.data.size());
@@ -103,14 +103,14 @@ struct AesCtrHmacTestVector
   {
     // Seal
     auto ciphertext = bytes(ct.data.size());
-    const auto ct_out = SFRAME_VALUE_OR_THROW(
-      seal(cipher_suite, key, nonce, ciphertext, aad, pt));
+    const auto ct_out =
+      seal(cipher_suite, key, nonce, ciphertext, aad, pt).unwrap();
     REQUIRE(ct_out == ct);
 
     // Open
     auto plaintext = bytes(pt.data.size());
     const auto pt_out =
-      SFRAME_VALUE_OR_THROW(open(cipher_suite, key, nonce, plaintext, aad, ct));
+      open(cipher_suite, key, nonce, plaintext, aad, ct).unwrap();
     REQUIRE(pt_out == pt);
   }
 };
@@ -148,16 +148,16 @@ struct SFrameTestVector
   {
     // Protect
     auto send_ctx = Context(cipher_suite);
-    send_ctx.add_key(kid, KeyUsage::protect, base_key);
+    send_ctx.add_key(kid, KeyUsage::protect, base_key).unwrap();
 
     auto ct_data = owned_bytes<128>();
     auto next_ctr = uint64_t(0);
     while (next_ctr < ctr) {
-      send_ctx.protect(kid, ct_data, pt, metadata);
+      send_ctx.protect(kid, ct_data, pt, metadata).unwrap();
       next_ctr += 1;
     }
 
-    const auto ct_out = send_ctx.protect(kid, ct_data, pt, metadata);
+    const auto ct_out = send_ctx.protect(kid, ct_data, pt, metadata).unwrap();
 
     const auto act_ct_hex = to_hex(ct_out);
     const auto exp_ct_hex = to_hex(ct);
@@ -167,10 +167,10 @@ struct SFrameTestVector
 
     // Unprotect
     auto recv_ctx = Context(cipher_suite);
-    recv_ctx.add_key(kid, KeyUsage::unprotect, base_key);
+    recv_ctx.add_key(kid, KeyUsage::unprotect, base_key).unwrap();
 
     auto pt_data = owned_bytes<128>();
-    auto pt_out = recv_ctx.unprotect(pt_data, ct, metadata);
+    auto pt_out = recv_ctx.unprotect(pt_data, ct, metadata).unwrap();
     REQUIRE(pt_out == pt);
   }
 };
