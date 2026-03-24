@@ -118,6 +118,7 @@ public:
   virtual ~Context();
 
   Result<void> add_key(KeyID kid, KeyUsage usage, input_bytes key);
+  void remove_key(KeyID kid);
 
   Result<output_bytes> protect(KeyID key_id,
                                output_bytes ciphertext,
@@ -133,6 +134,8 @@ public:
 protected:
   CipherSuite suite;
   map<KeyID, KeyRecord, SFRAME_MAX_KEYS> keys;
+
+  Result<void> require_key(KeyID key_id) const;
 
   Result<output_bytes> protect_inner(const Header& header,
                                      output_bytes ciphertext,
@@ -160,6 +163,7 @@ public:
   Result<void> add_epoch(EpochID epoch_id,
                          input_bytes sframe_epoch_secret,
                          size_t sender_bits);
+  void remove_epoch(EpochID epoch_id);
   void purge_before(EpochID keeper);
 
   Result<output_bytes> protect(EpochID epoch_id,

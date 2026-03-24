@@ -231,3 +231,116 @@ TEST_CASE("MLS Failure after Purge")
   const auto dec_ab_2 = member_b.unprotect(pt_out, enc_ab_2, metadata).unwrap();
   CHECK(plaintext == to_bytes(dec_ab_2));
 }
+
+TEST_CASE("SFrame Context Remove Key")
+{
+  const auto suite = CipherSuite::AES_GCM_128_SHA256;
+  const auto kid = KeyID(0x07);
+  const auto key = from_hex("000102030405060708090a0b0c0d0e0f");
+  const auto plaintext = from_hex("00010203");
+  const auto metadata = bytes{};
+
+  auto pt_out = bytes(plaintext.size());
+  auto ct_out = bytes(plaintext.size() + Context::max_overhead);
+
+  auto sender = Context(suite);
+  auto receiver = Context(suite);
+  sender.add_key(kid, KeyUsage::protect, key).unwrap();
+  receiver.add_key(kid, KeyUsage::unprotect, key).unwrap();
+
+  // Protect and unprotect succeed before removal
+  auto encrypted =
+    to_bytes(sender.protect(kid, ct_out, plaintext, metadata).unwrap());
+  auto decrypted =
+    to_bytes(receiver.unprotect(pt_out, encrypted, metadata).unwrap());
+  CHECK(decrypted == plaintext);
+
+  // Remove sender key and verify protect fails
+  sender.remove_key(kid);
+  CHECK(sender.protect(kid, ct_out, plaintext, metadata).error().type() ==
+        SFrameErrorType::invalid_parameter_error);
+
+  // Remove receiver key and verify unprotect fails
+  receiver.remove_key(kid);
+  CHECK(receiver.unprotect(pt_out, encrypted, metadata).error().type() ==
+        SFrameErrorType::invalid_parameter_error);
+
+  // Re-add keys and verify round-trip works again
+  sender.add_key(kid, KeyUsage::protect, key).unwrap();
+  receiver.add_key(kid, KeyUsage::unprotect, key).unwrap();
+
+  encrypted =
+    to_bytes(sender.protect(kid, ct_out, plaintext, metadata).unwrap());
+  decrypted =
+    to_bytes(receiver.unprotect(pt_out, encrypted, metadata).unwrap());
+  CHECK(decrypted == plaintext);
+}
+
+TEST_CASE("SFrame Context Remove Key - Nonexistent Key")
+{
+  const auto suite = CipherSuite::AES_GCM_128_SHA256;
+
+  auto ctx = Context(suite);
+
+  // Removing a key that was never added should not throw
+  CHECK_NOTHROW(ctx.remove_key(KeyID(0x99)));
+}
+
+TEST_CASE("MLS Remove Epoch")
+{
+  const auto suite = CipherSuite::AES_GCM_128_SHA256;
+  const auto epoch_bits = 2;
+  const auto metadata = from_hex("00010203");
+  const auto plaintext = from_hex("04050607");
+  const auto sender_id = MLSContext::SenderID(0xA0A0A0A0);
+  const auto sframe_epoch_secret_1 = bytes(32, 1);
+  const auto sframe_epoch_secret_2 = bytes(32, 2);
+
+  auto pt_out = bytes(plaintext.size());
+  auto ct_out = bytes(plaintext.size() + Context::max_overhead);
+
+  auto member_a = MLSContext(suite, epoch_bits);
+  auto member_b = MLSContext(suite, epoch_bits);
+
+  // Install epoch 1 and verify round-trip
+  const auto epoch_id_1 = MLSContext::EpochID(1);
+  member_a.add_epoch(epoch_id_1, sframe_epoch_secret_1);
+  member_b.add_epoch(epoch_id_1, sframe_epoch_secret_1);
+
+  auto enc =
+    member_a.protect(epoch_id_1, sender_id, ct_out, plaintext, metadata)
+      .unwrap();
+  auto enc_data = to_bytes(enc);
+  auto dec = to_bytes(member_b.unprotect(pt_out, enc_data, metadata).unwrap());
+  CHECK(plaintext == dec);
+
+  // Install epoch 2
+  const auto epoch_id_2 = MLSContext::EpochID(2);
+  member_a.add_epoch(epoch_id_2, sframe_epoch_secret_2);
+  member_b.add_epoch(epoch_id_2, sframe_epoch_secret_2);
+
+  // Remove only epoch 1 (not purge_before) and verify it fails
+  member_a.remove_epoch(epoch_id_1);
+  member_b.remove_epoch(epoch_id_1);
+
+  CHECK(member_a.protect(epoch_id_1, sender_id, ct_out, plaintext, metadata)
+          .error()
+          .type() == SFrameErrorType::invalid_parameter_error);
+  CHECK(member_b.unprotect(pt_out, enc_data, metadata).error().type() ==
+        SFrameErrorType::invalid_parameter_error);
+
+  // Epoch 2 should still work
+  enc = member_a.protect(epoch_id_2, sender_id, ct_out, plaintext, metadata)
+          .unwrap();
+  dec = to_bytes(member_b.unprotect(pt_out, enc, metadata).unwrap());
+  CHECK(plaintext == dec);
+
+  // Re-add epoch 1 with the same secret and verify it works again
+  member_a.add_epoch(epoch_id_1, sframe_epoch_secret_1);
+  member_b.add_epoch(epoch_id_1, sframe_epoch_secret_1);
+
+  enc = member_a.protect(epoch_id_1, sender_id, ct_out, plaintext, metadata)
+          .unwrap();
+  dec = to_bytes(member_b.unprotect(pt_out, enc, metadata).unwrap());
+  CHECK(plaintext == dec);
+}

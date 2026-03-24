@@ -81,6 +81,12 @@ Context::Context(CipherSuite suite_in)
 
 Context::~Context() = default;
 
+void
+Context::remove_key(KeyID key_id)
+{
+  keys.erase(key_id);
+}
+
 Result<void>
 Context::add_key(KeyID key_id, KeyUsage usage, input_bytes base_key)
 {
@@ -118,12 +124,23 @@ form_aad(const Header& header, input_bytes metadata)
   return aad;
 }
 
+Result<void>
+Context::require_key(KeyID key_id) const
+{
+  if (!keys.contains(key_id)) {
+    return SFrameError(SFrameErrorType::invalid_parameter_error,
+                       "Unknown key ID");
+  }
+  return Result<void>::ok();
+}
+
 Result<output_bytes>
 Context::protect(KeyID key_id,
                  output_bytes ciphertext,
                  input_bytes plaintext,
                  input_bytes metadata)
 {
+  SFRAME_VOID_OR_RETURN(require_key(key_id));
   auto& key_record = keys.at(key_id);
   const auto counter = key_record.counter;
   key_record.counter += 1;
@@ -166,6 +183,7 @@ Context::protect_inner(const Header& header,
                        "Ciphertext too small for cipher overhead");
   }
 
+  SFRAME_VOID_OR_RETURN(require_key(header.key_id));
   const auto& key_and_salt = keys.at(header.key_id);
 
   SFRAME_VALUE_OR_RETURN(aad, form_aad(header, metadata));
@@ -190,6 +208,7 @@ Context::unprotect_inner(const Header& header,
                        "Plaintext too small for decrypted value");
   }
 
+  SFRAME_VOID_OR_RETURN(require_key(header.key_id));
   const auto& key_and_salt = keys.at(header.key_id);
 
   SFRAME_VALUE_OR_RETURN(aad, form_aad(header, metadata));
@@ -324,6 +343,17 @@ MLSContext::EpochKeys::base_key(CipherSuite ciphersuite,
 
   return hkdf_expand(
     ciphersuite, sframe_epoch_secret, enc_sender_id, hash_size);
+}
+
+void
+MLSContext::remove_epoch(EpochID epoch_id)
+{
+  purge_epoch(epoch_id);
+
+  const auto idx = epoch_id & epoch_mask;
+  if (idx < epoch_cache.size()) {
+    epoch_cache[idx].reset();
+  }
 }
 
 void

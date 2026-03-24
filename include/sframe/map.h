@@ -58,6 +58,14 @@ public:
     return pos->value().second;
   }
 
+  void erase(const K& key)
+  {
+    auto pos = find(key);
+    if (pos != this->end()) {
+      pos->reset();
+    }
+  }
+
   template<typename F>
   void erase_if_key(F&& f)
   {
