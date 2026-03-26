@@ -60,7 +60,7 @@ public:
 
   void erase(const K& key)
   {
-    erase_if_key([key](const auto& other){ return other == key; });
+    erase_if_key([key](const auto& other) { return other == key; });
   }
 
   template<typename F>
