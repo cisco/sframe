@@ -60,10 +60,7 @@ public:
 
   void erase(const K& key)
   {
-    auto pos = find(key);
-    if (pos != this->end()) {
-      pos->reset();
-    }
+    erase_if_key([key](const auto& other){ return other == key; });
   }
 
   template<typename F>
