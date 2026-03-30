@@ -12,7 +12,7 @@ env:
   CTEST_OUTPUT_ON_FAILURE: 1
 
 jobs:
-  build:
+  desktop-build:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -73,4 +73,131 @@ jobs:
     - name: Unit tests
       run: |
         ctest --test-dir "${{ env.CMAKE_BUILD_DIR }}"
+
+    - name: Record binary size
+      shell: bash
+      run: |
+        mkdir -p size-report
+        if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+          LIB_FILE=$(find "${{ env.CMAKE_BUILD_DIR }}" -name "sframe.lib" -o -name "sframe.dll" | head -1)
+        else
+          LIB_FILE=$(find "${{ env.CMAKE_BUILD_DIR }}" -name "libsframe.a" -o -name "libsframe.so" | head -1)
+        fi
+        if [ -n "$LIB_FILE" ]; then
+          SIZE=$(stat --printf="%s" "$LIB_FILE" 2>/dev/null || stat -f%z "$LIB_FILE" 2>/dev/null)
+          echo "${{ matrix.os }},${{ matrix.crypto }},no_alloc=${{ matrix.no_alloc }},${SIZE}" > size-report/desktop-${{ matrix.os }}-${{ matrix.crypto }}-${{ matrix.no_alloc }}.csv
+        fi
+
+    - name: Upload size report
+      uses: actions/upload-artifact@v4
+      with:
+        name: size-desktop-${{ matrix.os }}-${{ matrix.crypto }}-no_alloc_${{ matrix.no_alloc }}
+        path: size-report/
+
+  android-build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        crypto: [OPENSSL_1_1, OPENSSL_3, BORINGSSL]
+        abi: [arm64-v8a, armeabi-v7a, x86_64]
+        no_alloc: [OFF, ON]
+        include:
+          - abi: arm64-v8a
+            vcpkg-triplet: arm64-android
+          - abi: armeabi-v7a
+            vcpkg-triplet: arm-neon-android
+          - abi: x86_64
+            vcpkg-triplet: x64-android
+
+    env:
+      CMAKE_BUILD_DIR: ${{ github.workspace }}/build
+      CMAKE_GENERATOR: "Ninja"
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: dependencies
+      run: |
+        sudo apt-get install -y nasm ninja-build
+
+    - name: Restore cache
+      uses: actions/cache@v4
+      with:
+        path: |
+            ${{ env.CMAKE_BUILD_DIR }}/vcpkg_installed
+        key: android-${{ matrix.abi }}-${{ matrix.crypto }}-${{ hashFiles( '**/vcpkg.json' ) }}
+
+    - name: configure
+      run: cmake -B "${{ env.CMAKE_BUILD_DIR }}"
+                 -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+                 -DVCPKG_TARGET_TRIPLET="${{ matrix.vcpkg-triplet }}"
+                 -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE="$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake"
+                 -DANDROID_ABI="${{ matrix.abi }}"
+                 -DANDROID_PLATFORM=android-24
+                 -DCRYPTO="${{ matrix.crypto }}"
+                 -DVCPKG_MANIFEST_DIR="alternatives/${{ matrix.crypto }}"
+                 -DNO_ALLOC="${{ matrix.no_alloc }}"
+
+    - name: build
+      run: cmake --build "${{ env.CMAKE_BUILD_DIR }}" --config Release
+
+    - name: Record binary size
+      run: |
+        mkdir -p size-report
+        LIB_FILE=$(find "${{ env.CMAKE_BUILD_DIR }}" -name "libsframe.a" -o -name "libsframe.so" | head -1)
+        if [ -n "$LIB_FILE" ]; then
+          SIZE=$(stat --printf="%s" "$LIB_FILE")
+          echo "android-${{ matrix.abi }},${{ matrix.crypto }},no_alloc=${{ matrix.no_alloc }},${SIZE}" > size-report/android-${{ matrix.abi }}-${{ matrix.crypto }}-${{ matrix.no_alloc }}.csv
+        fi
+
+    - name: Upload size report
+      uses: actions/upload-artifact@v4
+      with:
+        name: size-android-${{ matrix.abi }}-${{ matrix.crypto }}-no_alloc_${{ matrix.no_alloc }}
+        path: size-report/
+
+  size-report:
+    if: github.event_name == 'pull_request'
+    needs: [desktop-build, android-build]
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+    - name: Download all size reports
+      uses: actions/download-artifact@v4
+      with:
+        pattern: size-*
+        merge-multiple: true
+        path: sizes
+
+    - name: Generate summary comment
+      run: |
+        {
+          echo "## 📦 Binary Size Report"
+          echo ""
+          echo "| Platform | Crypto | Config | Size |"
+          echo "|----------|--------|--------|------|"
+          for f in sizes/*.csv; do
+            [ -f "$f" ] || continue
+            while IFS=, read -r platform crypto config size; do
+              if [ "$size" -ge 1048576 ] 2>/dev/null; then
+                human_size="$(awk "BEGIN {printf \"%.2f MiB\", $size/1048576}")"
+              elif [ "$size" -ge 1024 ] 2>/dev/null; then
+                human_size="$(awk "BEGIN {printf \"%.2f KiB\", $size/1024}")"
+              else
+                human_size="${size} B"
+              fi
+              echo "| ${platform} | ${crypto} | ${config} | ${human_size} |"
+            done < "$f"
+          done
+        } > comment-body.md
+        cat comment-body.md
+
+    - name: Post PR comment
+      continue-on-error: true
+      uses: marocchino/sticky-pull-request-comment@v2
+      with:
+        header: binary-size-report
+        path: comment-body.md
 
