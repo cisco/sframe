@@ -30,6 +30,10 @@
 #define SFRAME_EPOCH_BITS 4
 #endif
 
+#ifndef SFRAME_ENABLE_MLS_CONTEXT
+#define SFRAME_ENABLE_MLS_CONTEXT 1
+#endif
+
 namespace SFRAME_NAMESPACE {
 
 #ifdef __cpp_exceptions
@@ -147,6 +151,8 @@ protected:
                                        input_bytes metadata);
 };
 
+#if SFRAME_ENABLE_MLS_CONTEXT
+
 // MLSContext augments Context with logic for deriving keys from MLS.  Instead
 // of adding individual keys, salts, and key IDs, the caller adds a secret for
 // an epoch, and keys / salts / key IDs are derived as needed.
@@ -218,5 +224,7 @@ private:
   static constexpr size_t max_epochs = 1 << SFRAME_EPOCH_BITS;
   vector<std::optional<EpochKeys>, max_epochs> epoch_cache;
 };
+
+#endif // SFRAME_ENABLE_MLS_CONTEXT
 
 } // namespace SFRAME_NAMESPACE
