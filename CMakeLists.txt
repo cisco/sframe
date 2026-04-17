@@ -9,6 +9,7 @@ option(TESTING    "Build tests" OFF)
 option(CLANG_TIDY "Perform linting with clang-tidy" OFF)
 option(SANITIZERS "Enable sanitizers" OFF)
 option(NO_ALLOC   "Build without needing an allocator" OFF)
+option(MLS_CONTEXT "Build with MLSContext support" ON)
 option(NAMESPACE_SUFFIX "Namespace Suffix for CXX and CMake Export")
 
 if(NAMESPACE_SUFFIX)
@@ -70,6 +71,11 @@ endif()
 if(NO_ALLOC)
   message(STATUS "Configuring no-allocator version")
   add_definitions(-DNO_ALLOC)
+endif()
+
+if(NOT MLS_CONTEXT)
+  message(STATUS "Disabling MLSContext")
+  add_definitions(-DSFRAME_ENABLE_MLS_CONTEXT=0)
 endif()
 
 ###
