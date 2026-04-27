@@ -59,12 +59,12 @@ KeyRecord::from_base_key(CipherSuite suite,
   SFRAME_VALUE_OR_RETURN(key_size, cipher_key_size(suite));
   SFRAME_VALUE_OR_RETURN(nonce_size, cipher_nonce_size(suite));
 
-  const auto empty_byte_string = owned_bytes<1>();
+  const auto empty_salt_storage = owned_bytes<1>();
+  const auto empty_salt = input_bytes(empty_salt_storage).first(0);
   const auto key_label = sframe_key_label(suite, key_id);
   const auto salt_label = sframe_salt_label(suite, key_id);
 
-  SFRAME_VALUE_OR_RETURN(secret,
-                         hkdf_extract(suite, empty_byte_string, base_key));
+  SFRAME_VALUE_OR_RETURN(secret, hkdf_extract(suite, empty_salt, base_key));
   SFRAME_VALUE_OR_RETURN(key, hkdf_expand(suite, secret, key_label, key_size));
   SFRAME_VALUE_OR_RETURN(salt,
                          hkdf_expand(suite, secret, salt_label, nonce_size));
