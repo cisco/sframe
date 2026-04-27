@@ -126,6 +126,8 @@ public:
                                output_bytes ciphertext,
                                input_bytes plaintext,
                                input_bytes metadata);
+  // This API authenticates and decrypts a frame, but callers must layer their
+  // own replay protection if they need it.
   Result<output_bytes> unprotect(output_bytes plaintext,
                                  input_bytes ciphertext,
                                  input_bytes metadata);
@@ -180,6 +182,8 @@ public:
                                input_bytes plaintext,
                                input_bytes metadata);
 
+  // This API authenticates and decrypts a frame, but callers must layer their
+  // own replay protection if they need it.
   Result<output_bytes> unprotect(output_bytes plaintext,
                                  input_bytes ciphertext,
                                  input_bytes metadata);
