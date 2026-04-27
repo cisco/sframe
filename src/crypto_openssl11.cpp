@@ -38,6 +38,17 @@ clear_openssl_errors()
   ERR_clear_error();
 }
 
+static Result<int>
+checked_int(size_t size)
+{
+  if (size > INT_MAX) {
+    return SFrameError(SFrameErrorType::invalid_parameter_error,
+                       "Input too large for OpenSSL");
+  }
+
+  return static_cast<int>(size);
+}
+
 static Result<const EVP_MD*>
 openssl_digest_type(CipherSuite suite)
 {
@@ -108,7 +119,7 @@ public:
     //
     // https://doi.org/10.6028/NIST.SP.800-131Ar2
     static const auto fips_min_hmac_key_len = 14;
-    auto key_size = static_cast<int>(key.size());
+    SFRAME_VALUE_OR_RETURN(key_size, checked_int(key.size()));
     if (FIPS_mode() != 0 && key_size < fips_min_hmac_key_len) {
       HMAC_CTX_set_flags(ctx.get(), EVP_MD_CTX_FLAG_NON_FIPS_ALLOW);
     }
@@ -258,7 +269,7 @@ ctr_crypt(CipherSuite suite,
   }
 
   int outlen = 0;
-  auto in_size_int = static_cast<int>(in.size());
+  SFRAME_VALUE_OR_RETURN(in_size_int, checked_int(in.size()));
   if (1 != EVP_EncryptUpdate(
              ctx.get(), out.data(), &outlen, in.data(), in_size_int)) {
     return SFrameErrorType::crypto_error;
@@ -349,7 +360,7 @@ seal_aead(CipherSuite suite,
   }
 
   int outlen = 0;
-  auto aad_size_int = static_cast<int>(aad.size());
+  SFRAME_VALUE_OR_RETURN(aad_size_int, checked_int(aad.size()));
   if (aad.size() > 0) {
     if (1 != EVP_EncryptUpdate(
                ctx.get(), nullptr, &outlen, aad.data(), aad_size_int)) {
@@ -357,7 +368,7 @@ seal_aead(CipherSuite suite,
     }
   }
 
-  auto pt_size_int = static_cast<int>(pt.size());
+  SFRAME_VALUE_OR_RETURN(pt_size_int, checked_int(pt.size()));
   if (1 != EVP_EncryptUpdate(
              ctx.get(), ct.data(), &outlen, pt.data(), pt_size_int)) {
     return SFrameErrorType::crypto_error;
@@ -371,7 +382,7 @@ seal_aead(CipherSuite suite,
 
   auto tag = ct.subspan(pt.size(), tag_size);
   auto tag_ptr = const_cast<void*>(static_cast<const void*>(tag.data()));
-  auto tag_size_downcast = static_cast<int>(tag.size());
+  SFRAME_VALUE_OR_RETURN(tag_size_downcast, checked_int(tag.size()));
   if (1 != EVP_CIPHER_CTX_ctrl(
              ctx.get(), EVP_CTRL_GCM_GET_TAG, tag_size_downcast, tag_ptr)) {
     return SFrameErrorType::crypto_error;
@@ -476,14 +487,14 @@ open_aead(CipherSuite suite,
 
   auto tag = ct.subspan(inner_ct_size, tag_size);
   auto tag_ptr = const_cast<void*>(static_cast<const void*>(tag.data()));
-  auto tag_size_downcast = static_cast<int>(tag.size());
+  SFRAME_VALUE_OR_RETURN(tag_size_downcast, checked_int(tag.size()));
   if (1 != EVP_CIPHER_CTX_ctrl(
              ctx.get(), EVP_CTRL_GCM_SET_TAG, tag_size_downcast, tag_ptr)) {
     return SFrameErrorType::crypto_error;
   }
 
   int out_size;
-  auto aad_size_int = static_cast<int>(aad.size());
+  SFRAME_VALUE_OR_RETURN(aad_size_int, checked_int(aad.size()));
   if (aad.size() > 0) {
     if (1 != EVP_DecryptUpdate(
                ctx.get(), nullptr, &out_size, aad.data(), aad_size_int)) {
@@ -491,7 +502,7 @@ open_aead(CipherSuite suite,
     }
   }
 
-  auto inner_ct_size_int = static_cast<int>(inner_ct_size);
+  SFRAME_VALUE_OR_RETURN(inner_ct_size_int, checked_int(inner_ct_size));
   if (1 != EVP_DecryptUpdate(
              ctx.get(), pt.data(), &out_size, ct.data(), inner_ct_size_int)) {
     return SFrameErrorType::crypto_error;
