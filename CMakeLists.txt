@@ -49,6 +49,30 @@ elseif(MSVC)
   add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 endif()
 
+if ((CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU") AND NOT WIN32)
+  set(SFRAME_RELEASE_COMPILE_FLAGS "-fstack-protector-strong -D_FORTIFY_SOURCE=2")
+  if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    set(SFRAME_RELEASE_COMPILE_FLAGS
+      "${SFRAME_RELEASE_COMPILE_FLAGS} -ftrivial-auto-var-init=zero")
+  endif()
+
+  foreach(config RELEASE RELWITHDEBINFO MINSIZEREL)
+    set(CMAKE_C_FLAGS_${config} "${CMAKE_C_FLAGS_${config}} ${SFRAME_RELEASE_COMPILE_FLAGS}")
+    set(CMAKE_CXX_FLAGS_${config} "${CMAKE_CXX_FLAGS_${config}} ${SFRAME_RELEASE_COMPILE_FLAGS}")
+  endforeach()
+
+  if(APPLE)
+    foreach(config RELEASE RELWITHDEBINFO MINSIZEREL)
+      set(CMAKE_EXE_LINKER_FLAGS_${config} "${CMAKE_EXE_LINKER_FLAGS_${config}} -pie")
+    endforeach()
+  elseif(UNIX)
+    foreach(config RELEASE RELWITHDEBINFO MINSIZEREL)
+      set(CMAKE_EXE_LINKER_FLAGS_${config}
+        "${CMAKE_EXE_LINKER_FLAGS_${config}} -pie -Wl,-z,relro,-z,now")
+    endforeach()
+  endif()
+endif()
+
 if (SANITIZERS AND ((CMAKE_CXX_COMPILER_ID STREQUAL "Clang") OR (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")) AND NOT WIN32)
   set (SANITIZERS "-fsanitize=address -fsanitize=undefined")
   set (CMAKE_C_FLAGS              "${CMAKE_C_FLAGS}             ${SANITIZERS}")
