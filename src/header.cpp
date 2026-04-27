@@ -1,5 +1,7 @@
 #include "header.h"
 
+#include <algorithm>
+
 namespace SFRAME_NAMESPACE {
 
 static size_t
@@ -23,6 +25,7 @@ void
 encode_uint(uint64_t val, output_bytes buffer)
 {
   size_t size = buffer.size();
+  std::fill(buffer.begin(), buffer.end(), uint8_t(0));
   for (size_t i = 0; i < size && i < 8; i++) {
     buffer[size - i - 1] = uint8_t(val >> (8 * i));
   }
