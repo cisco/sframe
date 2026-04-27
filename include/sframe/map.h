@@ -83,28 +83,35 @@ public:
 
 namespace SFRAME_NAMESPACE {
 
-// NOTE: NOT RECOMMENDED FOR USE OUTSIDE THIS LIBRARY
-//
-// We have used public inheritance from std::map<T> to simplify the interface
-// here.  This works fine for the use cases we have within this library.  If you
-// choose to use this map type outside this library, you MUST NOT store it as a
-// std::map<T> pointer or reference.  This will cause memory leaks, because the
-// destructor ~std::map<T> is not virtual.
 template<typename K, typename V, size_t N>
-class map : public std::map<K, V>
+class map : private std::map<K, V>
 {
 private:
   using parent = std::map<K, V>;
 
 public:
+  template<class... Args>
+  void emplace(Args&&... args)
+  {
+    parent::emplace(std::forward<Args>(args)...);
+  }
+
+  auto find(const K& key) { return parent::find(key); }
+  auto find(const K& key) const { return parent::find(key); }
+
   bool contains(const K& key) const { return this->count(key) > 0; }
+
+  const V& at(const K& key) const { return parent::at(key); }
+  V& at(const K& key) { return parent::at(key); }
+
+  void erase(const K& key) { parent::erase(key); }
 
   template<typename F>
   void erase_if_key(F&& f)
   {
-    for (auto iter = this->begin(); iter != this->end();) {
+    for (auto iter = parent::begin(); iter != parent::end();) {
       if (f(iter->first)) {
-        iter = this->erase(iter);
+        iter = parent::erase(iter);
       } else {
         ++iter;
       }

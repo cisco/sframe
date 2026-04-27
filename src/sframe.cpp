@@ -3,6 +3,8 @@
 #include "crypto.h"
 #include "header.h"
 
+#include <limits>
+
 namespace SFRAME_NAMESPACE {
 
 ///
@@ -57,12 +59,12 @@ KeyRecord::from_base_key(CipherSuite suite,
   SFRAME_VALUE_OR_RETURN(key_size, cipher_key_size(suite));
   SFRAME_VALUE_OR_RETURN(nonce_size, cipher_nonce_size(suite));
 
-  const auto empty_byte_string = owned_bytes<1>();
+  const auto empty_salt_storage = owned_bytes<1>();
+  const auto empty_salt = input_bytes(empty_salt_storage).first(0);
   const auto key_label = sframe_key_label(suite, key_id);
   const auto salt_label = sframe_salt_label(suite, key_id);
 
-  SFRAME_VALUE_OR_RETURN(secret,
-                         hkdf_extract(suite, empty_byte_string, base_key));
+  SFRAME_VALUE_OR_RETURN(secret, hkdf_extract(suite, empty_salt, base_key));
   SFRAME_VALUE_OR_RETURN(key, hkdf_expand(suite, secret, key_label, key_size));
   SFRAME_VALUE_OR_RETURN(salt,
                          hkdf_expand(suite, secret, salt_label, nonce_size));
@@ -142,6 +144,16 @@ Context::protect(KeyID key_id,
 {
   SFRAME_VOID_OR_RETURN(require_key(key_id));
   auto& key_record = keys.at(key_id);
+  if (key_record.usage != KeyUsage::protect) {
+    return SFrameError(SFrameErrorType::invalid_key_usage_error,
+                       "Key is not valid for protect");
+  }
+
+  if (key_record.counter == std::numeric_limits<Counter>::max()) {
+    return SFrameError(SFrameErrorType::invalid_parameter_error,
+                       "Counter exhausted");
+  }
+
   const auto counter = key_record.counter;
   key_record.counter += 1;
 
@@ -210,6 +222,10 @@ Context::unprotect_inner(const Header& header,
 
   SFRAME_VOID_OR_RETURN(require_key(header.key_id));
   const auto& key_and_salt = keys.at(header.key_id);
+  if (key_and_salt.usage != KeyUsage::unprotect) {
+    return SFrameError(SFrameErrorType::invalid_key_usage_error,
+                       "Key is not valid for unprotect");
+  }
 
   SFRAME_VALUE_OR_RETURN(aad, form_aad(header, metadata));
   const auto nonce = form_nonce(header.counter, key_and_salt.salt);
@@ -359,10 +375,10 @@ MLSContext::remove_epoch(EpochID epoch_id)
 void
 MLSContext::purge_epoch(EpochID epoch_id)
 {
-  const auto drop_bits = epoch_id & epoch_bits;
+  const auto drop_bits = epoch_id & epoch_mask;
 
   keys.erase_if_key(
-    [&](const auto& epoch) { return (epoch & epoch_bits) == drop_bits; });
+    [&](const auto& epoch) { return (epoch & epoch_mask) == drop_bits; });
 }
 
 Result<KeyID>
