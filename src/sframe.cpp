@@ -359,10 +359,10 @@ MLSContext::remove_epoch(EpochID epoch_id)
 void
 MLSContext::purge_epoch(EpochID epoch_id)
 {
-  const auto drop_bits = epoch_id & epoch_bits;
+  const auto drop_bits = epoch_id & epoch_mask;
 
   keys.erase_if_key(
-    [&](const auto& epoch) { return (epoch & epoch_bits) == drop_bits; });
+    [&](const auto& epoch) { return (epoch & epoch_mask) == drop_bits; });
 }
 
 Result<KeyID>
