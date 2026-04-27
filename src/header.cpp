@@ -34,6 +34,11 @@ encode_uint(uint64_t val, output_bytes buffer)
 static Result<uint64_t>
 decode_uint(input_bytes data)
 {
+  if (data.empty()) {
+    return SFrameError(SFrameErrorType::invalid_parameter_error,
+                       "Integer encoding is empty");
+  }
+
   if (!data.empty() && data[0] == 0) {
     return SFrameError(SFrameErrorType::invalid_parameter_error,
                        "Integer is not minimally encoded");
