@@ -71,6 +71,8 @@ enum class CipherSuite : uint16_t
 {
   AES_128_CTR_HMAC_SHA256_80 = 1,
   AES_128_CTR_HMAC_SHA256_64 = 2,
+  // This truncated-HMAC variant offers less forgery resistance than the
+  // larger-tag suites and should only be used for compatibility.
   AES_128_CTR_HMAC_SHA256_32 = 3,
   AES_GCM_128_SHA256 = 4,
   AES_GCM_256_SHA512 = 5,
