@@ -71,8 +71,6 @@ enum class CipherSuite : uint16_t
 {
   AES_128_CTR_HMAC_SHA256_80 = 1,
   AES_128_CTR_HMAC_SHA256_64 = 2,
-  // This truncated-HMAC variant offers less forgery resistance than the
-  // larger-tag suites and should only be used for compatibility.
   AES_128_CTR_HMAC_SHA256_32 = 3,
   AES_GCM_128_SHA256 = 4,
   AES_GCM_256_SHA512 = 5,
@@ -126,8 +124,6 @@ public:
                                output_bytes ciphertext,
                                input_bytes plaintext,
                                input_bytes metadata);
-  // This API authenticates and decrypts a frame, but callers must layer their
-  // own replay protection if they need it.
   Result<output_bytes> unprotect(output_bytes plaintext,
                                  input_bytes ciphertext,
                                  input_bytes metadata);
@@ -182,8 +178,6 @@ public:
                                input_bytes plaintext,
                                input_bytes metadata);
 
-  // This API authenticates and decrypts a frame, but callers must layer their
-  // own replay protection if they need it.
   Result<output_bytes> unprotect(output_bytes plaintext,
                                  input_bytes ciphertext,
                                  input_bytes metadata);

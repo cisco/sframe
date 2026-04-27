@@ -1,6 +1,10 @@
 #include "crypto.h"
 #include "header.h"
 
+#include <openssl/err.h>
+
+#include <climits>
+
 namespace SFRAME_NAMESPACE {
 
 Result<size_t>
@@ -92,6 +96,40 @@ cipher_overhead(CipherSuite suite)
     default:
       return SFrameErrorType::unsupported_ciphersuite_error;
   }
+}
+
+Result<int>
+checked_int(size_t size)
+{
+  if (size > INT_MAX) {
+    return SFrameError(SFrameErrorType::invalid_parameter_error,
+                       "Input too large for OpenSSL");
+  }
+
+  return static_cast<int>(size);
+}
+
+Result<void>
+validate_ctr_size(size_t size)
+{
+  static constexpr uint64_t max_ctr_size = uint64_t(1) << 36;
+  if (uint64_t(size) > max_ctr_size) {
+    return SFrameError(SFrameErrorType::invalid_parameter_error,
+                       "CTR input too large");
+  }
+
+  auto size_int = checked_int(size);
+  if (size_int.is_err()) {
+    return size_int.error();
+  }
+
+  return Result<void>::ok();
+}
+
+void
+clear_openssl_errors()
+{
+  ERR_clear_error();
 }
 
 } // namespace SFRAME_NAMESPACE

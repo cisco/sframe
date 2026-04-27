@@ -9,8 +9,6 @@
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
 
-#include <climits>
-
 namespace SFRAME_NAMESPACE {
 
 ///
@@ -31,23 +29,6 @@ crypto_error::crypto_error()
 {
 }
 #endif
-
-static void
-clear_openssl_errors()
-{
-  ERR_clear_error();
-}
-
-static Result<int>
-checked_int(size_t size)
-{
-  if (size > INT_MAX) {
-    return SFrameError(SFrameErrorType::invalid_parameter_error,
-                       "Input too large for OpenSSL");
-  }
-
-  return static_cast<int>(size);
-}
 
 static Result<const EVP_MD*>
 openssl_digest_type(CipherSuite suite)
@@ -279,23 +260,6 @@ ctr_crypt(CipherSuite suite,
   // null output pointer is fine here.
   if (1 != EVP_EncryptFinal(ctx.get(), nullptr, &outlen)) {
     return SFrameErrorType::crypto_error;
-  }
-
-  return Result<void>::ok();
-}
-
-static Result<void>
-validate_ctr_size(size_t size)
-{
-  static constexpr size_t max_ctr_size = size_t(uint64_t(1) << 32) * 16;
-  if (size > max_ctr_size) {
-    return SFrameError(SFrameErrorType::invalid_parameter_error,
-                       "CTR input too large");
-  }
-
-  if (size > INT_MAX) {
-    return SFrameError(SFrameErrorType::invalid_parameter_error,
-                       "Input too large for OpenSSL");
   }
 
   return Result<void>::ok();
