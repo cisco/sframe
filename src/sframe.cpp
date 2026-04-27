@@ -197,10 +197,6 @@ Context::protect_inner(const Header& header,
 
   SFRAME_VOID_OR_RETURN(require_key(header.key_id));
   const auto& key_and_salt = keys.at(header.key_id);
-  if (key_and_salt.usage != KeyUsage::unprotect) {
-    return SFrameError(SFrameErrorType::invalid_key_usage_error,
-                       "Key is not valid for unprotect");
-  }
 
   SFRAME_VALUE_OR_RETURN(aad, form_aad(header, metadata));
   const auto nonce = form_nonce(header.counter, key_and_salt.salt);
@@ -226,6 +222,10 @@ Context::unprotect_inner(const Header& header,
 
   SFRAME_VOID_OR_RETURN(require_key(header.key_id));
   const auto& key_and_salt = keys.at(header.key_id);
+  if (key_and_salt.usage != KeyUsage::unprotect) {
+    return SFrameError(SFrameErrorType::invalid_key_usage_error,
+                       "Key is not valid for unprotect");
+  }
 
   SFRAME_VALUE_OR_RETURN(aad, form_aad(header, metadata));
   const auto nonce = form_nonce(header.counter, key_and_salt.salt);
