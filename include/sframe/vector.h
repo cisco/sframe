@@ -29,12 +29,14 @@ public:
 
   constexpr vector(std::initializer_list<uint8_t> content)
   {
+    std::fill(_data.begin(), _data.end(), T());
     resize(content.size());
     std::copy(content.begin(), content.end(), _data.begin());
   }
 
   constexpr vector(gsl::span<const T> content)
   {
+    std::fill(_data.begin(), _data.end(), T());
     resize(content.size());
     std::copy(content.begin(), content.end(), _data.begin());
   }
@@ -44,6 +46,7 @@ public:
   template<size_t M>
   constexpr vector(const vector<T, M>& content)
   {
+    std::fill(_data.begin(), _data.end(), T());
     resize(content.size());
     std::copy(content.begin(), content.end(), _data.begin());
   }
