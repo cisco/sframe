@@ -109,9 +109,9 @@ public:
   template<typename F>
   void erase_if_key(F&& f)
   {
-    for (auto iter = this->begin(); iter != this->end();) {
+    for (auto iter = parent::begin(); iter != parent::end();) {
       if (f(iter->first)) {
-        iter = this->erase(iter);
+        iter = parent::erase(iter);
       } else {
         ++iter;
       }

@@ -122,7 +122,7 @@ public:
 
   template<size_t M>
   constexpr vector(const vector<T, M>& content)
-    : parent(content)
+    : parent(content.begin(), content.end())
   {
   }
 
