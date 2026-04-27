@@ -3,6 +3,8 @@
 #include "crypto.h"
 #include "header.h"
 
+#include <limits>
+
 namespace SFRAME_NAMESPACE {
 
 ///
@@ -142,6 +144,11 @@ Context::protect(KeyID key_id,
 {
   SFRAME_VOID_OR_RETURN(require_key(key_id));
   auto& key_record = keys.at(key_id);
+  if (key_record.counter == std::numeric_limits<Counter>::max()) {
+    return SFrameError(SFrameErrorType::invalid_parameter_error,
+                       "Counter exhausted");
+  }
+
   const auto counter = key_record.counter;
   key_record.counter += 1;
 
