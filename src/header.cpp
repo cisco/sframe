@@ -150,6 +150,11 @@ Header::parse(input_bytes buffer)
   }
 
   const auto cfg = ConfigByte{ buffer[0] };
+  if (cfg.encoded_size() > buffer.size()) {
+    return SFrameError(SFrameErrorType::buffer_too_small_error,
+                       "Ciphertext too small to decode header");
+  }
+
   const auto after_cfg = buffer.subspan(1);
   SFRAME_VALUE_OR_RETURN(kid_result, cfg.kid.read(after_cfg));
   const auto [key_id, after_kid] = kid_result;
