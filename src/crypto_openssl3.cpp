@@ -26,6 +26,12 @@ crypto_error::crypto_error()
 }
 #endif
 
+static void
+clear_openssl_errors()
+{
+  ERR_clear_error();
+}
+
 static Result<const EVP_CIPHER*>
 openssl_cipher(CipherSuite suite)
 {
@@ -75,6 +81,7 @@ using scoped_evp_kdf_ctx =
 Result<owned_bytes<max_hkdf_expand_size>>
 hkdf_extract(CipherSuite suite, input_bytes salt, input_bytes ikm)
 {
+  clear_openssl_errors();
   auto mode = EVP_KDF_HKDF_MODE_EXTRACT_ONLY;
   SFRAME_VALUE_OR_RETURN(digest_name, openssl_digest_name(suite));
   auto* salt_ptr =
@@ -111,6 +118,7 @@ hkdf_extract(CipherSuite suite, input_bytes salt, input_bytes ikm)
 Result<owned_bytes<max_hkdf_extract_size>>
 hkdf_expand(CipherSuite suite, input_bytes prk, input_bytes info, size_t size)
 {
+  clear_openssl_errors();
   auto mode = EVP_KDF_HKDF_MODE_EXPAND_ONLY;
   SFRAME_VALUE_OR_RETURN(digest_name, openssl_digest_name(suite));
   auto* prk_ptr = const_cast<void*>(reinterpret_cast<const void*>(prk.data()));
@@ -152,6 +160,7 @@ compute_tag(CipherSuite suite,
             input_bytes ct,
             size_t tag_size)
 {
+  clear_openssl_errors();
   using scoped_evp_mac = std::unique_ptr<EVP_MAC, decltype(&EVP_MAC_free)>;
   using scoped_evp_mac_ctx =
     std::unique_ptr<EVP_MAC_CTX, decltype(&EVP_MAC_CTX_free)>;
@@ -215,6 +224,7 @@ ctr_crypt(CipherSuite suite,
           output_bytes out,
           input_bytes in)
 {
+  clear_openssl_errors();
   if (out.size() != in.size()) {
     return SFrameError(SFrameErrorType::buffer_too_small_error,
                        "CTR size mismatch");
@@ -307,6 +317,7 @@ seal_aead(CipherSuite suite,
           input_bytes aad,
           input_bytes pt)
 {
+  clear_openssl_errors();
   SFRAME_VALUE_OR_RETURN(tag_size, cipher_overhead(suite));
   if (ct.size() < pt.size() + tag_size) {
     return SFrameError(SFrameErrorType::buffer_too_small_error,
@@ -426,6 +437,7 @@ open_aead(CipherSuite suite,
           input_bytes aad,
           input_bytes ct)
 {
+  clear_openssl_errors();
   SFRAME_VALUE_OR_RETURN(tag_size, cipher_overhead(suite));
   if (ct.size() < tag_size) {
     return SFrameError(SFrameErrorType::buffer_too_small_error,

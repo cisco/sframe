@@ -32,6 +32,12 @@ crypto_error::crypto_error()
 }
 #endif
 
+static void
+clear_openssl_errors()
+{
+  ERR_clear_error();
+}
+
 static Result<const EVP_MD*>
 openssl_digest_type(CipherSuite suite)
 {
@@ -90,6 +96,7 @@ public:
 
   static Result<HMAC> create(CipherSuite suite, input_bytes key)
   {
+    clear_openssl_errors();
     SFRAME_VALUE_OR_RETURN(type, openssl_digest_type(suite));
 
     auto ctx = scoped_hmac_ctx(HMAC_CTX_new(), HMAC_CTX_free);
@@ -146,6 +153,7 @@ public:
 Result<owned_bytes<max_hkdf_expand_size>>
 hkdf_extract(CipherSuite suite, input_bytes salt, input_bytes ikm)
 {
+  clear_openssl_errors();
   SFRAME_VALUE_OR_RETURN(h, HMAC::create(suite, salt));
   SFRAME_VOID_OR_RETURN(h.write(ikm));
 
@@ -158,6 +166,7 @@ hkdf_extract(CipherSuite suite, input_bytes salt, input_bytes ikm)
 Result<owned_bytes<max_hkdf_extract_size>>
 hkdf_expand(CipherSuite suite, input_bytes prk, input_bytes info, size_t size)
 {
+  clear_openssl_errors();
   // Ensure that we need only one hash invocation
   if (size > max_hkdf_extract_size) {
     return SFrameError(SFrameErrorType::invalid_parameter_error,
@@ -201,6 +210,7 @@ compute_tag(CipherSuite suite,
             input_bytes ct,
             size_t tag_size)
 {
+  clear_openssl_errors();
   auto len_block = owned_bytes<24>();
   auto len_view = output_bytes(len_block);
   encode_uint(aad.size(), len_view.first(8));
@@ -226,6 +236,7 @@ ctr_crypt(CipherSuite suite,
           output_bytes out,
           input_bytes in)
 {
+  clear_openssl_errors();
   if (out.size() != in.size()) {
     return SFrameError(SFrameErrorType::buffer_too_small_error,
                        "CTR size mismatch");
@@ -318,6 +329,7 @@ seal_aead(CipherSuite suite,
           input_bytes aad,
           input_bytes pt)
 {
+  clear_openssl_errors();
   SFRAME_VALUE_OR_RETURN(tag_size, cipher_overhead(suite));
   if (ct.size() < pt.size() + tag_size) {
     return SFrameError(SFrameErrorType::buffer_too_small_error,
@@ -437,6 +449,7 @@ open_aead(CipherSuite suite,
           input_bytes aad,
           input_bytes ct)
 {
+  clear_openssl_errors();
   SFRAME_VALUE_OR_RETURN(tag_size, cipher_overhead(suite));
   if (ct.size() < tag_size) {
     return SFrameError(SFrameErrorType::buffer_too_small_error,
