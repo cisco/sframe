@@ -11,6 +11,8 @@
 #include <openssl/hmac.h>
 #include <openssl/mem.h>
 
+#include <climits>
+
 namespace SFRAME_NAMESPACE {
 
 ///
@@ -207,6 +209,23 @@ ctr_crypt(CipherSuite suite,
   return Result<void>::ok();
 }
 
+static Result<void>
+validate_ctr_size(size_t size)
+{
+  static constexpr size_t max_ctr_size = size_t(uint64_t(1) << 32) * 16;
+  if (size > max_ctr_size) {
+    return SFrameError(SFrameErrorType::invalid_parameter_error,
+                       "CTR input too large");
+  }
+
+  if (size > INT_MAX) {
+    return SFrameError(SFrameErrorType::invalid_parameter_error,
+                       "Input too large for OpenSSL");
+  }
+
+  return Result<void>::ok();
+}
+
 static Result<output_bytes>
 seal_ctr(CipherSuite suite,
          input_bytes key,
@@ -216,6 +235,7 @@ seal_ctr(CipherSuite suite,
          input_bytes pt)
 {
   SFRAME_VALUE_OR_RETURN(tag_size, cipher_overhead(suite));
+  SFRAME_VOID_OR_RETURN(validate_ctr_size(pt.size()));
   if (ct.size() < pt.size() + tag_size) {
     return SFrameError(SFrameErrorType::buffer_too_small_error,
                        "Ciphertext buffer too small");
@@ -334,6 +354,7 @@ open_ctr(CipherSuite suite,
   }
 
   auto inner_ct_size = ct.size() - tag_size;
+  SFRAME_VOID_OR_RETURN(validate_ctr_size(inner_ct_size));
   auto inner_ct = ct.subspan(0, inner_ct_size);
   auto tag = ct.subspan(inner_ct_size, tag_size);
 
