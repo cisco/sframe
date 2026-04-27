@@ -212,6 +212,8 @@ ctr_crypt(CipherSuite suite,
     return SFrameErrorType::crypto_error;
   }
 
+  // CTR is a streaming mode, so finalization does not emit more bytes and a
+  // null output pointer is fine here.
   if (1 != EVP_EncryptFinal(ctx.get(), nullptr, &outlen)) {
     return SFrameErrorType::crypto_error;
   }
