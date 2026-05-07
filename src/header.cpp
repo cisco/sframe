@@ -1,5 +1,7 @@
 #include "header.h"
 
+#include <algorithm>
+
 namespace SFRAME_NAMESPACE {
 
 static size_t
@@ -23,6 +25,7 @@ void
 encode_uint(uint64_t val, output_bytes buffer)
 {
   size_t size = buffer.size();
+  std::fill(buffer.begin(), buffer.end(), uint8_t(0));
   for (size_t i = 0; i < size && i < 8; i++) {
     buffer[size - i - 1] = uint8_t(val >> (8 * i));
   }
@@ -31,6 +34,11 @@ encode_uint(uint64_t val, output_bytes buffer)
 static Result<uint64_t>
 decode_uint(input_bytes data)
 {
+  if (data.empty()) {
+    return SFrameError(SFrameErrorType::invalid_parameter_error,
+                       "Integer encoding is empty");
+  }
+
   if (!data.empty() && data[0] == 0) {
     return SFrameError(SFrameErrorType::invalid_parameter_error,
                        "Integer is not minimally encoded");
@@ -150,6 +158,11 @@ Header::parse(input_bytes buffer)
   }
 
   const auto cfg = ConfigByte{ buffer[0] };
+  if (cfg.encoded_size() > buffer.size()) {
+    return SFrameError(SFrameErrorType::buffer_too_small_error,
+                       "Ciphertext too small to decode header");
+  }
+
   const auto after_cfg = buffer.subspan(1);
   SFRAME_VALUE_OR_RETURN(kid_result, cfg.kid.read(after_cfg));
   const auto [key_id, after_kid] = kid_result;

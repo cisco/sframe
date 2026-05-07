@@ -15,6 +15,12 @@ Result<size_t>
 cipher_nonce_size(CipherSuite suite);
 Result<size_t>
 cipher_overhead(CipherSuite suite);
+Result<int>
+checked_int(size_t size);
+Result<void>
+validate_ctr_size(size_t size);
+void
+clear_openssl_errors();
 
 ///
 /// HKDF

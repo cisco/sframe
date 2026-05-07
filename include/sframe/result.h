@@ -45,6 +45,8 @@ public:
 
 private:
   SFrameErrorType type_;
+  // Message storage is borrowed; callers must pass a string with static or
+  // otherwise stable lifetime.
   const char* message_ = nullptr;
 };
 

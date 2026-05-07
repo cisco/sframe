@@ -88,6 +88,7 @@ public:
 
   static Result<HMAC> create(CipherSuite suite, input_bytes key)
   {
+    clear_openssl_errors();
     SFRAME_VALUE_OR_RETURN(type, openssl_digest_type(suite));
 
     auto ctx = scoped_hmac_ctx(HMAC_CTX_new(), HMAC_CTX_free);
@@ -95,11 +96,11 @@ public:
     // Some FIPS-enabled libraries are overly conservative in their
     // interpretation of NIST SP 800-131A, which requires HMAC keys to be at
     // least 112 bits long. That document does not impose that requirement on
-    // HKDF, so we disable FIPS enforcement for purposes of HKDF.
+    // HKDF, so this override is limited to the HKDF helper paths in this file.
     //
     // https://doi.org/10.6028/NIST.SP.800-131Ar2
     static const auto fips_min_hmac_key_len = 14;
-    auto key_size = static_cast<int>(key.size());
+    SFRAME_VALUE_OR_RETURN(key_size, checked_int(key.size()));
     if (FIPS_mode() != 0 && key_size < fips_min_hmac_key_len) {
       HMAC_CTX_set_flags(ctx.get(), EVP_MD_CTX_FLAG_NON_FIPS_ALLOW);
     }
@@ -144,6 +145,7 @@ public:
 Result<owned_bytes<max_hkdf_expand_size>>
 hkdf_extract(CipherSuite suite, input_bytes salt, input_bytes ikm)
 {
+  clear_openssl_errors();
   SFRAME_VALUE_OR_RETURN(h, HMAC::create(suite, salt));
   SFRAME_VOID_OR_RETURN(h.write(ikm));
 
@@ -156,6 +158,7 @@ hkdf_extract(CipherSuite suite, input_bytes salt, input_bytes ikm)
 Result<owned_bytes<max_hkdf_extract_size>>
 hkdf_expand(CipherSuite suite, input_bytes prk, input_bytes info, size_t size)
 {
+  clear_openssl_errors();
   // Ensure that we need only one hash invocation
   if (size > max_hkdf_extract_size) {
     return SFrameError(SFrameErrorType::invalid_parameter_error,
@@ -199,6 +202,7 @@ compute_tag(CipherSuite suite,
             input_bytes ct,
             size_t tag_size)
 {
+  clear_openssl_errors();
   auto len_block = owned_bytes<24>();
   auto len_view = output_bytes(len_block);
   encode_uint(aad.size(), len_view.first(8));
@@ -224,6 +228,7 @@ ctr_crypt(CipherSuite suite,
           output_bytes out,
           input_bytes in)
 {
+  clear_openssl_errors();
   if (out.size() != in.size()) {
     return SFrameError(SFrameErrorType::buffer_too_small_error,
                        "CTR size mismatch");
@@ -245,12 +250,14 @@ ctr_crypt(CipherSuite suite,
   }
 
   int outlen = 0;
-  auto in_size_int = static_cast<int>(in.size());
+  SFRAME_VALUE_OR_RETURN(in_size_int, checked_int(in.size()));
   if (1 != EVP_EncryptUpdate(
              ctx.get(), out.data(), &outlen, in.data(), in_size_int)) {
     return SFrameErrorType::crypto_error;
   }
 
+  // CTR is a streaming mode, so finalization does not emit more bytes and a
+  // null output pointer is fine here.
   if (1 != EVP_EncryptFinal(ctx.get(), nullptr, &outlen)) {
     return SFrameErrorType::crypto_error;
   }
@@ -267,6 +274,7 @@ seal_ctr(CipherSuite suite,
          input_bytes pt)
 {
   SFRAME_VALUE_OR_RETURN(tag_size, cipher_overhead(suite));
+  SFRAME_VOID_OR_RETURN(validate_ctr_size(pt.size()));
   if (ct.size() < pt.size() + tag_size) {
     return SFrameError(SFrameErrorType::buffer_too_small_error,
                        "Ciphertext buffer too small");
@@ -298,6 +306,7 @@ seal_aead(CipherSuite suite,
           input_bytes aad,
           input_bytes pt)
 {
+  clear_openssl_errors();
   SFRAME_VALUE_OR_RETURN(tag_size, cipher_overhead(suite));
   if (ct.size() < pt.size() + tag_size) {
     return SFrameError(SFrameErrorType::buffer_too_small_error,
@@ -315,7 +324,7 @@ seal_aead(CipherSuite suite,
   }
 
   int outlen = 0;
-  auto aad_size_int = static_cast<int>(aad.size());
+  SFRAME_VALUE_OR_RETURN(aad_size_int, checked_int(aad.size()));
   if (aad.size() > 0) {
     if (1 != EVP_EncryptUpdate(
                ctx.get(), nullptr, &outlen, aad.data(), aad_size_int)) {
@@ -323,7 +332,7 @@ seal_aead(CipherSuite suite,
     }
   }
 
-  auto pt_size_int = static_cast<int>(pt.size());
+  SFRAME_VALUE_OR_RETURN(pt_size_int, checked_int(pt.size()));
   if (1 != EVP_EncryptUpdate(
              ctx.get(), ct.data(), &outlen, pt.data(), pt_size_int)) {
     return SFrameErrorType::crypto_error;
@@ -337,7 +346,7 @@ seal_aead(CipherSuite suite,
 
   auto tag = ct.subspan(pt.size(), tag_size);
   auto tag_ptr = const_cast<void*>(static_cast<const void*>(tag.data()));
-  auto tag_size_downcast = static_cast<int>(tag.size());
+  SFRAME_VALUE_OR_RETURN(tag_size_downcast, checked_int(tag.size()));
   if (1 != EVP_CIPHER_CTX_ctrl(
              ctx.get(), EVP_CTRL_GCM_GET_TAG, tag_size_downcast, tag_ptr)) {
     return SFrameErrorType::crypto_error;
@@ -385,6 +394,7 @@ open_ctr(CipherSuite suite,
   }
 
   auto inner_ct_size = ct.size() - tag_size;
+  SFRAME_VOID_OR_RETURN(validate_ctr_size(inner_ct_size));
   auto inner_ct = ct.subspan(0, inner_ct_size);
   auto tag = ct.subspan(inner_ct_size, tag_size);
 
@@ -416,6 +426,7 @@ open_aead(CipherSuite suite,
           input_bytes aad,
           input_bytes ct)
 {
+  clear_openssl_errors();
   SFRAME_VALUE_OR_RETURN(tag_size, cipher_overhead(suite));
   if (ct.size() < tag_size) {
     return SFrameError(SFrameErrorType::buffer_too_small_error,
@@ -440,14 +451,14 @@ open_aead(CipherSuite suite,
 
   auto tag = ct.subspan(inner_ct_size, tag_size);
   auto tag_ptr = const_cast<void*>(static_cast<const void*>(tag.data()));
-  auto tag_size_downcast = static_cast<int>(tag.size());
+  SFRAME_VALUE_OR_RETURN(tag_size_downcast, checked_int(tag.size()));
   if (1 != EVP_CIPHER_CTX_ctrl(
              ctx.get(), EVP_CTRL_GCM_SET_TAG, tag_size_downcast, tag_ptr)) {
     return SFrameErrorType::crypto_error;
   }
 
   int out_size;
-  auto aad_size_int = static_cast<int>(aad.size());
+  SFRAME_VALUE_OR_RETURN(aad_size_int, checked_int(aad.size()));
   if (aad.size() > 0) {
     if (1 != EVP_DecryptUpdate(
                ctx.get(), nullptr, &out_size, aad.data(), aad_size_int)) {
@@ -455,7 +466,7 @@ open_aead(CipherSuite suite,
     }
   }
 
-  auto inner_ct_size_int = static_cast<int>(inner_ct_size);
+  SFRAME_VALUE_OR_RETURN(inner_ct_size_int, checked_int(inner_ct_size));
   if (1 != EVP_DecryptUpdate(
              ctx.get(), pt.data(), &out_size, ct.data(), inner_ct_size_int)) {
     return SFrameErrorType::crypto_error;

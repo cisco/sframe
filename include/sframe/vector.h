@@ -29,12 +29,14 @@ public:
 
   constexpr vector(std::initializer_list<uint8_t> content)
   {
+    std::fill(_data.begin(), _data.end(), T());
     resize(content.size());
     std::copy(content.begin(), content.end(), _data.begin());
   }
 
   constexpr vector(gsl::span<const T> content)
   {
+    std::fill(_data.begin(), _data.end(), T());
     resize(content.size());
     std::copy(content.begin(), content.end(), _data.begin());
   }
@@ -44,6 +46,7 @@ public:
   template<size_t M>
   constexpr vector(const vector<T, M>& content)
   {
+    std::fill(_data.begin(), _data.end(), T());
     resize(content.size());
     std::copy(content.begin(), content.end(), _data.begin());
   }
@@ -95,15 +98,8 @@ public:
 
 namespace SFRAME_NAMESPACE {
 
-// NOTE: NOT RECOMMENDED FOR USE OUTSIDE THIS LIBRARY
-//
-// We have used public inheritance from std::vector<T> to simplify the interface
-// here.  This works fine for the use cases we have within this library.  If you
-// choose to use this vector type outside this library, you MUST NOT store it as
-// a std::vector<T> pointer or reference.  This will cause memory leaks, because
-// the destructor ~std::vector<T> is not virtual.
 template<typename T, size_t N>
-class vector : public std::vector<T>
+class vector : private std::vector<T>
 {
 private:
   using parent = std::vector<T>;
@@ -126,9 +122,25 @@ public:
 
   template<size_t M>
   constexpr vector(const vector<T, M>& content)
-    : parent(content)
+    : parent(content.begin(), content.end())
   {
   }
+
+  T* data() { return parent::data(); }
+  const T* data() const { return parent::data(); }
+
+  auto begin() const { return parent::begin(); }
+  auto begin() { return parent::begin(); }
+
+  auto end() const { return parent::end(); }
+  auto end() { return parent::end(); }
+
+  auto size() const { return parent::size(); }
+  auto capacity() const { return parent::capacity(); }
+  void resize(size_t size) { parent::resize(size); }
+
+  auto& operator[](size_t i) { return parent::operator[](i); }
+  const auto& operator[](size_t i) const { return parent::operator[](i); }
 
   void append(gsl::span<const T> content)
   {
@@ -136,6 +148,13 @@ public:
     this->resize(start + content.size());
     std::copy(content.begin(), content.end(), this->begin() + start);
   }
+
+  operator gsl::span<const T>() const
+  {
+    return gsl::span(parent::data(), parent::size());
+  }
+
+  operator gsl::span<T>() { return gsl::span(parent::data(), parent::size()); }
 };
 
 } // namespace SFRAME_NAMESPACE
