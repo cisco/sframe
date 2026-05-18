@@ -114,3 +114,41 @@ jobs:
     - name: build
       run: cmake --build "${{ env.CMAKE_BUILD_DIR }}" --config Release
 
+  fuzz:
+    runs-on: ubuntu-latest
+    env:
+      CMAKE_BUILD_DIR: ${{ github.workspace }}/build-fuzz
+      CMAKE_GENERATOR: "Ninja"
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: dependencies
+      run: |
+        sudo apt-get install -y nasm ninja-build
+
+    - name: Restore cache
+      uses: actions/cache@v4
+      with:
+        path: |
+            ${{ env.CMAKE_BUILD_DIR }}/vcpkg_installed
+        key: fuzz-${{ hashFiles( '**/vcpkg.json' ) }}
+
+    - name: configure
+      run: cmake -B "${{ env.CMAKE_BUILD_DIR }}"
+                 -DFUZZING=ON
+                 -DSANITIZERS=ON
+                 -DCMAKE_CXX_COMPILER=clang++
+                 -DCMAKE_C_COMPILER=clang
+                 -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+                 -DCRYPTO="BORINGSSL"
+                 -DVCPKG_MANIFEST_DIR="alternatives/BORINGSSL"
+
+    - name: build
+      run: cmake --build "${{ env.CMAKE_BUILD_DIR }}"
+
+    - name: run fuzz_header
+      run: ${{ env.CMAKE_BUILD_DIR }}/fuzz/fuzz_header -max_total_time=60
+
+    - name: run fuzz_unprotect
+      run: ${{ env.CMAKE_BUILD_DIR }}/fuzz/fuzz_unprotect -max_total_time=60

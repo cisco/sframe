@@ -123,3 +123,11 @@ if(TESTING)
   enable_testing()
   add_subdirectory(test)
 endif()
+
+###
+### Fuzzers
+###
+option(FUZZING "Build fuzz targets" OFF)
+if(FUZZING)
+  add_subdirectory(fuzz)
+endif()
