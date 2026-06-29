@@ -5,10 +5,12 @@
 #include <memory>
 #include <vector>
 
-#include <gsl/gsl-lite.hpp>
+#include <gsl-lite/gsl-lite.hpp>
 #include <namespace.h>
 
 namespace SFRAME_NAMESPACE {
+
+namespace gsl = ::gsl_lite;
 
 struct openssl_error : std::runtime_error
 {

@@ -104,7 +104,7 @@ set_directory_properties( PROPERTIES EP_PREFIX ${CMAKE_BINARY_DIR}/third_party )
 ExternalProject_Add(
     gsl-extern
     GIT_REPOSITORY ${GSL_LITE_URL}
-    GIT_TAG v0.37.0
+    GIT_TAG v1.1.0
     TIMEOUT 10
     UPDATE_COMMAND ""
     CONFIGURE_COMMAND ""
