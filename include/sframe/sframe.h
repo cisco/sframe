@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <iosfwd>
 #include <map>
 #include <memory>
