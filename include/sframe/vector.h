@@ -4,14 +4,10 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <gsl-lite/gsl-lite.hpp>
 #include <initializer_list>
 #include <namespace.h>
+#include <sframe/span.h>
 #include <stdexcept>
-
-namespace SFRAME_NAMESPACE {
-namespace gsl = ::gsl_lite;
-}
 
 #ifdef NO_ALLOC
 
@@ -44,7 +40,7 @@ public:
     std::copy(content.begin(), content.end(), _data.begin());
   }
 
-  constexpr vector(gsl::span<const T> content)
+  constexpr vector(span<const T> content)
   {
     std::fill(_data.begin(), _data.end(), T());
     resize(content.size());
@@ -86,7 +82,7 @@ public:
     _data.at(_size - 1) = item;
   }
 
-  void append(gsl::span<const T> content)
+  void append(span<const T> content)
   {
     const auto start = _size;
     resize(_size + content.size());
@@ -96,8 +92,8 @@ public:
   auto& operator[](size_t i) { return _data.at(i); }
   const auto& operator[](size_t i) const { return _data.at(i); }
 
-  operator gsl::span<const T>() const { return gsl::span(_data).first(_size); }
-  operator gsl::span<T>() { return gsl::span(_data).first(_size); }
+  operator span<const T>() const { return span<const T>(_data.data(), _size); }
+  operator span<T>() { return span<T>(_data.data(), _size); }
 };
 
 } // namespace SFRAME_NAMESPACE
@@ -125,7 +121,7 @@ public:
   {
   }
 
-  constexpr vector(gsl::span<const T> content)
+  constexpr vector(span<const T> content)
     : parent(content.begin(), content.end())
   {
   }
@@ -152,19 +148,19 @@ public:
   auto& operator[](size_t i) { return parent::operator[](i); }
   const auto& operator[](size_t i) const { return parent::operator[](i); }
 
-  void append(gsl::span<const T> content)
+  void append(span<const T> content)
   {
     const auto start = this->size();
     this->resize(start + content.size());
     std::copy(content.begin(), content.end(), this->begin() + start);
   }
 
-  operator gsl::span<const T>() const
+  operator span<const T>() const
   {
-    return gsl::span(parent::data(), parent::size());
+    return span<const T>(parent::data(), parent::size());
   }
 
-  operator gsl::span<T>() { return gsl::span(parent::data(), parent::size()); }
+  operator span<T>() { return span<T>(parent::data(), parent::size()); }
 };
 
 } // namespace SFRAME_NAMESPACE

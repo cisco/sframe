@@ -2,11 +2,11 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <gsl-lite/gsl-lite.hpp>
 #include <optional>
 
 #include <sframe/map.h>
 #include <sframe/result.h>
+#include <sframe/span.h>
 #include <sframe/vector.h>
 
 #ifdef __cpp_exceptions
@@ -32,8 +32,6 @@
 #endif
 
 namespace SFRAME_NAMESPACE {
-
-namespace gsl = ::gsl_lite;
 
 #ifdef __cpp_exceptions
 struct crypto_error : std::runtime_error
@@ -85,8 +83,8 @@ enum class CipherSuite : uint16_t
   AES_GCM_256_SHA512 = 5,
 };
 
-using input_bytes = gsl::span<const uint8_t>;
-using output_bytes = gsl::span<uint8_t>;
+using input_bytes = span<const uint8_t>;
+using output_bytes = span<uint8_t>;
 
 template<size_t N>
 using owned_bytes = vector<uint8_t, N>;
