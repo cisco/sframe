@@ -359,8 +359,10 @@ MLSContext::EpochKeys::base_key(CipherSuite ciphersuite,
   auto enc_sender_id = owned_bytes<8>();
   encode_uint(sender_id, enc_sender_id);
 
-  return hkdf_expand(
-    ciphersuite, sframe_epoch_secret, enc_sender_id, hash_size);
+  SFRAME_VALUE_OR_RETURN(
+    expanded,
+    hkdf_expand(ciphersuite, sframe_epoch_secret, enc_sender_id, hash_size));
+  return owned_bytes<max_secret_size>(expanded);
 }
 
 void

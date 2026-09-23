@@ -27,7 +27,7 @@ clear_openssl_errors();
 ///
 
 static constexpr size_t max_hkdf_extract_size = 64;
-static constexpr size_t max_hkdf_expand_size = 64;
+static constexpr size_t max_hkdf_expand_size = 96;
 
 Result<owned_bytes<max_hkdf_extract_size>>
 hkdf_extract(CipherSuite suite, input_bytes salt, input_bytes ikm);

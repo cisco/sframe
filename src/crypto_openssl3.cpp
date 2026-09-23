@@ -38,6 +38,11 @@ openssl_cipher(CipherSuite suite)
     case CipherSuite::AES_128_CTR_HMAC_SHA256_32:
       return EVP_aes_128_ctr();
 
+    case CipherSuite::AES_256_CTR_HMAC_SHA512_80:
+    case CipherSuite::AES_256_CTR_HMAC_SHA512_64:
+    case CipherSuite::AES_256_CTR_HMAC_SHA512_32:
+      return EVP_aes_256_ctr();
+
     case CipherSuite::AES_GCM_128_SHA256:
       return EVP_aes_128_gcm();
 
@@ -60,6 +65,9 @@ openssl_digest_name(CipherSuite suite)
       return std::string(OSSL_DIGEST_NAME_SHA2_256);
 
     case CipherSuite::AES_GCM_256_SHA512:
+    case CipherSuite::AES_256_CTR_HMAC_SHA512_80:
+    case CipherSuite::AES_256_CTR_HMAC_SHA512_64:
+    case CipherSuite::AES_256_CTR_HMAC_SHA512_32:
       return std::string(OSSL_DIGEST_NAME_SHA2_512);
 
     default:
@@ -75,7 +83,7 @@ using scoped_evp_kdf = std::unique_ptr<EVP_KDF, decltype(&EVP_KDF_free)>;
 using scoped_evp_kdf_ctx =
   std::unique_ptr<EVP_KDF_CTX, decltype(&EVP_KDF_CTX_free)>;
 
-Result<owned_bytes<max_hkdf_expand_size>>
+Result<owned_bytes<max_hkdf_extract_size>>
 hkdf_extract(CipherSuite suite, input_bytes salt, input_bytes ikm)
 {
   clear_openssl_errors();
@@ -104,7 +112,7 @@ hkdf_extract(CipherSuite suite, input_bytes salt, input_bytes ikm)
   }
 
   const auto digest_size = EVP_KDF_CTX_get_kdf_size(ctx.get());
-  auto out = owned_bytes<max_hkdf_expand_size>(digest_size);
+  auto out = owned_bytes<max_hkdf_extract_size>(digest_size);
   if (1 != EVP_KDF_derive(ctx.get(), out.data(), out.size(), nullptr)) {
     return SFrameErrorType::crypto_error;
   }
@@ -112,7 +120,7 @@ hkdf_extract(CipherSuite suite, input_bytes salt, input_bytes ikm)
   return out;
 }
 
-Result<owned_bytes<max_hkdf_extract_size>>
+Result<owned_bytes<max_hkdf_expand_size>>
 hkdf_expand(CipherSuite suite, input_bytes prk, input_bytes info, size_t size)
 {
   clear_openssl_errors();
@@ -359,7 +367,10 @@ seal(CipherSuite suite,
   switch (suite) {
     case CipherSuite::AES_128_CTR_HMAC_SHA256_80:
     case CipherSuite::AES_128_CTR_HMAC_SHA256_64:
-    case CipherSuite::AES_128_CTR_HMAC_SHA256_32: {
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_32:
+    case CipherSuite::AES_256_CTR_HMAC_SHA512_80:
+    case CipherSuite::AES_256_CTR_HMAC_SHA512_64:
+    case CipherSuite::AES_256_CTR_HMAC_SHA512_32: {
       return seal_ctr(suite, key, nonce, ct, aad, pt);
     }
 
@@ -485,7 +496,10 @@ open(CipherSuite suite,
   switch (suite) {
     case CipherSuite::AES_128_CTR_HMAC_SHA256_80:
     case CipherSuite::AES_128_CTR_HMAC_SHA256_64:
-    case CipherSuite::AES_128_CTR_HMAC_SHA256_32: {
+    case CipherSuite::AES_128_CTR_HMAC_SHA256_32:
+    case CipherSuite::AES_256_CTR_HMAC_SHA512_80:
+    case CipherSuite::AES_256_CTR_HMAC_SHA512_64:
+    case CipherSuite::AES_256_CTR_HMAC_SHA512_32: {
       return open_ctr(suite, key, nonce, pt, aad, ct);
     }
 
