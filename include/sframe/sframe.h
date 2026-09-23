@@ -6,12 +6,10 @@
 #include <memory>
 #include <vector>
 
-#include <gsl-lite/gsl-lite.hpp>
 #include <namespace.h>
+#include <sframe/span.h>
 
 namespace SFRAME_NAMESPACE {
-
-namespace gsl = ::gsl_lite;
 
 struct openssl_error : std::runtime_error
 {
@@ -51,8 +49,8 @@ enum class CipherSuite : uint16_t
 constexpr size_t max_overhead = 17 + 16;
 
 using bytes = std::vector<uint8_t>;
-using input_bytes = gsl::span<const uint8_t>;
-using output_bytes = gsl::span<uint8_t>;
+using input_bytes = span<const uint8_t>;
+using output_bytes = span<uint8_t>;
 
 std::ostream&
 operator<<(std::ostream& str, const input_bytes data);
