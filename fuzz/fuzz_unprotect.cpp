@@ -21,7 +21,7 @@ LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
   }
 
   // Use the first byte to select a cipher suite, remaining bytes as ciphertext.
-  auto suite = static_cast<CipherSuite>((data[0] % 5) + 1);
+  auto suite = static_cast<CipherSuite>((data[0] % 8) + 1);
   auto ciphertext = input_bytes(data + 1, size - 1);
 
   auto ctx = Context(suite);

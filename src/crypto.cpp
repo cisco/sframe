@@ -18,6 +18,9 @@ cipher_digest_size(CipherSuite suite)
       return 32;
 
     case CipherSuite::AES_GCM_256_SHA512:
+    case CipherSuite::AES_256_CTR_HMAC_SHA512_80:
+    case CipherSuite::AES_256_CTR_HMAC_SHA512_64:
+    case CipherSuite::AES_256_CTR_HMAC_SHA512_32:
       return 64;
 
     default:
@@ -34,6 +37,12 @@ cipher_key_size(CipherSuite suite)
     case CipherSuite::AES_128_CTR_HMAC_SHA256_32:
       // 16-byte AES key + 32-byte HMAC key
       return 48;
+
+    case CipherSuite::AES_256_CTR_HMAC_SHA512_80:
+    case CipherSuite::AES_256_CTR_HMAC_SHA512_64:
+    case CipherSuite::AES_256_CTR_HMAC_SHA512_32:
+      // 32-byte AES key + 64-byte HMAC key
+      return 96;
 
     case CipherSuite::AES_GCM_128_SHA256:
       return 16;
@@ -55,6 +64,11 @@ cipher_enc_key_size(CipherSuite suite)
     case CipherSuite::AES_128_CTR_HMAC_SHA256_32:
       return 16;
 
+    case CipherSuite::AES_256_CTR_HMAC_SHA512_80:
+    case CipherSuite::AES_256_CTR_HMAC_SHA512_64:
+    case CipherSuite::AES_256_CTR_HMAC_SHA512_32:
+      return 32;
+
     default:
       return SFrameErrorType::unsupported_ciphersuite_error;
   }
@@ -69,6 +83,9 @@ cipher_nonce_size(CipherSuite suite)
     case CipherSuite::AES_128_CTR_HMAC_SHA256_32:
     case CipherSuite::AES_GCM_128_SHA256:
     case CipherSuite::AES_GCM_256_SHA512:
+    case CipherSuite::AES_256_CTR_HMAC_SHA512_80:
+    case CipherSuite::AES_256_CTR_HMAC_SHA512_64:
+    case CipherSuite::AES_256_CTR_HMAC_SHA512_32:
       return 12;
 
     default:
@@ -81,12 +98,15 @@ cipher_overhead(CipherSuite suite)
 {
   switch (suite) {
     case CipherSuite::AES_128_CTR_HMAC_SHA256_80:
+    case CipherSuite::AES_256_CTR_HMAC_SHA512_80:
       return 10; // 80-bit tag
 
     case CipherSuite::AES_128_CTR_HMAC_SHA256_64:
+    case CipherSuite::AES_256_CTR_HMAC_SHA512_64:
       return 8; // 64-bit tag
 
     case CipherSuite::AES_128_CTR_HMAC_SHA256_32:
+    case CipherSuite::AES_256_CTR_HMAC_SHA512_32:
       return 4; // 32-bit tag
 
     case CipherSuite::AES_GCM_128_SHA256:

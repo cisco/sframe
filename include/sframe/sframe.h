@@ -81,6 +81,9 @@ enum class CipherSuite : uint16_t
   AES_128_CTR_HMAC_SHA256_32 = 3,
   AES_GCM_128_SHA256 = 4,
   AES_GCM_256_SHA512 = 5,
+  AES_256_CTR_HMAC_SHA512_80 = 6,
+  AES_256_CTR_HMAC_SHA512_64 = 7,
+  AES_256_CTR_HMAC_SHA512_32 = 8,
 };
 
 using input_bytes = span<const uint8_t>;
@@ -106,7 +109,8 @@ struct KeyRecord
                                          KeyUsage usage,
                                          input_bytes base_key);
 
-  static constexpr size_t max_key_size = 48;
+  // 32-byte AES-256 key + 64-byte HMAC-SHA512 key
+  static constexpr size_t max_key_size = 96;
   static constexpr size_t max_salt_size = 12;
 
   owned_bytes<max_key_size> key;
