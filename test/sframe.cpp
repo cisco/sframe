@@ -4,9 +4,23 @@
 #include <sframe/sframe.h>
 
 #include <iostream>
-#include <map>       // for map
+#include <map> // for map
+#include <sstream>
 #include <stdexcept> // for invalid_argument
 #include <string>    // for basic_string, operator==
+
+namespace doctest {
+template<>
+struct StringMaker<SFRAME_NAMESPACE::bytes>
+{
+  static String convert(const SFRAME_NAMESPACE::bytes& value)
+  {
+    std::ostringstream stream;
+    SFRAME_NAMESPACE::operator<<(stream, SFRAME_NAMESPACE::input_bytes(value));
+    return stream.str().c_str();
+  }
+};
+} // namespace doctest
 
 using namespace SFRAME_NAMESPACE;
 

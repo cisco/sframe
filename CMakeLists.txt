@@ -36,7 +36,9 @@ configure_file(
   @ONLY
 )
 
-set(CMAKE_CXX_STANDARD 11)
+if(NOT DEFINED CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 11)
+endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
   add_compile_options(-Wall -pedantic -Wextra -Werror -Wmissing-declarations)
@@ -135,6 +137,9 @@ file(GLOB_RECURSE LIB_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src
 add_library(${LIB_NAME} ${LIB_HEADERS} ${LIB_GENERATED_HEADERS} ${LIB_SOURCES})
 add_dependencies(${LIB_NAME} gsl)
 target_link_libraries(${LIB_NAME} PRIVATE gsl OpenSSL::Crypto)
+if(CMAKE_CXX_STANDARD GREATER_EQUAL 20)
+  target_compile_definitions(${LIB_NAME} PUBLIC SFRAME_USE_STD_SPAN)
+endif()
 target_include_directories(${LIB_NAME}
   PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>

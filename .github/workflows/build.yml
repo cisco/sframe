@@ -20,6 +20,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
+        cxx-standard: [11, 20]
         include:
             - os: windows-latest
               vcpkg-cmake-file: "$env:VCPKG_INSTALLATION_ROOT\\scripts\\buildsystems\\vcpkg.cmake"
@@ -50,11 +51,11 @@ jobs:
       with:
         path: |
             ${{ env.CMAKE_BUILD_DIR }}/vcpkg_installed
-        key: ${{ runner.os }}-${{ hashFiles( '**/vcpkg.json' ) }}
+        key: ${{ runner.os }}-cxx${{ matrix.cxx-standard }}-${{ hashFiles( '**/vcpkg.json' ) }}
 
     - name: configure to use clang-tidy and sanitizers      
       run: |
-        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DCLANG_TIDY=ON -DTESTING=ON -DSANITIZERS=ON -DCMAKE_TOOLCHAIN_FILE="${{ matrix.vcpkg-cmake-file}}" .
+        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DCMAKE_CXX_STANDARD=${{ matrix.cxx-standard }} -DCLANG_TIDY=ON -DTESTING=ON -DSANITIZERS=ON -DCMAKE_TOOLCHAIN_FILE="${{ matrix.vcpkg-cmake-file}}" .
 
     - name: build
       run: |
